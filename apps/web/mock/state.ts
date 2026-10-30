@@ -102,7 +102,7 @@ function device(id: string, kind: Schemas["DeviceKind"], name: string, secret: s
     name,
     secret,
     status: "ACTIVE",
-    idleTimerIntervalMilliseconds: 20000,
+    idleTimerIntervalMilliseconds: 30000,
     printerEnabled: false,
     maintenanceMode: false,
     atCapacityMode: false,
