@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 export const ADMIN_SECTIONS = [
   { href: "/admin", label: "Início" },
   { href: "/admin/esgotados", label: "Esgotados" },
+  { href: "/admin/relatorio", label: "Relatório" },
   { href: "/admin/cardapios", label: "Cardápios" },
   { href: "/admin/categorias", label: "Categorias" },
   { href: "/admin/itens", label: "Itens" },

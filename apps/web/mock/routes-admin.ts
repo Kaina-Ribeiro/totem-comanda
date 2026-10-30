@@ -330,3 +330,48 @@ adminRoutes.push(
     }),
   ],
 );
+
+const PAID_STATUSES = new Set(["PAID", "PREPARING", "READY", "COLLECTED"]);
+
+adminRoutes.push([
+  "GET",
+  /^\/v1\/admin\/reports\/daily$/,
+  owner((req) => {
+    const date = req.query.get("date") ?? "";
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date))
+      return problem(422, "VALIDATION_FAILED", "Validation failed", "date");
+    const orders = [...state.orders.values()].filter(
+      (o) => o.businessDate === date && PAID_STATUSES.has(o.status),
+    );
+    const revenue = orders.reduce((sum, o) => sum + o.orderTotal.total, 0);
+    const byType = (type: Schemas["OrderType"]) => {
+      const list = orders.filter((o) => o.orderType === type);
+      return { orders: list.length, revenue: list.reduce((sum, o) => sum + o.orderTotal.total, 0) };
+    };
+    const sellers = new Map<
+      string,
+      { itemId: string; name: string; quantity: number; revenue: number }
+    >();
+    for (const line of orders.flatMap((o) => o.orderItems)) {
+      const entry = sellers.get(line.itemId) ?? {
+        itemId: line.itemId,
+        name: line.name,
+        quantity: 0,
+        revenue: 0,
+      };
+      entry.quantity += line.quantity;
+      entry.revenue += line.lineTotal;
+      sellers.set(line.itemId, entry);
+    }
+    return ok({
+      date,
+      ordersCount: orders.length,
+      revenue,
+      averageTicket: orders.length ? Math.round(revenue / orders.length) : 0,
+      byOrderType: { DINEIN: byType("DINEIN"), TAKE_OUT: byType("TAKE_OUT") },
+      bestSellers: [...sellers.values()]
+        .sort((a, b) => b.quantity - a.quantity || b.revenue - a.revenue)
+        .slice(0, 10),
+    } satisfies Schemas["DailyReport"]);
+  }),
+]);
