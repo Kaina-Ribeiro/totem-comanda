@@ -363,3 +363,86 @@ catalogueRoutes.push(
     }),
   ],
 );
+
+function discountProblem(input: Partial<Schemas["DiscountInput"]> | null): string | null {
+  if (input?.type !== "COMANDA_COUPON" && input?.type !== "RESTAURANT_DISCOUNT") return "type";
+  if (!/^[A-Z0-9]{3,20}$/.test(input.code ?? "")) return "code";
+  if (!input.title?.["pt-BR"]?.trim()) return "title";
+  if (input.kind !== "PERCENT" && input.kind !== "FIXED") return "kind";
+  const value = input.value ?? 0;
+  if (!Number.isInteger(value) || value < 1 || (input.kind === "PERCENT" && value > 100))
+    return "value";
+  for (const field of ["validFrom", "validTo"] as const) {
+    const at = input[field];
+    if (at && Number.isNaN(Date.parse(at))) return field;
+  }
+  if (
+    input.validFrom &&
+    input.validTo &&
+    Date.parse(input.validTo) <= Date.parse(input.validFrom)
+  ) {
+    return "validTo";
+  }
+  if (typeof input.active !== "boolean") return "active";
+  return null;
+}
+
+const codeTaken = (code: string, except?: string) =>
+  catalogue().discounts.some((d) => d.id !== except && d.code.toUpperCase() === code.toUpperCase());
+
+const discountOf = (input: Schemas["DiscountInput"], id: string): Schemas["AdminDiscount"] => ({
+  id,
+  type: input.type,
+  code: input.code,
+  title: input.title,
+  ...(input.description ? { description: input.description } : {}),
+  kind: input.kind,
+  value: input.value,
+  validFrom: input.validFrom ?? null,
+  validTo: input.validTo ?? null,
+  active: input.active,
+});
+
+catalogueRoutes.push(
+  ["GET", /^\/v1\/admin\/discounts$/, owner(() => ok(catalogue().discounts))],
+  [
+    "POST",
+    /^\/v1\/admin\/discounts$/,
+    owner((req) => {
+      const input = req.body as Schemas["DiscountInput"];
+      const bad = discountProblem(input);
+      if (bad) return invalid(bad);
+      if (codeTaken(input.code)) {
+        return problem(409, "DISCOUNT_CODE_TAKEN", "Code already used by another discount");
+      }
+      const discount = discountOf(input, newId("dsc"));
+      catalogue().discounts.push(discount);
+      return ok(discount, 201);
+    }),
+  ],
+  [
+    "PUT",
+    /^\/v1\/admin\/discounts\/([^/]+)$/,
+    owner((req, [discountId]) => {
+      const index = catalogue().discounts.findIndex((d) => d.id === discountId);
+      if (index === -1) return notFound();
+      const input = req.body as Schemas["DiscountInput"];
+      const bad = discountProblem(input);
+      if (bad) return invalid(bad);
+      if (codeTaken(input.code, discountId)) {
+        return problem(409, "DISCOUNT_CODE_TAKEN", "Code already used by another discount");
+      }
+      catalogue().discounts[index] = discountOf(input, discountId);
+      return ok(catalogue().discounts[index]);
+    }),
+  ],
+  [
+    "DELETE",
+    /^\/v1\/admin\/discounts\/([^/]+)$/,
+    owner((_req, [discountId]) => {
+      if (!catalogue().discounts.some((d) => d.id === discountId)) return notFound();
+      catalogue().discounts = catalogue().discounts.filter((d) => d.id !== discountId);
+      return { status: 204 };
+    }),
+  ],
+);
