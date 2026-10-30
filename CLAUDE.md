@@ -69,14 +69,17 @@ api/                      Go Core API (partner)
 
 | Phase | Goal | Done when |
 |:--|:--|:--|
-| 0 | Foundation: Next.js app, BFF, device auth, config, heartbeat, PWA shell | A locked kiosk reaches the API |
+| 0 | Foundation: Next.js app, BFF, device auth, config, heartbeat, PWA shell, HTTPS deploy | The kiosk, in a regular browser over the server's HTTPS address, reaches the Go API |
 | 1 | Back office and menus: catalogue, schedules, sold out, discounts | The menu switches by itself |
 | 2 | Kiosk ordering: full flow, PT/EN, coupons, simulated payment, number on screen | A real order on the unit |
 | 3 | Kitchen screen (SSE) and daily report | Order in the kitchen in 2 s |
-| 4 | Payment terminal, receipt and kitchen printers, NFC-e | Real sale, valid NFC-e |
+| 4 | Kiosk board (Orange Pi, Chromium kiosk, measurements), payment terminal, receipt and kitchen printers, NFC-e | Real sale, valid NFC-e, on a locked kiosk |
 | 5 | Pilot at the bakery | Owner keeps it running |
 
-Everything that is hardware beyond the screen (payment terminal, printers) is phase 4.
+Everything that is hardware is phase 4, last: the kiosk board itself, the payment terminal and the
+printers (Kai, 30 Oct 2026; this overrides `docs/plan.md`, which had the board in phase 0). Until
+then the kiosk is developed and tested in a regular desktop browser at 1080x1920; the board setup
+kit waits in `infra/kiosk/`.
 Until then: simulated payment (`POST /v1/payments/{id}/simulate`) and the order number on screen only.
 
 The `x-phase` field on each contract operation says which phase needs it.
@@ -99,7 +102,8 @@ The `x-phase` field on each contract operation says which phase needs it.
   the item builder and the idle timer.
 - Images through `next/image`, sized for 1080x1920; cached by the service worker.
 - CSS transitions only. No blur or heavy shadows in animation.
-- Measure the bundle with the Next.js bundle analyzer and test on the real board in phase 0.
+- Keep the bundle in check with `npm run analyze` (baseline: ~181 KB gzip of JS on `/kiosk`); the
+  real board is tested in phase 4, so do not let client code grow without a reason.
 
 ## Design
 
