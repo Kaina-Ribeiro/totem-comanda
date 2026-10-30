@@ -153,6 +153,16 @@ export function KioskJourney({
           strings={strings}
           canChangeOrderType={settings.orderTypes.length > 1}
           onChangeOrderType={() => dispatch({ type: "changeOrderType" })}
+          onPickItem={(item) => {
+            // Items with nothing to choose go straight in (F-MENU-03); the item builder is COM-35.
+            if ((item.optionGroups ?? []).length === 0) {
+              dispatch({
+                type: "addLine",
+                line: { guid: crypto.randomUUID(), itemId: item.id, quantity: 1, options: [] },
+              });
+            }
+          }}
+          onOpenBasket={() => {}}
           onCancel={reset}
         />
       );

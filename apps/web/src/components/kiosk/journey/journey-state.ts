@@ -1,4 +1,5 @@
 import type { components } from "@/lib/core-api";
+import type { BasketLine } from "@/lib/kiosk/menu-view";
 import type { Language, Strings } from "@/lib/kiosk/strings";
 
 type Schemas = components["schemas"];
@@ -15,6 +16,8 @@ export type Journey = {
   menu: Menu | null;
   strings: Strings | null;
   orderType: OrderType | null;
+  /** What the kiosk sends: item and option ids with quantities, never prices. */
+  basket: BasketLine[];
 };
 
 export type JourneyAction =
@@ -33,6 +36,7 @@ export type JourneyAction =
   | { type: "relocalized"; language: Language; menu: Menu; strings: Strings }
   | { type: "orderType"; orderType: OrderType }
   | { type: "changeOrderType" }
+  | { type: "addLine"; line: BasketLine }
   | { type: "reset"; language: Language };
 
 export function initialJourney(language: Language): Journey {
@@ -44,6 +48,7 @@ export function initialJourney(language: Language): Journey {
     menu: null,
     strings: null,
     orderType: null,
+    basket: [],
   };
 }
 
@@ -74,6 +79,8 @@ export function journeyReducer(state: Journey, action: JourneyAction): Journey {
       return { ...state, phase: "menu", orderType: action.orderType };
     case "changeOrderType":
       return { ...state, phase: "orderType" };
+    case "addLine":
+      return { ...state, basket: [...state.basket, action.line] };
     case "reset":
       return initialJourney(action.language);
   }
