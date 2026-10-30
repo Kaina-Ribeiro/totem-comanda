@@ -1,0 +1,3762 @@
+openapi: 3.0.3
+info:
+  title: Comanda Core API
+  version: 0.1.0
+  license:
+    name: Proprietary
+  description: |
+    Contract between the Comanda BFF (Next.js server, built by Kai) and the Comanda
+    Core API (Go, built by the partner). The Go API owns every business rule:
+    prices, discounts, menu availability, order numbers and payments. The BFF only
+    combines and formats.
+
+    This file is the source of truth. Any change goes through a pull request that
+    both partners approve. See `contract/README.md`.
+
+    Conventions
+    - Money: integer cents in BRL. `2800` means R$ 28,00. Never floats.
+    - Field names: camelCase, matching the functional specs wherever they define one
+      (`orderNonce`, `posCheckNumber`, `orderItems`, `isDineInAvailable`).
+    - Timestamps: ISO 8601 in UTC (`2026-10-30T09:15:00Z`). Business dates are
+      `YYYY-MM-DD` in the restaurant's timezone. Opening hours are local `HH:MM`.
+    - IDs are opaque strings. Clients must not parse them.
+    - Errors: `application/problem+json` (RFC 9457) with a stable `code`.
+    - Writes that must not run twice (orders, payments, placing) require an
+      `Idempotency-Key` header. Same key and same body returns the first result.
+    - Guest-facing endpoints return text already resolved to the requested
+      `language`. Back-office endpoints use `LocalizedText` (`pt-BR` required, `en` optional).
+    - `GET /v1/devices/me/config` and `GET /v1/menus/active` return an `ETag`. Send it
+      back in `If-None-Match` to get `304 Not Modified` instead of the full body.
+    - `x-phase` on each operation is the MVP phase that needs it.
+servers:
+  - url: http://localhost:4010
+    description: Prism mock (front-end work before the Go API exists)
+  - url: http://localhost:8080
+    description: Go API, local
+tags:
+  - name: Devices
+    description: Kiosk and kitchen device identity, configuration and health (A01).
+  - name: Kiosk
+    description: Guest journey, menu, totals and discounts (A02, A03, A04, A07).
+  - name: Orders
+    description: Order creation, payment and placement (A08, A10).
+  - name: Kitchen
+    description: Kitchen screen (not in the specs).
+  - name: Admin
+    description: Back office for the owner (not in the specs).
+
+paths:
+  # ---------------------------------------------------------------- Devices
+  /v1/devices/auth:
+    post:
+      tags: [Devices]
+      operationId: authenticateDevice
+      summary: Exchange device credentials for a short-lived token
+      description: |
+        Called by the BFF with the `deviceId` and `deviceSecret` set at provisioning.
+        A device disabled in the back office gets `403 DEVICE_DISABLED`.
+      x-phase: 0
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceAuthRequest'
+      responses:
+        '200':
+          description: Token issued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceToken'
+        '401':
+          $ref: '#/components/responses/InvalidCredentials'
+        '403':
+          $ref: '#/components/responses/DeviceDisabled'
+
+  /v1/devices/me/config:
+    get:
+      tags: [Devices]
+      operationId: getDeviceConfig
+      summary: Configuration of the calling device and its restaurant
+      description: |
+        OP-KIOSK-06. Evaluates the menu schedule in the restaurant's timezone and
+        returns `isOpen`. With no active menu, `isOpen` is false and the kiosk shows
+        Lane Closed with `closedMessage` (BR-KIOSK-06, FR-109). The kiosk retries
+        every 5 s on failure (BR-KIOSK-02).
+      x-phase: 0
+      security:
+        - deviceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Current configuration.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceConfig'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/devices/heartbeat:
+    post:
+      tags: [Devices]
+      operationId: sendHeartbeat
+      summary: Report that the device is alive
+      description: Updates `lastSeenAt` on the device. The server records the request's source IP.
+      x-phase: 0
+      security:
+        - deviceAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Heartbeat'
+      responses:
+        '204':
+          description: Recorded.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/devices/status:
+    post:
+      tags: [Devices]
+      operationId: reportDeviceStatus
+      summary: Report a status change or a key action
+      description: OP-KIOSK-04. Fire-and-forget; the kiosk ignores errors.
+      x-phase: 0
+      security:
+        - deviceAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceReport'
+            examples:
+              trading:
+                value:
+                  kind: STATUS
+                  statusType: TRADING
+                  category: APPLICATION_STATUS
+                  message: Config refreshed
+              journeyFailed:
+                value:
+                  kind: KEY_ACTION
+                  type: START_JOURNEY_FAILED
+                  kioskStatusType: TRADING
+                  reason: FAILED_LOAD_MENU
+                  message: Menu request timed out
+      responses:
+        '204':
+          description: Recorded.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  # ---------------------------------------------------------------- Kiosk
+  /v1/menus/active:
+    get:
+      tags: [Kiosk]
+      operationId: getActiveMenu
+      summary: The menu active right now, in the ENT-MENU-01 shape
+      description: |
+        OP-MENU-01 / OP-START-04. Called once per journey (at start and on a
+        language change); the kiosk keeps it in memory until the journey ends, so a
+        guest who started at 10:59 finishes on the morning menu. Sold-out items are
+        left out. Text is resolved to `language`.
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Language'
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Active menu.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Menu'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No menu is active now (`NO_ACTIVE_MENU`); the kiosk shows Lane Closed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: /problems/no-active-menu
+                title: No menu is active now
+                status: 404
+                code: NO_ACTIVE_MENU
+
+  /v1/languages/{code}:
+    get:
+      tags: [Kiosk]
+      operationId: getLanguagePack
+      summary: Language pack override for the kiosk UI
+      description: |
+        OP-START-02. Strings the owner changed; the kiosk merges them over its
+        bundled pack and falls back to the bundled pack on any error.
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/LanguageCode'
+      responses:
+        '200':
+          description: Language pack.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LanguagePack'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/journeys:
+    post:
+      tags: [Kiosk]
+      operationId: startJourney
+      summary: Record the start of a guest journey
+      description: OP-START-01. Non-blocking for the guest; the kiosk logs failures and carries on.
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartJourneyRequest'
+      responses:
+        '201':
+          description: Journey recorded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JourneyStarted'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v1/journeys/{orderNonce}/events:
+    post:
+      tags: [Kiosk]
+      operationId: recordJourneyEvent
+      summary: Record a reset or an abandoned journey
+      description: OP-KIOSK-01, OP-KIOSK-02, OP-START-03. Fire-and-forget.
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderNonce'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JourneyEvent'
+      responses:
+        '204':
+          description: Recorded.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v1/quotes:
+    post:
+      tags: [Kiosk]
+      operationId: createQuote
+      summary: Totals for the current basket
+      description: |
+        OP-BASKET-01. Called after every basket or discount change. Nothing is
+        stored; `POST /v1/orders` reprices everything again.
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuoteRequest'
+            example:
+              orderType: TAKE_OUT
+              discountCode: null
+              orderItems:
+                - guid: 3f0c9a52-6f0e-4d7b-9c61-0d1f4b7f2a10
+                  itemId: itm-croque-monsieur
+                  quantity: 1
+                  options:
+                    - optionId: opt-pao-brioche
+                      quantity: 1
+                    - optionId: opt-ovo-poche
+                      quantity: 1
+                - guid: 8b2d1c47-2a6e-4f53-8d0b-5e9a7c3f1b22
+                  itemId: itm-cappuccino
+                  quantity: 1
+                  options:
+                    - optionId: opt-leite-integral
+                      quantity: 1
+                - guid: c51e7a90-4b3d-4c8e-a2f6-9d0b1e3c5f44
+                  itemId: itm-fermentacao-natural
+                  quantity: 1
+                  options:
+                    - optionId: opt-inteiro-fatiado
+                      quantity: 1
+      responses:
+        '200':
+          description: Totals.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderTotal'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/BasketRejected'
+
+  /v1/discounts/validate:
+    post:
+      tags: [Kiosk]
+      operationId: validateDiscount
+      summary: Check a coupon or restaurant discount code
+      description: |
+        OP-DISC-01 / OP-DISC-04. Returns the discount as it would apply to this
+        basket. One discount per order: replacing the current one is the kiosk's
+        warning (SCR-DISC-05), then it sends the new code with `currentDiscountCode`.
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiscountValidationRequest'
+      responses:
+        '200':
+          description: Valid code.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscountItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: The same code is already on the order (`COUPON_ALREADY_APPLIED`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: /problems/coupon-already-applied
+                title: This code is already applied
+                status: 409
+                code: COUPON_ALREADY_APPLIED
+        '422':
+          description: Unknown, expired or inactive code (`INVALID_COUPON`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: /problems/invalid-coupon
+                title: Invalid coupon
+                status: 422
+                code: INVALID_COUPON
+
+  # ---------------------------------------------------------------- Orders
+  /v1/orders:
+    post:
+      tags: [Orders]
+      operationId: createOrder
+      summary: Store the order as AWAITING_PAYMENT
+      description: |
+        First half of OP-PAY-01. The Go API reprices every line from the menu and
+        ignores any price sent by the client. Pending open question 1: what happens
+        when the owner changed a price during the journey.
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '201':
+          description: Order created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          $ref: '#/components/responses/BasketRejected'
+
+  /v1/orders/{orderId}:
+    get:
+      tags: [Orders]
+      operationId: getOrder
+      summary: Read an order
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: The order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/orders/{orderId}/payments:
+    post:
+      tags: [Orders]
+      operationId: startPayment
+      summary: Start a payment for the order total
+      description: |
+        Second half of OP-PAY-01. Until phase 4 the gateway is `SIMULATED`. A new
+        payment can start after a `FAILED` or `CANCELLED` one; the order stays
+        AWAITING_PAYMENT until a payment is AUTHORISED.
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartPaymentRequest'
+      responses:
+        '201':
+          description: Payment started.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            `ORDER_NOT_AWAITING_PAYMENT` (already paid or cancelled),
+            `PAYMENT_IN_PROGRESS` (another payment is still AUTHORISING) or
+            `IDEMPOTENCY_KEY_REUSED`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /v1/payments/{paymentId}:
+    get:
+      tags: [Orders]
+      operationId: getPayment
+      summary: Poll a payment
+      description: OP-PAY-02. The kiosk polls at most once per second until a final status.
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      responses:
+        '200':
+          description: The payment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/payments/{paymentId}/cancel:
+    post:
+      tags: [Orders]
+      operationId: cancelPayment
+      summary: Cancel a payment that is still AUTHORISING
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      responses:
+        '200':
+          description: Cancelled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Already final (`PAYMENT_NOT_CANCELLABLE`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /v1/payments/{paymentId}/simulate:
+    post:
+      tags: [Orders]
+      operationId: simulatePayment
+      summary: Force the outcome of a simulated payment
+      description: |
+        Only while the gateway is `SIMULATED` (phases 2 and 3, staging). Lets the
+        kiosk and the tests reach both the success and the error screens. Returns
+        `404 SIMULATION_DISABLED` once a real gateway is configured.
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SimulatePaymentRequest'
+      responses:
+        '200':
+          description: Outcome applied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/orders/{orderId}/place:
+    post:
+      tags: [Orders]
+      operationId: placeOrder
+      summary: Place a paid order
+      description: |
+        OP-PAY-03. Requires an AUTHORISED payment. Assigns `posCheckNumber` (a
+        sequence per restaurant per business day, FR-1010), moves the order to
+        PAID, notifies the kitchen and, from phase 4, requests the NFC-e.
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Order placed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlacedOrder'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: No authorised payment (`PAYMENT_NOT_AUTHORISED`) or `IDEMPOTENCY_KEY_REUSED`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  # ---------------------------------------------------------------- Kitchen
+  /v1/kitchen/orders:
+    get:
+      tags: [Kitchen]
+      operationId: listKitchenOrders
+      summary: Paid orders not yet collected, oldest first
+      x-phase: 3
+      security:
+        - deviceAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [open]
+            default: open
+      responses:
+        '200':
+          description: Open orders.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/KitchenOrder'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/kitchen/stream:
+    get:
+      tags: [Kitchen]
+      operationId: streamKitchenEvents
+      summary: Server-Sent Events for the kitchen screen
+      description: |
+        One event per change. `event: order.paid` and `event: order.status_changed`,
+        each with a `KitchenOrder` as JSON in `data`. A `: ping` comment every 15 s
+        keeps the connection open. If the stream drops, the kitchen falls back to
+        polling `GET /v1/kitchen/orders` every 2 s.
+      x-phase: 3
+      security:
+        - deviceAuth: []
+      responses:
+        '200':
+          description: Event stream.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              example: |
+                event: order.paid
+                data: {"id":"ord-7f3a","posCheckNumber":"42","orderType":"TAKE_OUT","status":"PAID","placedAt":"2026-10-30T12:04:10Z","readyAt":null,"lines":[{"name":"Croque monsieur","quantity":1,"options":["Brioche","Ovo pochê"]}]}
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/kitchen/orders/{orderId}/status:
+    post:
+      tags: [Kitchen]
+      operationId: updateKitchenOrderStatus
+      summary: Move an order to PREPARING, READY or COLLECTED
+      x-phase: 3
+      security:
+        - deviceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KitchenStatusUpdate'
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KitchenOrder'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Not allowed from the current status (`INVALID_STATUS_TRANSITION`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  # ---------------------------------------------------------------- Admin
+  /v1/admin/auth/login:
+    post:
+      tags: [Admin]
+      operationId: ownerLogin
+      summary: Owner sign-in
+      description: The back-office BFF keeps the token in an HttpOnly session cookie; the browser never sees it.
+      x-phase: 1
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OwnerLoginRequest'
+      responses:
+        '200':
+          description: Signed in.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnerToken'
+        '401':
+          $ref: '#/components/responses/InvalidCredentials'
+
+  /v1/admin/restaurant:
+    get:
+      tags: [Admin]
+      operationId: getRestaurant
+      summary: Restaurant settings
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      responses:
+        '200':
+          description: Settings.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Restaurant'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      tags: [Admin]
+      operationId: replaceRestaurant
+      summary: Replace restaurant settings
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestaurantInput'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Restaurant'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v1/admin/media:
+    post:
+      tags: [Admin]
+      operationId: uploadMedia
+      summary: Upload an image for an item, category or the logo
+      description: The Go API stores the original; the Next.js image optimizer resizes it for the kiosk.
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Stored.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaAsset'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v1/admin/devices:
+    get:
+      tags: [Admin]
+      operationId: listDevices
+      summary: Devices with their health
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      responses:
+        '200':
+          description: Devices.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminDevice'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Admin]
+      operationId: createDevice
+      summary: Register a device and get its secret once
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceInput'
+      responses:
+        '201':
+          description: Created. `deviceSecret` is shown only in this response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceCredentials'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v1/admin/devices/{deviceId}:
+    put:
+      tags: [Admin]
+      operationId: replaceDevice
+      summary: Rename, enable or disable a device, change its settings
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceInput'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDevice'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v1/admin/devices/{deviceId}/secret:
+    post:
+      tags: [Admin]
+      operationId: rotateDeviceSecret
+      summary: Issue a new secret; the old one stops working
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      responses:
+        '200':
+          description: New secret, shown only in this response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceCredentials'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/admin/menus:
+    get:
+      tags: [Admin]
+      operationId: listMenus
+      summary: Menus
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      responses:
+        '200':
+          description: Menus.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminMenu'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Admin]
+      operationId: createMenu
+      summary: Create a menu
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuInput'
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminMenu'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v1/admin/menus/{menuId}:
+    get:
+      tags: [Admin]
+      operationId: getMenu
+      summary: Read a menu
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MenuId'
+      responses:
+        '200':
+          description: The menu.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminMenu'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Admin]
+      operationId: replaceMenu
+      summary: Replace a menu
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MenuId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuInput'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminMenu'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+    delete:
+      tags: [Admin]
+      operationId: deleteMenu
+      summary: Delete a menu
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MenuId'
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/admin/menus/{menuId}/schedules:
+    get:
+      tags: [Admin]
+      operationId: listMenuSchedules
+      summary: Opening windows of a menu
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MenuId'
+      responses:
+        '200':
+          description: Windows.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MenuSchedule'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Admin]
+      operationId: replaceMenuSchedules
+      summary: Replace all opening windows of a menu
+      description: Rejected with `SCHEDULE_OVERLAP` when a window overlaps another menu's, so at most one menu is active.
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MenuId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/MenuSchedule'
+            example:
+              - weekday: MON
+                timeStart: '06:00'
+                timeEnd: '11:00'
+              - weekday: TUE
+                timeStart: '06:00'
+                timeEnd: '11:00'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MenuSchedule'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Overlaps another menu (`SCHEDULE_OVERLAP`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /v1/admin/menus/{menuId}/force:
+    post:
+      tags: [Admin]
+      operationId: forceMenu
+      summary: Make this menu active now, until a given time
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MenuId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForceMenuRequest'
+      responses:
+        '200':
+          description: Forced.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminMenu'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Admin]
+      operationId: clearForcedMenu
+      summary: Return to the normal schedule
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MenuId'
+      responses:
+        '204':
+          description: Back on schedule.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/admin/categories:
+    get:
+      tags: [Admin]
+      operationId: listCategories
+      summary: Categories of a menu
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - name: menuId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Categories.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminCategory'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Admin]
+      operationId: createCategory
+      summary: Create a category
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryInput'
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminCategory'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v1/admin/categories/{categoryId}:
+    put:
+      tags: [Admin]
+      operationId: replaceCategory
+      summary: Replace a category
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CategoryId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryInput'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminCategory'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+    delete:
+      tags: [Admin]
+      operationId: deleteCategory
+      summary: Delete a category
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CategoryId'
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/admin/categories/{categoryId}/items:
+    put:
+      tags: [Admin]
+      operationId: replaceCategoryItems
+      summary: Set which items sit in a category, their order and price override
+      description: One item can sit in several categories and menus, at a different price in each (`priceOverride`).
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CategoryId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/CategoryItemLink'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CategoryItemLink'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v1/admin/items:
+    get:
+      tags: [Admin]
+      operationId: listItems
+      summary: All items
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      responses:
+        '200':
+          description: Items.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Admin]
+      operationId: createItem
+      summary: Create an item
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemInput'
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v1/admin/items/{itemId}:
+    get:
+      tags: [Admin]
+      operationId: getItem
+      summary: Read an item
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ItemId'
+      responses:
+        '200':
+          description: The item.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Admin]
+      operationId: replaceItem
+      summary: Replace an item
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ItemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemInput'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+    delete:
+      tags: [Admin]
+      operationId: deleteItem
+      summary: Delete an item
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ItemId'
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/admin/items/{itemId}/sold-out:
+    post:
+      tags: [Admin]
+      operationId: markItemSoldOut
+      summary: Sold out for the rest of today
+      description: Sets `soldOutDate` to today's business date; the item reappears on the next business day.
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ItemId'
+      responses:
+        '200':
+          description: Marked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Admin]
+      operationId: clearItemSoldOut
+      summary: Back in stock
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ItemId'
+      responses:
+        '200':
+          description: Cleared.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/admin/option-groups:
+    get:
+      tags: [Admin]
+      operationId: listOptionGroups
+      summary: Option groups of an item
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - name: itemId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Option groups.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminOptionGroup'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Admin]
+      operationId: createOptionGroup
+      summary: Create an option group with its options
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OptionGroupInput'
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminOptionGroup'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v1/admin/option-groups/{optionGroupId}:
+    put:
+      tags: [Admin]
+      operationId: replaceOptionGroup
+      summary: Replace an option group and its options
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OptionGroupId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OptionGroupInput'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminOptionGroup'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+    delete:
+      tags: [Admin]
+      operationId: deleteOptionGroup
+      summary: Delete an option group
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OptionGroupId'
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/admin/tags:
+    get:
+      tags: [Admin]
+      operationId: listTags
+      summary: Item and category badges
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      responses:
+        '200':
+          description: Tags.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminTag'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Admin]
+      operationId: createTag
+      summary: Create a badge
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagInput'
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminTag'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v1/admin/tags/{tagId}:
+    put:
+      tags: [Admin]
+      operationId: replaceTag
+      summary: Replace a badge
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TagId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagInput'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminTag'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+    delete:
+      tags: [Admin]
+      operationId: deleteTag
+      summary: Delete a badge
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TagId'
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/admin/cross-sells:
+    get:
+      tags: [Admin]
+      operationId: listCrossSellGroups
+      summary: Cross-sell groups
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      responses:
+        '200':
+          description: Groups.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminCrossSellGroup'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Admin]
+      operationId: createCrossSellGroup
+      summary: Create a cross-sell group
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrossSellGroupInput'
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminCrossSellGroup'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v1/admin/cross-sells/{crossSellGroupId}:
+    put:
+      tags: [Admin]
+      operationId: replaceCrossSellGroup
+      summary: Replace a cross-sell group
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CrossSellGroupId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrossSellGroupInput'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminCrossSellGroup'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+    delete:
+      tags: [Admin]
+      operationId: deleteCrossSellGroup
+      summary: Delete a cross-sell group
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CrossSellGroupId'
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/admin/discounts:
+    get:
+      tags: [Admin]
+      operationId: listDiscounts
+      summary: Coupons and restaurant discounts
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      responses:
+        '200':
+          description: Discounts.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminDiscount'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Admin]
+      operationId: createDiscount
+      summary: Create a coupon or restaurant discount
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiscountInput'
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDiscount'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Code already used by another discount (`DISCOUNT_CODE_TAKEN`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v1/admin/discounts/{discountId}:
+    put:
+      tags: [Admin]
+      operationId: replaceDiscount
+      summary: Replace a discount
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DiscountId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiscountInput'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDiscount'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Code already used by another discount (`DISCOUNT_CODE_TAKEN`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+    delete:
+      tags: [Admin]
+      operationId: deleteDiscount
+      summary: Delete a discount
+      x-phase: 1
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DiscountId'
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/admin/reports/daily:
+    get:
+      tags: [Admin]
+      operationId: getDailyReport
+      summary: Orders, revenue, best sellers and average ticket for one business day
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      parameters:
+        - name: date
+          in: query
+          required: true
+          description: Business date in the restaurant's timezone.
+          schema:
+            type: string
+            format: date
+          example: '2026-10-30'
+      responses:
+        '200':
+          description: Report.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyReport'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    deviceAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token from `POST /v1/devices/auth`. Kiosk and kitchen devices.
+    ownerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token from `POST /v1/admin/auth/login`. Held by the back-office BFF.
+
+  headers:
+    ETag:
+      description: Version of the representation. Send it back in `If-None-Match`.
+      schema:
+        type: string
+      example: '"menu-mnu-manha-v17-pt-BR"'
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: A UUID per logical attempt. Retrying with the same key and body returns the first result.
+      schema:
+        type: string
+        format: uuid
+      example: 6d1f2c9e-3b4a-4e5f-8a7b-9c0d1e2f3a4b
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      required: false
+      schema:
+        type: string
+    Language:
+      name: language
+      in: query
+      required: true
+      schema:
+        $ref: '#/components/schemas/LanguageCode'
+    OrderNonce:
+      name: orderNonce
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema:
+        type: string
+    PaymentId:
+      name: paymentId
+      in: path
+      required: true
+      schema:
+        type: string
+    DeviceId:
+      name: deviceId
+      in: path
+      required: true
+      schema:
+        type: string
+    MenuId:
+      name: menuId
+      in: path
+      required: true
+      schema:
+        type: string
+    CategoryId:
+      name: categoryId
+      in: path
+      required: true
+      schema:
+        type: string
+    ItemId:
+      name: itemId
+      in: path
+      required: true
+      schema:
+        type: string
+    OptionGroupId:
+      name: optionGroupId
+      in: path
+      required: true
+      schema:
+        type: string
+    TagId:
+      name: tagId
+      in: path
+      required: true
+      schema:
+        type: string
+    CrossSellGroupId:
+      name: crossSellGroupId
+      in: path
+      required: true
+      schema:
+        type: string
+    DiscountId:
+      name: discountId
+      in: path
+      required: true
+      schema:
+        type: string
+
+  responses:
+    NotModified:
+      description: The client's copy is current (matching `If-None-Match`).
+    Unauthorized:
+      description: Missing, expired or invalid token (`UNAUTHORIZED`).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/unauthorized
+            title: Unauthorized
+            status: 401
+            code: UNAUTHORIZED
+    InvalidCredentials:
+      description: Wrong id, secret, email or password (`INVALID_CREDENTIALS`).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/invalid-credentials
+            title: Invalid credentials
+            status: 401
+            code: INVALID_CREDENTIALS
+    DeviceDisabled:
+      description: The device was disabled in the back office (`DEVICE_DISABLED`).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/device-disabled
+            title: Device disabled
+            status: 403
+            code: DEVICE_DISABLED
+    NotFound:
+      description: No such resource (`NOT_FOUND`).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/not-found
+            title: Not found
+            status: 404
+            code: NOT_FOUND
+    ValidationFailed:
+      description: The body breaks a field rule (`VALIDATION_FAILED`); `errors` lists each field.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/validation-failed
+            title: Validation failed
+            status: 422
+            code: VALIDATION_FAILED
+            errors:
+              - field: orderItems[0].quantity
+                message: must be at least 1
+    IdempotencyConflict:
+      description: The `Idempotency-Key` was already used with a different body (`IDEMPOTENCY_KEY_REUSED`).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/idempotency-key-reused
+            title: Idempotency key reused with a different body
+            status: 409
+            code: IDEMPOTENCY_KEY_REUSED
+    BasketRejected:
+      description: |
+        The basket cannot be priced: `BASKET_ITEM_LIMIT_EXCEEDED` (FR-421),
+        `ITEM_UNAVAILABLE` (sold out or not on the active menu; `detail` names it),
+        `ORDER_TYPE_UNAVAILABLE`, `INVALID_COUPON`, `NO_ACTIVE_MENU` or
+        `VALIDATION_FAILED`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/basket-item-limit-exceeded
+            title: Too many items in the basket
+            status: 422
+            code: BASKET_ITEM_LIMIT_EXCEEDED
+
+  schemas:
+    # ------------------------------------------------------------ Common
+    Problem:
+      type: object
+      description: RFC 9457 problem details with a stable `code` the clients switch on.
+      required: [type, title, status, code]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+        code:
+          $ref: '#/components/schemas/ProblemCode'
+        errors:
+          type: array
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+    ProblemCode:
+      type: string
+      enum:
+        - UNAUTHORIZED
+        - INVALID_CREDENTIALS
+        - DEVICE_DISABLED
+        - NOT_FOUND
+        - VALIDATION_FAILED
+        - IDEMPOTENCY_KEY_REUSED
+        - NO_ACTIVE_MENU
+        - ITEM_UNAVAILABLE
+        - ORDER_TYPE_UNAVAILABLE
+        - BASKET_ITEM_LIMIT_EXCEEDED
+        - INVALID_COUPON
+        - COUPON_ALREADY_APPLIED
+        - ORDER_NOT_AWAITING_PAYMENT
+        - PAYMENT_IN_PROGRESS
+        - PAYMENT_NOT_CANCELLABLE
+        - PAYMENT_NOT_AUTHORISED
+        - SIMULATION_DISABLED
+        - INVALID_STATUS_TRANSITION
+        - SCHEDULE_OVERLAP
+        - DISCOUNT_CODE_TAKEN
+    Money:
+      type: integer
+      format: int64
+      minimum: 0
+      description: Integer cents in BRL. 2800 = R$ 28,00.
+      example: 2800
+    LanguageCode:
+      type: string
+      enum: [pt-BR, en]
+    OrderType:
+      type: string
+      description: ENT-START-03.
+      enum: [DINEIN, TAKE_OUT]
+    LocalizedText:
+      type: object
+      required: [pt-BR]
+      properties:
+        pt-BR:
+          type: string
+        en:
+          type: string
+      example:
+        pt-BR: Fermentação natural
+        en: Sourdough
+    ServicePriceOverride:
+      type: object
+      description: Price per order type when it differs from `price`.
+      properties:
+        DINEIN:
+          $ref: '#/components/schemas/Money'
+        TAKE_OUT:
+          $ref: '#/components/schemas/Money'
+    ServiceAvailability:
+      type: object
+      required: [DINEIN, TAKE_OUT]
+      properties:
+        DINEIN:
+          type: boolean
+        TAKE_OUT:
+          type: boolean
+    Weekday:
+      type: string
+      enum: [MON, TUE, WED, THU, FRI, SAT, SUN]
+    LocalTime:
+      type: string
+      pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+      example: '06:00'
+
+    # ------------------------------------------------------------ Devices
+    DeviceAuthRequest:
+      type: object
+      required: [deviceId, deviceSecret]
+      properties:
+        deviceId:
+          type: string
+          example: KIOSK-TBT-001
+        deviceSecret:
+          type: string
+          example: s3cr3t-from-provisioning
+    DeviceToken:
+      type: object
+      example:
+        accessToken: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJLSU9TSy1UQlQtMDAxIn0.sig
+        tokenType: Bearer
+        expiresIn: 900
+      required: [accessToken, tokenType, expiresIn]
+      properties:
+        accessToken:
+          type: string
+        tokenType:
+          type: string
+          enum: [Bearer]
+        expiresIn:
+          type: integer
+          description: Seconds.
+          example: 900
+    DeviceKind:
+      type: string
+      enum: [KIOSK, KITCHEN]
+    DeviceConfig:
+      type: object
+      example:
+        kioskID: KIOSK-TBT-001
+        kind: KIOSK
+        idleTimerIntervalMilliseconds: 20000
+        printerEnabled: false
+        maintenanceMode: false
+        atCapacityMode: false
+        isOpen: true
+        restaurant:
+          locationId: rst-padaria-01
+          name: '[Nome da padaria]'
+          logo: /media/logo-padaria.png
+          currency: BRL
+          timezone: America/Sao_Paulo
+          defaultLanguage: pt-BR
+          supportedLanguages:
+            - code: pt-BR
+              name: Português
+            - code: en
+              name: English
+          isDineInAvailable: true
+          isTakeOutAvailable: true
+          closedMessage:
+            title:
+              pt-BR: Fechado agora
+              en: Closed now
+            description:
+              pt-BR: Voltamos em breve.
+              en: We'll be back soon.
+          posCheckNumberDisplayLength: 2
+        activeMenu:
+          id: mnu-manha
+          name: Manhã
+          until: '2026-10-30T14:00:00Z'
+        nextOpeningAt: null
+        serverTime: '2026-10-30T12:00:00Z'
+      description: ENT-KIOSK-01 with the restaurant's brand config.
+      required: [kioskID, kind, idleTimerIntervalMilliseconds, printerEnabled, maintenanceMode, atCapacityMode, isOpen, restaurant, activeMenu, nextOpeningAt, serverTime]
+      properties:
+        kioskID:
+          type: string
+          example: KIOSK-TBT-001
+        kind:
+          $ref: '#/components/schemas/DeviceKind'
+        idleTimerIntervalMilliseconds:
+          type: integer
+          description: Idle timeout; 0 disables it.
+          example: 20000
+        printerEnabled:
+          type: boolean
+          description: False until phase 4.
+          example: false
+        maintenanceMode:
+          type: boolean
+          example: false
+        atCapacityMode:
+          type: boolean
+          example: false
+        isOpen:
+          type: boolean
+          description: True when a menu is active now.
+          example: true
+        restaurant:
+          $ref: '#/components/schemas/RestaurantPublic'
+        activeMenu:
+          $ref: '#/components/schemas/ActiveMenuRef'
+        nextOpeningAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the next menu starts, if closed. Lets the kiosk say "back at 06:00".
+        serverTime:
+          type: string
+          format: date-time
+          example: '2026-10-30T12:00:00Z'
+    RestaurantPublic:
+      type: object
+      required: [locationId, name, logo, currency, timezone, defaultLanguage, supportedLanguages, isDineInAvailable, isTakeOutAvailable, closedMessage, posCheckNumberDisplayLength]
+      properties:
+        locationId:
+          type: string
+          example: rst-padaria-01
+        name:
+          type: string
+          example: '[Nome da padaria]'
+        logo:
+          type: string
+          nullable: true
+          example: /media/logo-padaria.png
+        currency:
+          type: string
+          enum: [BRL]
+        timezone:
+          type: string
+          example: America/Sao_Paulo
+        defaultLanguage:
+          $ref: '#/components/schemas/LanguageCode'
+        supportedLanguages:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupportedLanguage'
+        isDineInAvailable:
+          type: boolean
+        isTakeOutAvailable:
+          type: boolean
+        closedMessage:
+          $ref: '#/components/schemas/ClosedMessage'
+        posCheckNumberDisplayLength:
+          type: integer
+          description: Digits shown for the order number (BR-POST-01).
+          example: 2
+    SupportedLanguage:
+      type: object
+      required: [code, name]
+      properties:
+        code:
+          $ref: '#/components/schemas/LanguageCode'
+        name:
+          type: string
+          example: Português
+    ClosedMessage:
+      type: object
+      description: ENT-KIOSK-03, both languages so the kiosk can switch without a call.
+      required: [title, description]
+      properties:
+        title:
+          $ref: '#/components/schemas/LocalizedText'
+        description:
+          $ref: '#/components/schemas/LocalizedText'
+    ActiveMenuRef:
+      type: object
+      nullable: true
+      required: [id, name, until]
+      properties:
+        id:
+          type: string
+          example: mnu-manha
+        name:
+          type: string
+          example: Manhã
+        until:
+          type: string
+          format: date-time
+          description: When this menu stops being active.
+          example: '2026-10-30T14:00:00Z'
+    Heartbeat:
+      type: object
+      required: [appVersion, screenResolution]
+      properties:
+        appVersion:
+          type: string
+          example: 0.1.0+3f9c2a1
+        screenResolution:
+          type: string
+          example: 1080x1920
+        ip:
+          type: string
+          description: LAN address if the device knows it; the server also records the source IP.
+    DeviceReport:
+      oneOf:
+        - $ref: '#/components/schemas/DeviceStatusReport'
+        - $ref: '#/components/schemas/DeviceKeyActionReport'
+      discriminator:
+        propertyName: kind
+        mapping:
+          STATUS: '#/components/schemas/DeviceStatusReport'
+          KEY_ACTION: '#/components/schemas/DeviceKeyActionReport'
+    KioskStatusType:
+      type: string
+      enum: [APPLICATION_STARTING, APPLICATION_START_FAILED, TRADING, UNAVAILABLE]
+    DeviceStatusReport:
+      type: object
+      required: [kind, statusType, category]
+      properties:
+        kind:
+          type: string
+          enum: [STATUS]
+        statusType:
+          $ref: '#/components/schemas/KioskStatusType'
+        reason:
+          type: string
+          enum: [MAINTENANCE, AT_CAPACITY, STORE_CLOSED, UNKNOWN]
+        category:
+          type: string
+          enum: [APPLICATION_STATUS, DISPLAYING_SCREEN]
+        message:
+          type: string
+    DeviceKeyActionReport:
+      type: object
+      required: [kind, type, kioskStatusType]
+      properties:
+        kind:
+          type: string
+          enum: [KEY_ACTION]
+        type:
+          type: string
+          enum: [START_JOURNEY_SUCCESS, START_JOURNEY_FAILED, APPLICATION_START_FAILED]
+        kioskStatusType:
+          $ref: '#/components/schemas/KioskStatusType'
+        reason:
+          type: string
+          enum: [FAILED_START_JOURNEY, FAILED_LOAD_MENU]
+        message:
+          type: string
+
+    # ------------------------------------------------------------ Menu (kiosk)
+    Menu:
+      type: object
+      description: ENT-MENU-01. Root `entities` are categories sorted by `displayOrder`.
+      required: [id, name, language, currency, showCategoriesPrice, entities, customizedItemTags, crossSellGroups]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        language:
+          $ref: '#/components/schemas/LanguageCode'
+        currency:
+          type: string
+          enum: [BRL]
+        showCategoriesPrice:
+          type: boolean
+        entities:
+          type: array
+          items:
+            $ref: '#/components/schemas/MenuEntity'
+        customizedItemTags:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomizedItemTag'
+        crossSellGroups:
+          type: array
+          items:
+            $ref: '#/components/schemas/CrossSellGroup'
+      example:
+        id: mnu-manha
+        name: Manhã
+        language: pt-BR
+        currency: BRL
+        showCategoriesPrice: false
+        entities:
+          - id: cat-paes
+            type: CATEGORY
+            name: Pães
+            image: null
+            displayOrder: 1
+            childEntities:
+              - id: itm-fermentacao-natural
+                type: ITEM
+                plu: '1001'
+                name: Fermentação natural
+                shortName: Fermentação
+                description: Pão de fermentação natural, casca crocante.
+                image: /media/fermentacao-natural.jpg
+                price: 2800
+                servicePriceOverride: {}
+                serviceAvailability:
+                  DINEIN: true
+                  TAKE_OUT: true
+                calories: null
+                itemLabels: []
+                displayOrder: 1
+                showFromPrice: false
+                defaultEntity: null
+                crossSellGroupId: null
+                childEntities: []
+                optionGroups:
+                  - id: grp-corte
+                    name: Como você quer?
+                    role: REQUIRED-MODIFIER
+                    minimum: 1
+                    maximum: 1
+                    defaultOption: opt-inteiro-fatiado
+                    displayOrder: 1
+                    compositeOptions: []
+                    options:
+                      - id: opt-inteiro-fatiado
+                        plu: '9001'
+                        name: Inteiro, fatiado
+                        price: 0
+                        servicePriceOverride: {}
+                        maximumQuantity: 1
+                        defaultQuantity: 1
+                        supersede: false
+                        displayOrder: 1
+                        optionGroups: []
+                      - id: opt-inteiro
+                        plu: '9002'
+                        name: Inteiro
+                        price: 0
+                        servicePriceOverride: {}
+                        maximumQuantity: 1
+                        defaultQuantity: 0
+                        supersede: false
+                        displayOrder: 2
+                        optionGroups: []
+              - id: itm-baguete
+                type: ITEM
+                plu: '1002'
+                name: Baguete tradicional
+                shortName: Baguete
+                description: null
+                image: /media/baguete.jpg
+                price: 1200
+                servicePriceOverride: {}
+                serviceAvailability:
+                  DINEIN: true
+                  TAKE_OUT: true
+                calories: null
+                itemLabels: []
+                displayOrder: 2
+                showFromPrice: false
+                defaultEntity: null
+                crossSellGroupId: null
+                childEntities: []
+                optionGroups: []
+          - id: cat-sanduiches
+            type: CATEGORY
+            name: Sanduíches
+            image: null
+            displayOrder: 4
+            childEntities:
+              - id: itm-croque-monsieur
+                type: ITEM
+                plu: '3001'
+                name: Croque monsieur
+                shortName: Croque
+                description: Presunto, gruyère e bechamel, gratinado.
+                image: /media/croque-monsieur.jpg
+                price: 3490
+                servicePriceOverride: {}
+                serviceAvailability:
+                  DINEIN: true
+                  TAKE_OUT: true
+                calories: null
+                itemLabels: []
+                displayOrder: 1
+                showFromPrice: false
+                defaultEntity: null
+                crossSellGroupId: xs-cafes
+                childEntities: []
+                optionGroups:
+                  - id: grp-pao
+                    name: Pão
+                    role: REQUIRED-MODIFIER
+                    minimum: 1
+                    maximum: 1
+                    defaultOption: opt-pao-brioche
+                    displayOrder: 1
+                    compositeOptions: []
+                    options:
+                      - id: opt-pao-brioche
+                        plu: '9101'
+                        name: Brioche
+                        price: 0
+                        servicePriceOverride: {}
+                        maximumQuantity: 1
+                        defaultQuantity: 1
+                        supersede: false
+                        displayOrder: 1
+                        optionGroups: []
+                      - id: opt-pao-fermentacao
+                        plu: '9102'
+                        name: Fermentação
+                        price: 0
+                        servicePriceOverride: {}
+                        maximumQuantity: 1
+                        defaultQuantity: 0
+                        supersede: false
+                        displayOrder: 2
+                        optionGroups: []
+                  - id: grp-adicionais
+                    name: Adicionais
+                    role: MODIFIERS
+                    minimum: 0
+                    maximum: 3
+                    defaultOption: null
+                    displayOrder: 2
+                    compositeOptions: []
+                    options:
+                      - id: opt-ovo-poche
+                        plu: '9201'
+                        name: Ovo pochê
+                        price: 600
+                        servicePriceOverride: {}
+                        maximumQuantity: 1
+                        defaultQuantity: 0
+                        supersede: false
+                        displayOrder: 1
+                        optionGroups: []
+                      - id: opt-gruyere-extra
+                        plu: '9203'
+                        name: Gruyère extra
+                        price: 700
+                        servicePriceOverride: {}
+                        maximumQuantity: 1
+                        defaultQuantity: 0
+                        supersede: false
+                        displayOrder: 2
+                        optionGroups: []
+        customizedItemTags:
+          - id: tag-mais-pedido
+            badgeName: Mais pedido
+            textColour: '#FAF6F0'
+            backgroundColour: '#4E3426'
+            tagsPages: [ITEM_MENU, ITEM_PAGE]
+            items:
+              - menuItemId: itm-fermentacao-natural
+                categoryId: null
+                enabled: true
+        crossSellGroups:
+          - id: xs-cafes
+            name: Que tal um café?
+            crossSells: [itm-cappuccino]
+    MenuEntity:
+      type: object
+      description: ENT-MENU-02. A category (`childEntities` filled) or an item.
+      required: [id, type, name, displayOrder, childEntities]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [CATEGORY, ITEM]
+        plu:
+          type: string
+          nullable: true
+        name:
+          type: string
+        shortName:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        image:
+          type: string
+          nullable: true
+          description: Path or URL of the original image; the BFF resizes it.
+        displayOrder:
+          type: integer
+        childEntities:
+          type: array
+          items:
+            $ref: '#/components/schemas/MenuEntity'
+        defaultEntity:
+          type: string
+          nullable: true
+          description: Pre-selected child id (variants).
+        price:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Unit price for this menu (items only).
+        servicePriceOverride:
+          $ref: '#/components/schemas/ServicePriceOverride'
+        serviceAvailability:
+          $ref: '#/components/schemas/ServiceAvailability'
+        calories:
+          type: string
+          nullable: true
+        itemLabels:
+          type: array
+          items:
+            type: string
+        showFromPrice:
+          type: boolean
+        optionGroups:
+          type: array
+          items:
+            $ref: '#/components/schemas/OptionGroup'
+        crossSellGroupId:
+          type: string
+          nullable: true
+    OptionGroupRole:
+      type: string
+      enum: [MODIFIERS, REQUIRED-MODIFIER, UPSELLS, INGREDIENTS, INGREDIENT_MODIFIERS, SURCHARGE, COMBO_MAIN]
+    OptionGroup:
+      type: object
+      description: ENT-MENU-03.
+      required: [id, name, role, minimum, maximum, displayOrder, options, compositeOptions]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          $ref: '#/components/schemas/OptionGroupRole'
+        minimum:
+          type: integer
+          minimum: 0
+        maximum:
+          type: integer
+          minimum: 0
+        defaultOption:
+          type: string
+          nullable: true
+        displayOrder:
+          type: integer
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/Option'
+        compositeOptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompositeOption'
+    Option:
+      type: object
+      description: ENT-MENU-04.
+      required: [id, name, price, maximumQuantity, defaultQuantity, supersede, displayOrder, optionGroups]
+      properties:
+        id:
+          type: string
+        plu:
+          type: string
+          nullable: true
+        name:
+          type: string
+        shortName:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        image:
+          type: string
+          nullable: true
+        price:
+          $ref: '#/components/schemas/Money'
+        servicePriceOverride:
+          $ref: '#/components/schemas/ServicePriceOverride'
+        calories:
+          type: string
+          nullable: true
+        maximumQuantity:
+          type: integer
+        defaultQuantity:
+          type: integer
+        supersede:
+          type: boolean
+        displayOrder:
+          type: integer
+        optionGroups:
+          type: array
+          items:
+            $ref: '#/components/schemas/OptionGroup'
+    CompositeOption:
+      type: object
+      description: ENT-MENU-05. An ingredient the guest turns on or off.
+      required: [type, positiveOption, negativeOption]
+      properties:
+        type:
+          type: string
+          enum: [TOGGLE]
+        positiveOption:
+          $ref: '#/components/schemas/Option'
+        negativeOption:
+          $ref: '#/components/schemas/Option'
+        defaultChoice:
+          type: string
+          nullable: true
+          enum: [POSITIVE, NEGATIVE]
+    TagsPage:
+      type: string
+      enum: [ITEM_MENU, ITEM_PAGE, BASKET]
+    CustomizedItemTag:
+      type: object
+      description: ENT-MENU-06, already filtered by its schedule.
+      required: [id, badgeName, textColour, backgroundColour, tagsPages, items]
+      properties:
+        id:
+          type: string
+        badgeName:
+          type: string
+        textColour:
+          type: string
+        backgroundColour:
+          type: string
+        tagsPages:
+          type: array
+          items:
+            $ref: '#/components/schemas/TagsPage'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TagLink'
+    TagLink:
+      type: object
+      required: [enabled]
+      properties:
+        menuItemId:
+          type: string
+          nullable: true
+        categoryId:
+          type: string
+          nullable: true
+        enabled:
+          type: boolean
+    CrossSellGroup:
+      type: object
+      description: ENT-MENU-07. `crossSells` are item ids in this menu.
+      required: [id, name, crossSells]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        crossSells:
+          type: array
+          items:
+            type: string
+    LanguagePack:
+      type: object
+      required: [code, name, strings]
+      properties:
+        code:
+          $ref: '#/components/schemas/LanguageCode'
+        name:
+          type: string
+        strings:
+          type: object
+          additionalProperties:
+            type: string
+          example:
+            attract.cta: Toque para começar
+            orderType.title: Onde você vai comer?
+
+    # ------------------------------------------------------------ Journey and basket
+    StartJourneyRequest:
+      type: object
+      required: [orderNonce, language]
+      properties:
+        orderNonce:
+          type: string
+          format: uuid
+          description: Generated by the kiosk at journey start; identifies the order until it gets an id.
+        language:
+          $ref: '#/components/schemas/LanguageCode'
+    JourneyStarted:
+      type: object
+      example:
+        journeyStartedTimestamp: '2026-10-30T11:58:02Z'
+      required: [journeyStartedTimestamp]
+      properties:
+        journeyStartedTimestamp:
+          type: string
+          format: date-time
+    JourneyEvent:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [RESET, IDLE_TIMEOUT, CANCELLED_BY_GUEST]
+        orderTotal:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Basket total at the moment of the event.
+    OrderLineInput:
+      type: object
+      description: ENT-BASKET-03 as the kiosk sends it. No prices; the Go API prices everything.
+      required: [guid, itemId, quantity, options]
+      properties:
+        guid:
+          type: string
+          format: uuid
+        itemId:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderLineOptionInput'
+    OrderLineOptionInput:
+      type: object
+      required: [optionId, quantity]
+      properties:
+        optionId:
+          type: string
+          description: For a composite option, the id of the chosen positive or negative option.
+        quantity:
+          type: integer
+          minimum: 1
+        options:
+          type: array
+          description: Choices inside this option's nested groups.
+          items:
+            $ref: '#/components/schemas/OrderLineOptionInput'
+    QuoteRequest:
+      type: object
+      required: [orderType, orderItems]
+      properties:
+        orderType:
+          $ref: '#/components/schemas/OrderType'
+        orderItems:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderLineInput'
+        discountCode:
+          type: string
+          nullable: true
+    OrderTotal:
+      type: object
+      description: ENT-BASKET-02. Prices are tax-inclusive; `tax` is filled from phase 4 with the NFC-e data. `discount` is absent when none applies.
+      required: [subtotal, discountTotal, total, taxInclusive, tax, currency]
+      properties:
+        subtotal:
+          $ref: '#/components/schemas/Money'
+        discountTotal:
+          $ref: '#/components/schemas/Money'
+        total:
+          $ref: '#/components/schemas/Money'
+        taxInclusive:
+          type: boolean
+        tax:
+          type: integer
+          format: int64
+          minimum: 0
+          nullable: true
+          description: Integer cents in BRL, or null.
+        currency:
+          type: string
+          enum: [BRL]
+        discount:
+          $ref: '#/components/schemas/DiscountItem'
+      example:
+        subtotal: 8280
+        discountTotal: 0
+        total: 8280
+        taxInclusive: true
+        tax: null
+        currency: BRL
+    DiscountType:
+      type: string
+      enum: [COMANDA_COUPON, RESTAURANT_DISCOUNT]
+    DiscountValidationRequest:
+      type: object
+      required: [code, entryMethod, orderType, orderItems]
+      properties:
+        code:
+          type: string
+          example: BEMVINDO10
+        entryMethod:
+          type: string
+          enum: [MANUAL, SCAN, UNKNOWN]
+        orderType:
+          $ref: '#/components/schemas/OrderType'
+        orderItems:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderLineInput'
+        currentDiscountCode:
+          type: string
+          nullable: true
+          description: The code already on the order, if any.
+    DiscountItem:
+      type: object
+      example:
+        type: COMANDA_COUPON
+        value: BEMVINDO10
+        entryMethod: MANUAL
+        title: 10% na primeira compra
+        description: null
+        amount: 828
+      description: ENT-DISC-01 (applied side), amount computed for the sent basket.
+      required: [type, value, entryMethod, title, amount]
+      properties:
+        type:
+          $ref: '#/components/schemas/DiscountType'
+        value:
+          type: string
+          description: The code.
+          example: BEMVINDO10
+        entryMethod:
+          type: string
+          enum: [MANUAL, SCAN, UNKNOWN]
+        title:
+          type: string
+          example: 10% na primeira compra
+        description:
+          type: string
+          nullable: true
+        amount:
+          $ref: '#/components/schemas/Money'
+
+    # ------------------------------------------------------------ Orders and payments
+    OrderStatus:
+      type: string
+      enum: [AWAITING_PAYMENT, PAID, PREPARING, READY, COLLECTED, CANCELLED]
+    CreateOrderRequest:
+      type: object
+      required: [orderNonce, orderType, language, orderItems]
+      properties:
+        orderNonce:
+          type: string
+          format: uuid
+        orderType:
+          $ref: '#/components/schemas/OrderType'
+        language:
+          $ref: '#/components/schemas/LanguageCode'
+        orderItems:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/OrderLineInput'
+        discountCode:
+          type: string
+          nullable: true
+        cpfCnpj:
+          type: string
+          nullable: true
+          description: Digits only, 11 (CPF) or 14 (CNPJ). OP-BASKET-04.
+          pattern: '^([0-9]{11}|[0-9]{14})$'
+        journeyStartedTimestamp:
+          type: string
+          format: date-time
+          nullable: true
+    Order:
+      type: object
+      required: [id, orderNonce, orderType, status, posCheckNumber, businessDate, language, orderItems, orderTotal, cpfCnpj, journeyStartedTimestamp, createdAt, placedAt, readyAt]
+      properties:
+        id:
+          type: string
+          example: ord-7f3a
+        orderNonce:
+          type: string
+          format: uuid
+        orderType:
+          $ref: '#/components/schemas/OrderType'
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        posCheckNumber:
+          type: string
+          nullable: true
+          description: Set when placed.
+        businessDate:
+          type: string
+          format: date
+        language:
+          $ref: '#/components/schemas/LanguageCode'
+        orderItems:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderLine'
+        orderTotal:
+          $ref: '#/components/schemas/OrderTotal'
+        cpfCnpj:
+          type: string
+          nullable: true
+        journeyStartedTimestamp:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        placedAt:
+          type: string
+          format: date-time
+          nullable: true
+        readyAt:
+          type: string
+          format: date-time
+          nullable: true
+      example:
+        id: ord-7f3a
+        orderNonce: 0b6c7d8e-1f2a-4b3c-9d4e-5f6a7b8c9d0e
+        orderType: TAKE_OUT
+        status: AWAITING_PAYMENT
+        posCheckNumber: null
+        businessDate: '2026-10-30'
+        language: pt-BR
+        orderItems:
+          - guid: 3f0c9a52-6f0e-4d7b-9c61-0d1f4b7f2a10
+            itemId: itm-croque-monsieur
+            name: Croque monsieur
+            unitPrice: 4090
+            quantity: 1
+            lineTotal: 4090
+            options:
+              - optionId: opt-pao-brioche
+                name: Brioche
+                price: 0
+                quantity: 1
+                options: []
+              - optionId: opt-ovo-poche
+                name: Ovo pochê
+                price: 600
+                quantity: 1
+                options: []
+          - guid: 8b2d1c47-2a6e-4f53-8d0b-5e9a7c3f1b22
+            itemId: itm-cappuccino
+            name: Cappuccino
+            unitPrice: 1390
+            quantity: 1
+            lineTotal: 1390
+            options:
+              - optionId: opt-leite-integral
+                name: Leite integral
+                price: 0
+                quantity: 1
+                options: []
+          - guid: c51e7a90-4b3d-4c8e-a2f6-9d0b1e3c5f44
+            itemId: itm-fermentacao-natural
+            name: Fermentação natural
+            unitPrice: 2800
+            quantity: 1
+            lineTotal: 2800
+            options:
+              - optionId: opt-inteiro-fatiado
+                name: Inteiro, fatiado
+                price: 0
+                quantity: 1
+                options: []
+        orderTotal:
+          subtotal: 8280
+          discountTotal: 0
+          total: 8280
+          taxInclusive: true
+          tax: null
+          currency: BRL
+        cpfCnpj: null
+        journeyStartedTimestamp: '2026-10-30T11:58:02Z'
+        createdAt: '2026-10-30T12:03:40Z'
+        placedAt: null
+        readyAt: null
+    OrderLine:
+      type: object
+      description: ENT-BASKET-03 as sold. `unitPrice` includes the options.
+      required: [guid, itemId, name, unitPrice, quantity, lineTotal, options]
+      properties:
+        guid:
+          type: string
+          format: uuid
+        itemId:
+          type: string
+        name:
+          type: string
+        unitPrice:
+          $ref: '#/components/schemas/Money'
+        quantity:
+          type: integer
+          minimum: 1
+        lineTotal:
+          $ref: '#/components/schemas/Money'
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderLineOption'
+    OrderLineOption:
+      type: object
+      required: [optionId, name, price, quantity, options]
+      properties:
+        optionId:
+          type: string
+        name:
+          type: string
+        price:
+          $ref: '#/components/schemas/Money'
+        quantity:
+          type: integer
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderLineOption'
+    PaymentMethod:
+      type: string
+      enum: [PIX, CREDIT, DEBIT]
+    PaymentStatus:
+      type: string
+      enum: [AUTHORISING, AUTHORISED, FAILED, CANCELLED]
+    StartPaymentRequest:
+      type: object
+      required: [method]
+      properties:
+        method:
+          $ref: '#/components/schemas/PaymentMethod'
+    Payment:
+      type: object
+      example:
+        id: pay-91c2
+        orderId: ord-7f3a
+        method: CREDIT
+        amount: 8280
+        paymentStatus: AUTHORISING
+        gatewayType: SIMULATED
+        providerRef: null
+        failureReason: null
+        pix: null
+        createdAt: '2026-10-30T12:03:45Z'
+        updatedAt: '2026-10-30T12:03:45Z'
+      description: ENT-PAY-01.
+      required: [id, orderId, method, amount, paymentStatus, gatewayType, providerRef, failureReason, pix, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          example: pay-91c2
+        orderId:
+          type: string
+          example: ord-7f3a
+        method:
+          $ref: '#/components/schemas/PaymentMethod'
+        amount:
+          $ref: '#/components/schemas/Money'
+        paymentStatus:
+          $ref: '#/components/schemas/PaymentStatus'
+        gatewayType:
+          type: string
+          description: '`SIMULATED` until phase 4; then the chosen provider.'
+          example: SIMULATED
+        providerRef:
+          type: string
+          nullable: true
+        failureReason:
+          type: string
+          nullable: true
+          example: null
+        pix:
+          $ref: '#/components/schemas/PixCharge'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PixCharge:
+      type: object
+      nullable: true
+      description: Only for `PIX` shown on screen.
+      required: [copyPaste, expiresAt]
+      properties:
+        copyPaste:
+          type: string
+          description: Pix "copia e cola" payload; the kiosk draws the QR code from it.
+        expiresAt:
+          type: string
+          format: date-time
+    SimulatePaymentRequest:
+      type: object
+      required: [outcome]
+      properties:
+        outcome:
+          type: string
+          enum: [AUTHORISED, FAILED]
+    PlacedOrder:
+      type: object
+      example:
+        orderId: ord-7f3a
+        posCheckNumber: '42'
+        waitTime: 8
+        status: PAID
+      description: OP-PAY-03 response (`OrderResponse`).
+      required: [orderId, posCheckNumber, waitTime, status]
+      properties:
+        orderId:
+          type: string
+          example: ord-7f3a
+        posCheckNumber:
+          type: string
+          example: '42'
+        waitTime:
+          type: integer
+          nullable: true
+          description: Minutes. How it is computed is open question 2.
+          example: 8
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+
+    # ------------------------------------------------------------ Kitchen
+    KitchenOrder:
+      type: object
+      example:
+        id: ord-7f3a
+        posCheckNumber: '42'
+        orderType: TAKE_OUT
+        status: PAID
+        placedAt: '2026-10-30T12:04:10Z'
+        readyAt: null
+        lines:
+          - name: Croque monsieur
+            quantity: 1
+            options: [Brioche, Ovo pochê]
+          - name: Cappuccino
+            quantity: 1
+            options: [Leite integral]
+          - name: Fermentação natural
+            quantity: 1
+            options: [Inteiro, fatiado]
+      required: [id, posCheckNumber, orderType, status, placedAt, readyAt, lines]
+      properties:
+        id:
+          type: string
+        posCheckNumber:
+          type: string
+        orderType:
+          $ref: '#/components/schemas/OrderType'
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        placedAt:
+          type: string
+          format: date-time
+        readyAt:
+          type: string
+          format: date-time
+          nullable: true
+        lines:
+          type: array
+          items:
+            type: object
+            required: [name, quantity, options]
+            properties:
+              name:
+                type: string
+              quantity:
+                type: integer
+              options:
+                type: array
+                description: Option names, flattened, in pt-BR.
+                items:
+                  type: string
+    KitchenStatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [PREPARING, READY, COLLECTED]
+
+    # ------------------------------------------------------------ Admin
+    OwnerLoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+    OwnerToken:
+      type: object
+      required: [accessToken, tokenType, expiresIn]
+      properties:
+        accessToken:
+          type: string
+        tokenType:
+          type: string
+          enum: [Bearer]
+        expiresIn:
+          type: integer
+          description: Seconds.
+    RestaurantInput:
+      type: object
+      required: [name, cnpj, timezone, defaultLanguage, supportedLanguages, isDineInAvailable, isTakeOutAvailable, closedMessage, posCheckNumberDisplayLength]
+      properties:
+        name:
+          type: string
+        logo:
+          type: string
+          nullable: true
+        cnpj:
+          type: string
+          pattern: '^[0-9]{14}$'
+        timezone:
+          type: string
+          example: America/Sao_Paulo
+        defaultLanguage:
+          $ref: '#/components/schemas/LanguageCode'
+        supportedLanguages:
+          type: array
+          items:
+            $ref: '#/components/schemas/LanguageCode'
+        isDineInAvailable:
+          type: boolean
+        isTakeOutAvailable:
+          type: boolean
+        closedMessage:
+          $ref: '#/components/schemas/ClosedMessage'
+        posCheckNumberDisplayLength:
+          type: integer
+          minimum: 1
+          maximum: 6
+        receiptFooter:
+          $ref: '#/components/schemas/LocalizedText'
+    Restaurant:
+      allOf:
+        - type: object
+          required: [id]
+          properties:
+            id:
+              type: string
+        - $ref: '#/components/schemas/RestaurantInput'
+    MediaAsset:
+      type: object
+      required: [id, url, width, height]
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+          example: /media/fermentacao-natural.jpg
+        width:
+          type: integer
+        height:
+          type: integer
+    DeviceStatus:
+      type: string
+      enum: [ACTIVE, DISABLED]
+    DeviceInput:
+      type: object
+      required: [name, kind, status, idleTimerIntervalMilliseconds, printerEnabled, maintenanceMode, atCapacityMode]
+      properties:
+        name:
+          type: string
+          example: Totem da entrada
+        kind:
+          $ref: '#/components/schemas/DeviceKind'
+        status:
+          $ref: '#/components/schemas/DeviceStatus'
+        idleTimerIntervalMilliseconds:
+          type: integer
+          minimum: 0
+        printerEnabled:
+          type: boolean
+        maintenanceMode:
+          type: boolean
+        atCapacityMode:
+          type: boolean
+    AdminDevice:
+      allOf:
+        - $ref: '#/components/schemas/DeviceInput'
+        - type: object
+          required: [id, online, appVersion, lastSeenAt, ip, screenResolution]
+          properties:
+            id:
+              type: string
+              example: KIOSK-TBT-001
+            online:
+              type: boolean
+              description: A heartbeat arrived in the last 3 minutes.
+            appVersion:
+              type: string
+              nullable: true
+            lastSeenAt:
+              type: string
+              format: date-time
+              nullable: true
+            ip:
+              type: string
+              nullable: true
+            screenResolution:
+              type: string
+              nullable: true
+    DeviceCredentials:
+      type: object
+      required: [device, deviceSecret]
+      properties:
+        device:
+          $ref: '#/components/schemas/AdminDevice'
+        deviceSecret:
+          type: string
+          description: Shown once. The Go API stores only its hash.
+    MenuInput:
+      type: object
+      required: [name, showCategoriesPrice]
+      properties:
+        name:
+          $ref: '#/components/schemas/LocalizedText'
+        showCategoriesPrice:
+          type: boolean
+    AdminMenu:
+      allOf:
+        - $ref: '#/components/schemas/MenuInput'
+        - type: object
+          required: [id, currency, isActive, forcedUntil]
+          properties:
+            id:
+              type: string
+            currency:
+              type: string
+              enum: [BRL]
+            isActive:
+              type: boolean
+            forcedUntil:
+              type: string
+              format: date-time
+              nullable: true
+    MenuSchedule:
+      type: object
+      description: Opening window in the restaurant's timezone. `timeStart` later than `timeEnd` runs past midnight.
+      required: [weekday, timeStart, timeEnd]
+      properties:
+        weekday:
+          $ref: '#/components/schemas/Weekday'
+        timeStart:
+          $ref: '#/components/schemas/LocalTime'
+        timeEnd:
+          $ref: '#/components/schemas/LocalTime'
+    ForceMenuRequest:
+      type: object
+      required: [until]
+      properties:
+        until:
+          type: string
+          format: date-time
+    CategoryInput:
+      type: object
+      required: [menuId, name, displayOrder]
+      properties:
+        menuId:
+          type: string
+        parentId:
+          type: string
+          nullable: true
+        name:
+          $ref: '#/components/schemas/LocalizedText'
+        image:
+          type: string
+          nullable: true
+        displayOrder:
+          type: integer
+    AdminCategory:
+      allOf:
+        - $ref: '#/components/schemas/CategoryInput'
+        - type: object
+          required: [id]
+          properties:
+            id:
+              type: string
+    CategoryItemLink:
+      type: object
+      required: [itemId, displayOrder]
+      properties:
+        itemId:
+          type: string
+        displayOrder:
+          type: integer
+        priceOverride:
+          type: integer
+          format: int64
+          minimum: 0
+          nullable: true
+          description: Integer cents in BRL, or null.
+    FiscalFields:
+      type: object
+      nullable: true
+      description: Phase 4. Final shape depends on the NFC-e API and the accountant (open question 5).
+      properties:
+        ncm:
+          type: string
+          example: '19059090'
+        cfop:
+          type: string
+          example: '5102'
+        taxes:
+          type: object
+          additionalProperties:
+            type: string
+    ItemInput:
+      type: object
+      required: [name, price, serviceAvailability]
+      properties:
+        plu:
+          type: string
+          nullable: true
+        name:
+          $ref: '#/components/schemas/LocalizedText'
+        shortName:
+          $ref: '#/components/schemas/LocalizedText'
+        description:
+          $ref: '#/components/schemas/LocalizedText'
+        image:
+          type: string
+          nullable: true
+        price:
+          $ref: '#/components/schemas/Money'
+        servicePriceOverride:
+          $ref: '#/components/schemas/ServicePriceOverride'
+        serviceAvailability:
+          $ref: '#/components/schemas/ServiceAvailability'
+        calories:
+          type: string
+          nullable: true
+        itemLabels:
+          type: array
+          items:
+            type: string
+        defaultEntity:
+          type: string
+          nullable: true
+        crossSellGroupId:
+          type: string
+          nullable: true
+        fiscal:
+          $ref: '#/components/schemas/FiscalFields'
+    AdminItem:
+      allOf:
+        - $ref: '#/components/schemas/ItemInput'
+        - type: object
+          required: [id, soldOutDate]
+          properties:
+            id:
+              type: string
+            soldOutDate:
+              type: string
+              format: date
+              nullable: true
+    AdminOption:
+      type: object
+      required: [name, price, maximumQuantity, defaultQuantity, supersede, displayOrder]
+      properties:
+        id:
+          type: string
+          description: Empty on create; kept on replace so order history stays linked.
+        plu:
+          type: string
+          nullable: true
+        name:
+          $ref: '#/components/schemas/LocalizedText'
+        price:
+          $ref: '#/components/schemas/Money'
+        servicePriceOverride:
+          $ref: '#/components/schemas/ServicePriceOverride'
+        maximumQuantity:
+          type: integer
+          minimum: 1
+        defaultQuantity:
+          type: integer
+          minimum: 0
+        supersede:
+          type: boolean
+        displayOrder:
+          type: integer
+    AdminCompositeOption:
+      type: object
+      required: [positiveOption, negativeOption]
+      properties:
+        positiveOption:
+          $ref: '#/components/schemas/AdminOption'
+        negativeOption:
+          $ref: '#/components/schemas/AdminOption'
+        defaultChoice:
+          type: string
+          nullable: true
+          enum: [POSITIVE, NEGATIVE]
+    OptionGroupInput:
+      type: object
+      description: Belongs to an item, or to an option for nested groups.
+      required: [name, role, minimum, maximum, displayOrder, options]
+      properties:
+        itemId:
+          type: string
+          nullable: true
+        parentOptionId:
+          type: string
+          nullable: true
+        name:
+          $ref: '#/components/schemas/LocalizedText'
+        role:
+          $ref: '#/components/schemas/OptionGroupRole'
+        minimum:
+          type: integer
+          minimum: 0
+        maximum:
+          type: integer
+          minimum: 0
+        defaultOption:
+          type: string
+          nullable: true
+        displayOrder:
+          type: integer
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminOption'
+        compositeOptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminCompositeOption'
+    AdminOptionGroup:
+      allOf:
+        - $ref: '#/components/schemas/OptionGroupInput'
+        - type: object
+          required: [id]
+          properties:
+            id:
+              type: string
+    TagInput:
+      type: object
+      required: [badgeName, textColour, backgroundColour, tagsPages, scheduleEnabled, links]
+      properties:
+        badgeName:
+          $ref: '#/components/schemas/LocalizedText'
+        textColour:
+          type: string
+          example: '#FAF6F0'
+        backgroundColour:
+          type: string
+          example: '#4E3426'
+        tagsPages:
+          type: array
+          items:
+            $ref: '#/components/schemas/TagsPage'
+        scheduleEnabled:
+          type: boolean
+        startDate:
+          type: string
+          format: date
+          nullable: true
+        endDate:
+          type: string
+          format: date
+          nullable: true
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/TagLink'
+    AdminTag:
+      allOf:
+        - $ref: '#/components/schemas/TagInput'
+        - type: object
+          required: [id]
+          properties:
+            id:
+              type: string
+    CrossSellGroupInput:
+      type: object
+      required: [name, crossSells]
+      properties:
+        name:
+          $ref: '#/components/schemas/LocalizedText'
+        crossSells:
+          type: array
+          items:
+            type: string
+    AdminCrossSellGroup:
+      allOf:
+        - $ref: '#/components/schemas/CrossSellGroupInput'
+        - type: object
+          required: [id]
+          properties:
+            id:
+              type: string
+    DiscountInput:
+      type: object
+      required: [type, code, title, kind, value, active]
+      properties:
+        type:
+          $ref: '#/components/schemas/DiscountType'
+        code:
+          type: string
+          example: BEMVINDO10
+        title:
+          $ref: '#/components/schemas/LocalizedText'
+        description:
+          $ref: '#/components/schemas/LocalizedText'
+        kind:
+          type: string
+          enum: [PERCENT, FIXED]
+        value:
+          type: integer
+          minimum: 1
+          description: Whole percent (1 to 100) for PERCENT; cents for FIXED.
+          example: 10
+        validFrom:
+          type: string
+          format: date-time
+          nullable: true
+        validTo:
+          type: string
+          format: date-time
+          nullable: true
+        active:
+          type: boolean
+    AdminDiscount:
+      allOf:
+        - $ref: '#/components/schemas/DiscountInput'
+        - type: object
+          required: [id]
+          properties:
+            id:
+              type: string
+    DailyReport:
+      type: object
+      required: [date, ordersCount, revenue, averageTicket, byOrderType, bestSellers]
+      properties:
+        date:
+          type: string
+          format: date
+        ordersCount:
+          type: integer
+        revenue:
+          $ref: '#/components/schemas/Money'
+        averageTicket:
+          $ref: '#/components/schemas/Money'
+        byOrderType:
+          type: object
+          required: [DINEIN, TAKE_OUT]
+          properties:
+            DINEIN:
+              $ref: '#/components/schemas/OrderTypeTotals'
+            TAKE_OUT:
+              $ref: '#/components/schemas/OrderTypeTotals'
+        bestSellers:
+          type: array
+          items:
+            type: object
+            required: [itemId, name, quantity, revenue]
+            properties:
+              itemId:
+                type: string
+              name:
+                type: string
+              quantity:
+                type: integer
+              revenue:
+                $ref: '#/components/schemas/Money'
+    OrderTypeTotals:
+      type: object
+      required: [orders, revenue]
+      properties:
+        orders:
+          type: integer
+        revenue:
+          $ref: '#/components/schemas/Money'

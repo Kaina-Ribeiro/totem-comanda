@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Você ainda está aí?</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+</style>
+</helmet>
+<div style="width: 720px; height: 1280px; box-sizing: border-box; background: rgba(20,26,23,0.72); color: {{ink}}; font-family: Manrope, system-ui, sans-serif; display: flex; align-items: center; justify-content: center; padding: 48px; overflow: hidden">
+  <div role="alertdialog" aria-modal="true" aria-labelledby="idle-title" aria-describedby="idle-desc" style="width: 100%; background: {{surface}}; border-radius: 40px; padding: 52px 48px 44px; display: flex; flex-direction: column; gap: 36px">
+    <div style="display: flex; align-items: center; gap: 28px">
+      <div style="position: relative; width: 148px; height: 148px; flex-shrink: 0">
+        <svg width="148" height="148" viewBox="0 0 148 148" aria-hidden="true">
+          <circle cx="74" cy="74" r="64" fill="none" stroke="{{ground}}" stroke-width="10"></circle>
+          <circle cx="74" cy="74" r="64" fill="none" stroke="{{detail}}" stroke-width="10" stroke-linecap="round" stroke-dasharray="402.12" stroke-dashoffset="{{offset}}" transform="rotate(-90 74 74)"></circle>
+        </svg>
+        <div aria-live="polite" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 56px">{{seconds}}</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <h1 id="idle-title" style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 46px; letter-spacing: -0.02em; line-height: 1.05">Ainda está aí?</h1>
+        <p id="idle-desc" style="margin: 0; font-size: 20px; line-height: 1.4; color: {{muted}}">Sem resposta, o pedido é cancelado e o totem volta ao início.</p>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 14px">
+      <a href="Menu.dc.html" style="height: 100px; border-radius: 50px; background: {{accent}}; color: {{onAccent}}; display: flex; align-items: center; justify-content: center; font-size: 25px; font-weight: 700">Sim, continuar o pedido</a>
+      <a href="Main.dc.html" style="height: 84px; border-radius: 42px; background: {{ground}}; display: flex; align-items: center; justify-content: center; font-size: 21px; font-weight: 700">Cancelar pedido</a>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["padaria","tomate","verde","acafrao"],"default":"padaria"},"$preview":{"width":720,"height":1280}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { left: 20 };
+  }
+  componentDidMount() {
+    this.timer = setInterval(() => {
+      this.setState({ left: this.state.left <= 0 ? 20 : this.state.left - 1 });
+    }, 1000);
+  }
+  componentWillUnmount() {
+    clearInterval(this.timer);
+  }
+  renderVals() {
+    const THEMES = {
+      padaria: { ground:'#F3EFE8', surface:'#FFFFFF', ink:'#2B211C', muted:'#625750', accent:'#4E3426', onAccent:'#FAF6F0', detail:'#B07A3A' },
+      verde: { ground:'#EEECE6', surface:'#FFFFFF', ink:'#141A17', muted:'#5B615C', accent:'#1F3D31', onAccent:'#F4F2EC', detail:'#B9892C' },
+      tomate: { ground:'#F3F2ED', surface:'#FFFFFF', ink:'#1B1816', muted:'#5F5B57', accent:'#C8341F', onAccent:'#FFF6F1', detail:'#C8341F' },
+      acafrao: { ground:'#EFEEE9', surface:'#FFFFFF', ink:'#17181C', muted:'#5E5D59', accent:'#17181C', onAccent:'#F7F5EF', detail:'#F2B134' }
+    };
+    const t = THEMES[this.props.theme ?? 'padaria'] || THEMES.padaria;
+    const c = 402.12;
+    return {
+      ...t,
+      seconds: this.state.left,
+      offset: (c * (1 - this.state.left / 20)).toFixed(2)
+    };
+  }
+}
+</script>
+</body>
+</html>
