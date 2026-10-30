@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto";
 
 import { notFound, ok, problem, type Route, type Schemas } from "./http.ts";
 import { owner } from "./routes-admin.ts";
+import { today } from "./routes-kiosk.ts";
 import { state } from "./state.ts";
 
 const newId = (prefix: string) => `${prefix}-${randomBytes(3).toString("hex")}`;
@@ -218,3 +219,27 @@ catalogueRoutes.push([
   /^\/v1\/admin\/cross-sells$/,
   owner(() => ok(catalogue().crossSellGroups)),
 ]);
+
+catalogueRoutes.push(
+  [
+    "POST",
+    /^\/v1\/admin\/items\/([^/]+)\/sold-out$/,
+    owner((_req, [itemId]) => {
+      const item = catalogue().items.find((i) => i.id === itemId);
+      if (!item) return notFound();
+      // Sold out for today's business date: back by itself tomorrow.
+      item.soldOutDate = today();
+      return ok(item);
+    }),
+  ],
+  [
+    "DELETE",
+    /^\/v1\/admin\/items\/([^/]+)\/sold-out$/,
+    owner((_req, [itemId]) => {
+      const item = catalogue().items.find((i) => i.id === itemId);
+      if (!item) return notFound();
+      item.soldOutDate = null;
+      return ok(item);
+    }),
+  ],
+);

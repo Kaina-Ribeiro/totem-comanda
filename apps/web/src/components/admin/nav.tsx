@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 /** Back-office sections. Order follows how the owner sets the shop up. */
 export const ADMIN_SECTIONS = [
   { href: "/admin", label: "Início" },
+  { href: "/admin/esgotados", label: "Esgotados" },
   { href: "/admin/cardapios", label: "Cardápios" },
   { href: "/admin/categorias", label: "Categorias" },
   { href: "/admin/itens", label: "Itens" },
