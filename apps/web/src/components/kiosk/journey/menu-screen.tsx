@@ -83,7 +83,7 @@ export function MenuScreen({
       <div className="flex min-h-0 flex-1">
         <nav
           aria-label="Categorias"
-          className="flex w-[264px] shrink-0 flex-col gap-[9px] pt-3 pr-[18px] pl-[30px]"
+          className="flex w-[312px] shrink-0 flex-col gap-[9px] pt-3 pr-[18px] pl-[30px]"
         >
           {menu.entities.map((c, index) => {
             const on = index === categoryIndex;
@@ -93,7 +93,7 @@ export function MenuScreen({
                 key={c.id}
                 onClick={() => onPickCategory(c.id)}
                 aria-pressed={on}
-                className={`flex min-h-[108px] w-full items-center gap-[18px] rounded-[27px] px-[21px] text-left text-[30px] ${
+                className={`flex min-h-[108px] w-full items-center gap-[18px] rounded-[27px] px-[21px] text-left text-[27px] ${
                   on ? `${cTint} font-extrabold text-ink` : "font-semibold text-muted"
                 }`}
               >
