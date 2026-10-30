@@ -1,5 +1,6 @@
 import { AutoRefresh } from "@/components/auto-refresh";
 import type { DeviceConfig } from "@/lib/device/config";
+import { gateState } from "@/lib/device/gate";
 import { formatNextOpening } from "@/lib/format/next-opening";
 
 import { AttractScreen } from "./attract-screen";
@@ -25,38 +26,39 @@ function GateScreen({ config }: { config: DeviceConfig }) {
   const { restaurant } = config;
   const brand = restaurant.name;
 
-  if (config.maintenanceMode) {
-    return (
-      <UnavailableScreen
-        brand={brand}
-        title="Totem em manutenção"
-        body="Faça seu pedido no balcão. Já já voltamos."
-      />
-    );
+  switch (gateState(config)) {
+    case "maintenance":
+      return (
+        <UnavailableScreen
+          brand={brand}
+          title="Totem em manutenção"
+          body="Faça seu pedido no balcão. Já já voltamos."
+        />
+      );
+    case "at-capacity":
+      return (
+        <UnavailableScreen
+          brand={brand}
+          title="Cozinha a todo vapor"
+          body="Estamos com muitos pedidos agora. Voltamos a aceitar pedidos em instantes."
+        />
+      );
+    case "closed": {
+      const { title, description } = restaurant.closedMessage;
+      return (
+        <UnavailableScreen
+          brand={brand}
+          title={title["pt-BR"]}
+          body={description["pt-BR"]}
+          note={
+            config.nextOpeningAt
+              ? formatNextOpening(config.nextOpeningAt, restaurant.timezone)
+              : undefined
+          }
+        />
+      );
+    }
+    case "open":
+      return <AttractScreen brand={brand} />;
   }
-  if (config.atCapacityMode) {
-    return (
-      <UnavailableScreen
-        brand={brand}
-        title="Cozinha a todo vapor"
-        body="Estamos com muitos pedidos agora. Voltamos a aceitar pedidos em instantes."
-      />
-    );
-  }
-  if (!config.isOpen) {
-    const { title, description } = restaurant.closedMessage;
-    return (
-      <UnavailableScreen
-        brand={brand}
-        title={title["pt-BR"]}
-        body={description["pt-BR"]}
-        note={
-          config.nextOpeningAt
-            ? formatNextOpening(config.nextOpeningAt, restaurant.timezone)
-            : undefined
-        }
-      />
-    );
-  }
-  return <AttractScreen brand={brand} />;
 }

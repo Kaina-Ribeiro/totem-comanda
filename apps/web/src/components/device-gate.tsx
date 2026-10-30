@@ -2,8 +2,10 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { AutoRefresh } from "@/components/auto-refresh";
+import { DeviceReporter } from "@/components/device-reporter";
 import { UnavailableScreen } from "@/components/kiosk/unavailable-screen";
 import { type DeviceConfig, getDeviceConfig } from "@/lib/device/config";
+import { gateState } from "@/lib/device/gate";
 import { DeviceAuthError } from "@/lib/device/session";
 
 /** BR-KIOSK-02: a failed configuration load retries every 5 s. */
@@ -48,7 +50,12 @@ export async function DeviceGate({
         return <PreparingScreen />;
     }
   }
-  return children(config);
+  return (
+    <>
+      {children(config)}
+      <DeviceReporter state={gateState(config)} />
+    </>
+  );
 }
 
 /** SCR-KIOSK-01: shown while the config cannot be loaded; retries by itself. */
