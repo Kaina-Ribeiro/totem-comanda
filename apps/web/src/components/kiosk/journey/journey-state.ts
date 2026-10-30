@@ -24,6 +24,8 @@ export type Journey = {
   categoryId: string | null;
   /** The item open in the builder, and the basket line it edits, if any. */
   item: { itemId: string; editGuid: string | null; returnTo: "menu" | "basket" } | null;
+  /** CPF (11) or CNPJ (14) digits for the receipt, if the guest gave one (F-BASKET-10). */
+  cpfCnpj: string | null;
   /** Coupon or restaurant discount code on the order (one per order). */
   discountCode: string | null;
   /** The Core API's latest totals, for the basket they were asked for (`key`). */
@@ -56,6 +58,7 @@ export type JourneyAction =
   | { type: "lineQuantity"; guid: string; quantity: number }
   | { type: "removeLine"; guid: string }
   | { type: "quoted"; key: string; result: Result<OrderTotal> }
+  | { type: "taxId"; cpfCnpj: string | null }
   | { type: "reset"; language: Language };
 
 export function initialJourney(language: Language): Journey {
@@ -70,6 +73,7 @@ export function initialJourney(language: Language): Journey {
     basket: [],
     categoryId: null,
     item: null,
+    cpfCnpj: null,
     discountCode: null,
     quote: null,
   };
@@ -138,6 +142,8 @@ export function journeyReducer(state: Journey, action: JourneyAction): Journey {
       };
     case "removeLine":
       return { ...state, basket: state.basket.filter((line) => line.guid !== action.guid) };
+    case "taxId":
+      return { ...state, cpfCnpj: action.cpfCnpj };
     case "quoted":
       // A late answer for an older basket is dropped.
       return action.key === quoteKey(state)

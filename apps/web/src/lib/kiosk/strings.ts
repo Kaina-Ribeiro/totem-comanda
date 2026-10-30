@@ -60,6 +60,17 @@ const ptBR = {
   "cancel.bodyOne": "O item será removido e o totem volta para a tela inicial.",
   "cancel.keep": "Não, continuar o pedido",
   "cancel.confirm": "Sim, cancelar",
+  "taxId.row": "CPF na nota?",
+  "taxId.add": "Adicionar",
+  "taxId.change": "Alterar",
+  "taxId.title": "CPF ou CNPJ na nota",
+  "taxId.body": "Só os números. Pode pular se não quiser.",
+  "taxId.label": "Documento",
+  "taxId.invalid": "Esse número não é um CPF ou CNPJ válido.",
+  "taxId.clear": "Limpar",
+  "taxId.erase": "Apagar",
+  "taxId.skip": "Pular",
+  "taxId.confirm": "Confirmar",
 } as const;
 
 export type StringKey = keyof typeof ptBR;
@@ -123,6 +134,17 @@ const en: Strings = {
   "cancel.bodyOne": "The item will be removed and the kiosk goes back to the start.",
   "cancel.keep": "No, keep ordering",
   "cancel.confirm": "Yes, cancel",
+  "taxId.row": "CPF on the receipt?",
+  "taxId.add": "Add",
+  "taxId.change": "Change",
+  "taxId.title": "CPF or CNPJ on the receipt",
+  "taxId.body": "Numbers only. You can skip it.",
+  "taxId.label": "Document",
+  "taxId.invalid": "That is not a valid CPF or CNPJ.",
+  "taxId.clear": "Clear",
+  "taxId.erase": "Erase",
+  "taxId.skip": "Skip",
+  "taxId.confirm": "Confirm",
 };
 
 export type Language = "pt-BR" | "en";

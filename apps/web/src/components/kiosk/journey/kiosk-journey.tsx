@@ -21,6 +21,7 @@ import {
 } from "./journey-state";
 import { MenuScreen } from "./menu-screen";
 import { OrderTypeScreen } from "./order-type-screen";
+import { TaxIdRow, TaxIdSheet } from "./tax-id-sheet";
 
 export type KioskSettings = {
   brand: string;
@@ -52,6 +53,7 @@ export function KioskJourney({
   const [, startTransition] = useTransition();
   const { phase, language } = journey;
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [taxIdOpen, setTaxIdOpen] = useState(false);
   const [quoteAttempt, setQuoteAttempt] = useState(0);
   const key = quoteKey(journey);
   const needsQuote = phase === "basket" && journey.basket.length > 0;
@@ -100,6 +102,7 @@ export function KioskJourney({
 
   function reset() {
     setConfirmCancel(false);
+    setTaxIdOpen(false);
     dispatch({ type: "reset", language: settings.defaultLanguage });
   }
 
@@ -147,6 +150,17 @@ export function KioskJourney({
           strings={strings}
           onKeep={() => setConfirmCancel(false)}
           onConfirm={() => endJourney("CANCELLED_BY_GUEST")}
+        />
+      )}
+      {taxIdOpen && phase === "basket" && (
+        <TaxIdSheet
+          initial={journey.cpfCnpj}
+          strings={strings}
+          onSkip={() => setTaxIdOpen(false)}
+          onConfirm={(cpfCnpj) => {
+            dispatch({ type: "taxId", cpfCnpj });
+            setTaxIdOpen(false);
+          }}
         />
       )}
     </>
@@ -264,6 +278,13 @@ export function KioskJourney({
           <BasketScreen
             journey={journey}
             strings={strings}
+            extras={
+              <TaxIdRow
+                digits={journey.cpfCnpj}
+                strings={strings}
+                onOpen={() => setTaxIdOpen(true)}
+              />
+            }
             onBack={() => dispatch({ type: "openMenu" })}
             onCancel={askCancel}
             onEdit={(line) =>
