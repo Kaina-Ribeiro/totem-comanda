@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   cancelPayment,
@@ -20,6 +20,10 @@ import { currentQuote, type Journey } from "./journey-state";
 
 /** OP-PAY-02: poll at most once per second. */
 const POLL_MS = 1_000;
+/** SCR-PAY-05: a terminal that has not answered by then is cancelled as expired. */
+const AUTHORISE_TIMEOUT_MS = 120_000;
+/** After the timeout, how often to try cancelling again while the Core API cannot. */
+const CANCEL_RETRY_MS = 10_000;
 const METHODS: PaymentMethod[] = ["PIX", "CREDIT", "DEBIT"];
 
 type Step =
@@ -27,7 +31,10 @@ type Step =
   | { kind: "working"; method: PaymentMethod; label: "pay.preparing" | "pay.placing" }
   | { kind: "authorising"; method: PaymentMethod; payment: Payment; cancelling: boolean }
   | { kind: "declined"; method: PaymentMethod }
-  | { kind: "error"; method: PaymentMethod; basket: boolean };
+  | { kind: "expired"; method: PaymentMethod }
+  | { kind: "error"; method: PaymentMethod; basket: boolean }
+  /** Paid, but the order was not placed: only staff can sort it out (BR-PAY-05, 08). */
+  | { kind: "placeFailed"; method: PaymentMethod; order: Order };
 
 /** Codes that mean the basket itself must change before paying. */
 const BASKET_CODES = new Set([
@@ -64,10 +71,13 @@ export function CheckoutFlow({
   onBusy: (busy: boolean) => void;
 }) {
   const [step, setStep] = useState<Step>({ kind: "method" });
-  const busy = step.kind === "working" || step.kind === "authorising";
+  const busy =
+    step.kind === "working" || step.kind === "authorising" || step.kind === "placeFailed";
   useEffect(() => onBusy(busy), [busy, onBusy]);
   // One key per payment attempt; a retry after an error reuses it, a new attempt gets a new one.
   const [paymentKey, setPaymentKey] = useState(() => crypto.randomUUID());
+  // Set while an attempt runs, so a double tap cannot start a second payment.
+  const attempting = useRef(false);
   const checkout = journey.checkout!;
   const total = checkout.order?.orderTotal.total ?? currentQuote(journey)?.total ?? 0;
 
@@ -79,11 +89,24 @@ export function CheckoutFlow({
   async function place(method: PaymentMethod, order: Order) {
     setStep({ kind: "working", method, label: "pay.placing" });
     const placed = await placeOrder(order.id, checkout.placeKey);
-    if (placed.ok) onPlaced(placed.data);
-    else fail(method, placed);
+    if (placed.ok) return onPlaced(placed.data);
+    // The payment is taken: never offer another payment or a basket change.
+    // Placing again is safe, since the same key returns the same order.
+    console.warn(`Order not placed after payment: ${placed.code}`);
+    setStep({ kind: "placeFailed", method, order });
   }
 
   async function pay(method: PaymentMethod, key: string) {
+    if (attempting.current) return;
+    attempting.current = true;
+    try {
+      await attempt(method, key);
+    } finally {
+      attempting.current = false;
+    }
+  }
+
+  async function attempt(method: PaymentMethod, key: string) {
     setStep({ kind: "working", method, label: "pay.preparing" });
     let order = checkout.order;
     if (!order) {
@@ -112,17 +135,35 @@ export function CheckoutFlow({
   }
 
   const newAttempt = (method: PaymentMethod) => {
+    if (attempting.current) return;
     const key = crypto.randomUUID();
     setPaymentKey(key);
     void pay(method, key);
   };
 
-  // Polls the payment until it is final.
+  // Polls the payment until it is final; cancels it once the terminal has had its time.
   const polling = step.kind === "authorising" ? step.payment.id : null;
   useEffect(() => {
     if (!polling) return;
     let live = true;
     let timer: ReturnType<typeof setTimeout>;
+    const deadline = Date.now() + AUTHORISE_TIMEOUT_MS;
+    let nextCancel = deadline;
+
+    /** True when the payment was cancelled and the expired screen is up. */
+    const expire = async () => {
+      setStep((s) => (s.kind === "authorising" ? { ...s, cancelling: true } : s));
+      const result = await cancelPayment(polling);
+      if (!live) return true;
+      if (result.ok) {
+        setStep({ kind: "expired", method: result.data.method });
+        return true;
+      }
+      // Already final: the next poll reports how it ended. Otherwise try again later.
+      setStep((s) => (s.kind === "authorising" ? { ...s, cancelling: false } : s));
+      return false;
+    };
+
     const tick = async () => {
       const result = await pollPayment(polling);
       if (!live) return;
@@ -139,6 +180,10 @@ export function CheckoutFlow({
             setStep((s) => (s.kind === "authorising" ? { ...s, payment } : s));
         }
       }
+      if (Date.now() >= nextCancel) {
+        nextCancel = Date.now() + CANCEL_RETRY_MS;
+        if ((await expire()) || !live) return;
+      }
       timer = setTimeout(tick, POLL_MS);
     };
     timer = setTimeout(tick, POLL_MS);
@@ -154,8 +199,11 @@ export function CheckoutFlow({
     if (step.kind !== "authorising") return;
     setStep({ ...step, cancelling: true });
     const result = await cancelPayment(step.payment.id);
-    // Already final: the poll reports how it ended.
-    if (result.ok) setStep({ kind: "method" });
+    if (result.ok) return setStep({ kind: "method" });
+    // Already final: the poll reports how it ended. Any other failure brings the button back.
+    if (result.code !== "PAYMENT_NOT_CANCELLABLE") {
+      setStep((s) => (s.kind === "authorising" ? { ...s, cancelling: false } : s));
+    }
   }
 
   switch (step.kind) {
@@ -197,6 +245,30 @@ export function CheckoutFlow({
           secondary={{ label: strings["pay.other"], onPress: () => setStep({ kind: "method" }) }}
           cancelLabel={strings["menu.cancel"]}
           onCancelOrder={onCancelOrder}
+        />
+      );
+    case "expired":
+      return (
+        <ProblemScreen
+          tag={strings["pay.expiredTag"]}
+          title={strings["pay.expiredTitle"]}
+          body={strings["pay.expiredBody"]}
+          primary={{ label: strings["pay.retry"], onPress: () => newAttempt(step.method) }}
+          secondary={{ label: strings["pay.other"], onPress: () => setStep({ kind: "method" }) }}
+          cancelLabel={strings["menu.cancel"]}
+          onCancelOrder={onCancelOrder}
+        />
+      );
+    case "placeFailed":
+      return (
+        <ProblemScreen
+          tag={strings["pay.placeFailedTag"]}
+          title={strings["pay.placeFailedTitle"]}
+          body={strings["pay.placeFailedBody"]}
+          primary={{
+            label: strings["pay.placeRetry"],
+            onPress: () => void place(step.method, step.order),
+          }}
         />
       );
     case "error":
@@ -399,8 +471,9 @@ function ProblemScreen({
   body: string;
   primary: { label: string; onPress: () => void };
   secondary?: { label: string; onPress: () => void };
-  cancelLabel: string;
-  onCancelOrder: () => void;
+  /** Left out where cancelling would lose a paid order. */
+  cancelLabel?: string;
+  onCancelOrder?: () => void;
 }) {
   return (
     <main className="flex h-full flex-col bg-ground px-[84px] pt-[108px] pb-[72px] text-ink">
@@ -440,9 +513,11 @@ function ProblemScreen({
             {secondary.label}
           </button>
         )}
-        <button onClick={onCancelOrder} className="mt-[24px] text-[28.5px] font-bold text-danger">
-          {cancelLabel}
-        </button>
+        {onCancelOrder && (
+          <button onClick={onCancelOrder} className="mt-[24px] text-[28.5px] font-bold text-danger">
+            {cancelLabel}
+          </button>
+        )}
       </div>
     </main>
   );
