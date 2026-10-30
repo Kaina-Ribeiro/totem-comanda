@@ -9,40 +9,20 @@
 
 import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { fileURLToPath } from "node:url";
 
-import type { components } from "../src/lib/core-api.d.ts";
+import { SEED_MEDIA } from "./catalogue.ts";
+import { authDevice, problem, type Reply, type Request, type Route, type Schemas } from "./http.ts";
+import { kioskRoutes } from "./routes-kiosk.ts";
 import { activeMenu, nextOpening } from "./schedule.ts";
 import { applyScenario, isScenario, now, SCENARIOS, state } from "./state.ts";
-
-type Schemas = components["schemas"];
 
 const MOCK_PORT = Number(process.env.MOCK_PORT ?? 4020);
 const PRISM_PORT = Number(process.env.PRISM_PORT ?? 4010);
 const TOKEN_TTL_S = Number(process.env.MOCK_TOKEN_TTL ?? 900);
-
-type Reply = { status: number; body?: unknown; headers?: Record<string, string> };
-type Request = { method: string; path: string; headers: IncomingMessage["headers"]; body: unknown; ip: string };
-
-function problem(status: number, code: Schemas["ProblemCode"], title: string): Reply {
-  return {
-    status,
-    body: { type: `/problems/${code.toLowerCase().replaceAll("_", "-")}`, title, status, code },
-    headers: { "Content-Type": "application/problem+json" },
-  };
-}
-
-/** The device behind the bearer token, or a 401. */
-function authDevice(req: Request) {
-  const token = /^Bearer (.+)$/.exec(req.headers.authorization ?? "")?.[1];
-  const entry = token ? state.tokens.get(token) : undefined;
-  const device = entry && state.devices.find((d) => d.id === entry.deviceId);
-  if (!entry || entry.expiresAt < Date.now() || !device || device.status !== "ACTIVE") {
-    return { error: problem(401, "UNAUTHORIZED", "Unauthorized") };
-  }
-  return { device };
-}
+const ASSETS = new URL("../../../docs/prototype/assets/", import.meta.url);
 
 function deviceConfig(device: (typeof state.devices)[number]): Schemas["DeviceConfig"] {
   const r = state.restaurant;
@@ -84,7 +64,8 @@ function deviceConfig(device: (typeof state.devices)[number]): Schemas["DeviceCo
   };
 }
 
-const routes: Array<[string, RegExp, (req: Request, params: string[]) => Reply]> = [
+const routes: Route[] = [
+  ...kioskRoutes,
   [
     "POST",
     /^\/v1\/devices\/auth$/,
@@ -187,11 +168,35 @@ function send(res: ServerResponse, reply: Reply) {
   res.end(reply.body === undefined ? undefined : JSON.stringify(reply.body));
 }
 
-const server = createServer(async (incoming, res) => {
+/**
+ * Media the Core API serves under /media (not in the contract: MediaAsset.url
+ * points here). The BFF fetches it directly from the mock, not through Prism.
+ */
+async function serveMedia(path: string, res: ServerResponse): Promise<boolean> {
+  const name = /^\/media\/([\w.-]+)$/.exec(path)?.[1];
+  const file = name && (state.media.get(name) ?? SEED_MEDIA[name]);
+  if (!file) return false;
+  try {
+    const bytes = typeof file === "string" ? await readFile(new URL(file, ASSETS)) : file.bytes;
+    const type = typeof file === "string" ? "image/jpeg" : file.type;
+    res.writeHead(200, { "Content-Type": type, "Cache-Control": "public, max-age=3600" });
+    res.end(bytes);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Prism forwards some BFF requests (those Next.js sends chunked, e.g. from Route
+// Handlers) with both Content-Length and Transfer-Encoding. Node's strict
+// parser rejects that with a bare 400; Go's net/http accepts it, so the mock does too.
+const server = createServer({ insecureHTTPParser: true }, async (incoming, res) => {
   const url = new URL(incoming.url ?? "/", "http://mock");
+  if (incoming.method === "GET" && (await serveMedia(url.pathname, res))) return;
   const req: Request = {
     method: incoming.method ?? "GET",
     path: url.pathname,
+    query: url.searchParams,
     headers: incoming.headers,
     body: await readBody(incoming),
     ip: incoming.socket.remoteAddress ?? "",
@@ -201,6 +206,13 @@ const server = createServer(async (incoming, res) => {
     if (match && method === req.method) return send(res, handler(req, match.slice(1)));
   }
   send(res, problem(404, "NOT_FOUND", `Not mocked yet: ${req.method} ${req.path}`));
+});
+
+// Malformed requests get Node's bare 400; log why, since Prism only sees the status.
+server.on("clientError", (error: NodeJS.ErrnoException & { rawPacket?: Buffer }, socket) => {
+  console.warn(`[mock] bad request: ${error.code} ${error.message}`);
+  if (error.rawPacket) console.warn(error.rawPacket.toString("latin1").slice(0, 600));
+  socket.end("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n");
 });
 
 server.listen(MOCK_PORT, () => {

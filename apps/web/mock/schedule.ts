@@ -45,6 +45,11 @@ function instant(day: number, minutes: number, timeZone: string): Date {
 
 const weekdayOf = (day: number) => WEEKDAYS[new Date(day).getUTCDay()];
 
+/** The business date (`YYYY-MM-DD`) of `now` in `timeZone`. */
+export function businessDate(now: Date, timeZone: string): string {
+  return new Date(local(now, timeZone).day).toISOString().slice(0, 10);
+}
+
 /** Today's `hhmm` in `timeZone`, as an instant. */
 export function todayAt(hhmm: string, now: Date, timeZone: string): Date {
   return instant(local(now, timeZone).day, minutesOf(hhmm), timeZone);

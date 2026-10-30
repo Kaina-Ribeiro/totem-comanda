@@ -1,15 +1,21 @@
 // In-memory state of the mock Core API, seeded with the prototype's bakery.
 // Shapes follow contract/openapi.yaml; anything extra is mock-only.
 
-import type { components } from "../src/lib/core-api.d.ts";
+import { seedCatalogue } from "./catalogue.ts";
+import type { Reply, Schemas } from "./http.ts";
 import { todayAt, type ScheduledMenu, type Weekday } from "./schedule.ts";
-
-type Schemas = components["schemas"];
 
 export type MockDevice = Omit<Schemas["AdminDevice"], "online"> & { secret: string };
 export type MockMenu = ScheduledMenu & {
   name: Schemas["LocalizedText"];
   showCategoriesPrice: boolean;
+};
+export type MockJourney = {
+  orderNonce: string;
+  deviceId: string;
+  language: Schemas["LanguageCode"];
+  startedAt: string;
+  events: Array<Schemas["JourneyEvent"] & { at: string }>;
 };
 
 const WEEK: Weekday[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
@@ -55,6 +61,23 @@ function seed() {
         forcedUntil: null,
       },
     ] as MockMenu[],
+    catalogue: seedCatalogue(),
+    /** Owner-edited UI strings per language (OP-START-02), merged over the kiosk's bundle. */
+    languagePacks: { "pt-BR": {}, en: {} } as Record<Schemas["LanguageCode"], Record<string, string>>,
+    /**
+     * Menu each device last loaded. QuoteRequest carries no journey or menu id,
+     * so the mock prices a device's quotes on the menu its journey started with.
+     */
+    deviceMenus: new Map<string, string>(),
+    journeys: new Map<string, MockJourney>(),
+    orders: new Map<string, Schemas["Order"] & { deviceId: string; menuId: string }>(),
+    payments: new Map<string, Schemas["Payment"]>(),
+    /** Uploaded media by file name (POST /v1/admin/media); seed photos are in catalogue.ts. */
+    media: new Map<string, { bytes: Buffer; type: string }>(),
+    /** Idempotency-Key → first body and reply. */
+    idempotency: new Map<string, { body: string; reply: Reply }>(),
+    /** posCheckNumber sequence per business day (FR-1010). */
+    checkNumbers: { date: "", last: 0 },
     /** Opaque device tokens: token → device id and expiry (ms). */
     tokens: new Map<string, { deviceId: string; expiresAt: number }>(),
     /** OP-KIOSK-04 reports, newest last. */
