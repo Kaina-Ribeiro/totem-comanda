@@ -99,3 +99,26 @@ export function nextOpening(menus: ScheduledMenu[], now: Date, timeZone: string)
   }
   return best;
 }
+
+const WEEK_ORDER: Weekday[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+
+/** A window as minute ranges in the week (0 = Monday 00:00); overnight ones split in two. */
+function weekRanges(w: Window): Array<[number, number]> {
+  const day = WEEK_ORDER.indexOf(w.weekday) * 1440;
+  const start = day + minutesOf(w.timeStart);
+  const end = day + minutesOf(w.timeEnd);
+  if (end > start) return [[start, end]];
+  const week = 7 * 1440;
+  // Past midnight: today until 24:00, then the next day (Sunday wraps to Monday).
+  return [
+    [start, day + 1440],
+    [(day + 1440) % week, ((day + 1440) % week) + minutesOf(w.timeEnd)],
+  ];
+}
+
+/** True when any window of `a` overlaps any window of `b` (SCHEDULE_OVERLAP). */
+export function schedulesOverlap(a: Window[], b: Window[]): boolean {
+  const ra = a.flatMap(weekRanges);
+  const rb = b.flatMap(weekRanges);
+  return ra.some(([s1, e1]) => rb.some(([s2, e2]) => s1 < e2 && s2 < e1));
+}

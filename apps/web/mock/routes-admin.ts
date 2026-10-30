@@ -13,7 +13,8 @@ import {
   type Schemas,
 } from "./http.ts";
 import { firstFile, imageSize } from "./media.ts";
-import { state } from "./state.ts";
+import { activeMenu, schedulesOverlap } from "./schedule.ts";
+import { now, state } from "./state.ts";
 
 const OWNER_TTL_S = Number(process.env.MOCK_OWNER_TOKEN_TTL ?? 8 * 60 * 60);
 
@@ -183,6 +184,149 @@ adminRoutes.push(
         device: adminDevice(device),
         deviceSecret: device.secret,
       } satisfies Schemas["DeviceCredentials"]);
+    }),
+  ],
+);
+
+type MockMenu = (typeof state.menus)[number];
+
+function adminMenu(menu: MockMenu): Schemas["AdminMenu"] {
+  const active = activeMenu(state.menus, now(), state.restaurant.timezone);
+  return {
+    id: menu.id,
+    name: menu.name,
+    showCategoriesPrice: menu.showCategoriesPrice,
+    currency: "BRL",
+    isActive: active?.menu.id === menu.id,
+    forcedUntil:
+      menu.forcedUntil && Date.parse(menu.forcedUntil) > now().getTime() ? menu.forcedUntil : null,
+  };
+}
+
+const findMenu = (menuId: string) => state.menus.find((m) => m.id === menuId);
+const LOCAL_TIME = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
+const WEEKDAYS = new Set(["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]);
+
+function menuProblem(input: Partial<Schemas["MenuInput"]> | null): string | null {
+  if (!input?.name?.["pt-BR"]?.trim()) return "name";
+  if (typeof input.showCategoriesPrice !== "boolean") return "showCategoriesPrice";
+  return null;
+}
+
+adminRoutes.push(
+  ["GET", /^\/v1\/admin\/menus$/, owner(() => ok(state.menus.map(adminMenu)))],
+  [
+    "POST",
+    /^\/v1\/admin\/menus$/,
+    owner((req) => {
+      const input = req.body as Schemas["MenuInput"];
+      const invalid = menuProblem(input);
+      if (invalid) return problem(422, "VALIDATION_FAILED", "Validation failed", invalid);
+      const menu: MockMenu = {
+        id: `mnu-${randomBytes(3).toString("hex")}`,
+        name: input.name,
+        showCategoriesPrice: input.showCategoriesPrice,
+        schedules: [],
+        forcedUntil: null,
+      };
+      state.menus.push(menu);
+      return ok(adminMenu(menu), 201);
+    }),
+  ],
+  [
+    "GET",
+    /^\/v1\/admin\/menus\/([^/]+)$/,
+    owner((_req, [menuId]) => {
+      const menu = findMenu(menuId);
+      return menu ? ok(adminMenu(menu)) : notFound();
+    }),
+  ],
+  [
+    "PUT",
+    /^\/v1\/admin\/menus\/([^/]+)$/,
+    owner((req, [menuId]) => {
+      const menu = findMenu(menuId);
+      if (!menu) return notFound();
+      const input = req.body as Schemas["MenuInput"];
+      const invalid = menuProblem(input);
+      if (invalid) return problem(422, "VALIDATION_FAILED", "Validation failed", invalid);
+      Object.assign(menu, { name: input.name, showCategoriesPrice: input.showCategoriesPrice });
+      return ok(adminMenu(menu));
+    }),
+  ],
+  [
+    "DELETE",
+    /^\/v1\/admin\/menus\/([^/]+)$/,
+    owner((_req, [menuId]) => {
+      if (!findMenu(menuId)) return notFound();
+      state.menus = state.menus.filter((m) => m.id !== menuId);
+      state.catalogue.categories = state.catalogue.categories.filter((c) => c.menuId !== menuId);
+      return { status: 204 };
+    }),
+  ],
+  [
+    "GET",
+    /^\/v1\/admin\/menus\/([^/]+)\/schedules$/,
+    owner((_req, [menuId]) => {
+      const menu = findMenu(menuId);
+      return menu ? ok(menu.schedules) : notFound();
+    }),
+  ],
+  [
+    "PUT",
+    /^\/v1\/admin\/menus\/([^/]+)\/schedules$/,
+    owner((req, [menuId]) => {
+      const menu = findMenu(menuId);
+      if (!menu) return notFound();
+      const windows = req.body as Schemas["MenuSchedule"][];
+      if (!Array.isArray(windows))
+        return problem(422, "VALIDATION_FAILED", "Validation failed", "body");
+      const bad = windows.findIndex(
+        (w) =>
+          !WEEKDAYS.has(w.weekday) ||
+          !LOCAL_TIME.test(w.timeStart) ||
+          !LOCAL_TIME.test(w.timeEnd) ||
+          w.timeStart === w.timeEnd,
+      );
+      if (bad !== -1) return problem(422, "VALIDATION_FAILED", "Validation failed", `[${bad}]`);
+      const clash = state.menus.find(
+        (m) => m.id !== menuId && schedulesOverlap(windows, m.schedules),
+      );
+      if (clash) {
+        return problem(409, "SCHEDULE_OVERLAP", "Overlaps another menu", clash.name["pt-BR"]);
+      }
+      menu.schedules = windows.map(({ weekday, timeStart, timeEnd }) => ({
+        weekday,
+        timeStart,
+        timeEnd,
+      }));
+      return ok(menu.schedules);
+    }),
+  ],
+  [
+    "POST",
+    /^\/v1\/admin\/menus\/([^/]+)\/force$/,
+    owner((req, [menuId]) => {
+      const menu = findMenu(menuId);
+      if (!menu) return notFound();
+      const until = (req.body as Partial<Schemas["ForceMenuRequest"]> | null)?.until;
+      if (!until || Number.isNaN(Date.parse(until)) || Date.parse(until) <= now().getTime()) {
+        return problem(422, "VALIDATION_FAILED", "Validation failed", "until");
+      }
+      // One forced menu at a time.
+      for (const m of state.menus) m.forcedUntil = null;
+      menu.forcedUntil = new Date(until).toISOString();
+      return ok(adminMenu(menu));
+    }),
+  ],
+  [
+    "DELETE",
+    /^\/v1\/admin\/menus\/([^/]+)\/force$/,
+    owner((_req, [menuId]) => {
+      const menu = findMenu(menuId);
+      if (!menu) return notFound();
+      menu.forcedUntil = null;
+      return { status: 204 };
     }),
   ],
 );

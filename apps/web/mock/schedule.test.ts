@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { activeMenu, nextOpening, type ScheduledMenu, type Weekday } from "./schedule";
+import {
+  activeMenu,
+  nextOpening,
+  type ScheduledMenu,
+  schedulesOverlap,
+  type Weekday,
+} from "./schedule";
 
 const tz = "America/Sao_Paulo";
 const every = (timeStart: string, timeEnd: string) =>
@@ -57,5 +63,27 @@ describe("nextOpening", () => {
 
   it("is today 06:00 before dawn", () => {
     expect(nextOpening(menus, at("04:00"), tz)?.toISOString()).toBe("2026-10-30T09:00:00.000Z");
+  });
+});
+
+describe("schedulesOverlap", () => {
+  const w = (weekday: "MON" | "TUE" | "SUN", timeStart: string, timeEnd: string) => ({
+    weekday,
+    timeStart,
+    timeEnd,
+  });
+
+  it("lets back-to-back windows touch", () => {
+    expect(schedulesOverlap([w("MON", "06:00", "11:00")], [w("MON", "11:00", "20:00")])).toBe(
+      false,
+    );
+  });
+
+  it("finds overlaps, including past midnight", () => {
+    expect(schedulesOverlap([w("MON", "06:00", "12:00")], [w("MON", "11:00", "20:00")])).toBe(true);
+    expect(schedulesOverlap([w("SUN", "22:00", "02:00")], [w("MON", "01:00", "05:00")])).toBe(true);
+    expect(schedulesOverlap([w("MON", "06:00", "12:00")], [w("TUE", "06:00", "12:00")])).toBe(
+      false,
+    );
   });
 });
