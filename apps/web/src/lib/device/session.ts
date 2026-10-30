@@ -56,7 +56,7 @@ export type DeviceAuthHeaders = { Authorization: string };
  * credentials are wrong.
  */
 export async function asDevice<R extends { response: Response }>(
-  call: (headers: DeviceAuthHeaders) => Promise<R>,
+  call: (headers: DeviceAuthHeaders, deviceId: string) => Promise<R>,
 ): Promise<R> {
   // Device calls are per request: never part of a prerendered shell.
   await connection();
@@ -64,9 +64,9 @@ export async function asDevice<R extends { response: Response }>(
   if (!credentials) throw new DeviceAuthError("NOT_PROVISIONED");
 
   const headers = async () => ({ Authorization: `Bearer ${await tokens.get(credentials)}` });
-  const first = await call(await headers());
+  const first = await call(await headers(), credentials.deviceId);
   if (first.response.status !== 401) return first;
 
   tokens.invalidate(credentials);
-  return call(await headers());
+  return call(await headers(), credentials.deviceId);
 }

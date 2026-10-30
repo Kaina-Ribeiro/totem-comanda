@@ -35,7 +35,7 @@ describe("asDevice", () => {
     authAnswers(token("t1"));
     const call = vi.fn(async () => ({ response: new Response(null, { status: 200 }) }));
     await asDevice(call);
-    expect(call).toHaveBeenCalledWith({ Authorization: "Bearer t1" });
+    expect(call).toHaveBeenCalledWith({ Authorization: "Bearer t1" }, "KIOSK-TBT-001");
   });
 
   it("re-authenticates and repeats the call once after a 401", async () => {
@@ -46,7 +46,7 @@ describe("asDevice", () => {
       .mockResolvedValueOnce({ response: new Response(null, { status: 200 }) });
     const result = await asDevice(call);
     expect(result.response.status).toBe(200);
-    expect(call).toHaveBeenNthCalledWith(2, { Authorization: "Bearer t2" });
+    expect(call).toHaveBeenNthCalledWith(2, { Authorization: "Bearer t2" }, "KIOSK-TBT-001");
   });
 
   it("does not loop when the retry is a 401 too", async () => {

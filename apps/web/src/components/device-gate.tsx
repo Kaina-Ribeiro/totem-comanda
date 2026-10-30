@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { coreApi } from "@/lib/core/client";
-import type { components } from "@/lib/core-api";
-import { asDevice, DeviceAuthError } from "@/lib/device/session";
+import { AutoRefresh } from "@/components/auto-refresh";
+import { UnavailableScreen } from "@/components/kiosk/unavailable-screen";
+import { type DeviceConfig, getDeviceConfig } from "@/lib/device/config";
+import { DeviceAuthError } from "@/lib/device/session";
 
-export type DeviceConfig = components["schemas"]["DeviceConfig"];
+/** BR-KIOSK-02: a failed configuration load retries every 5 s. */
+const CONFIG_RETRY_MS = 5_000;
 
 const DISABLED_COPY = {
   kiosk: {
@@ -19,10 +21,10 @@ const DISABLED_COPY = {
 } as const;
 
 /**
- * Authenticates this browser as its device and hands the device config to
+ * Authenticates this browser as its device and hands its config to
  * `children`. Unprovisioned or rejected credentials go back to /setup; a
- * disabled device gets its own screen. Reads cookies, so render it inside
- * <Suspense>.
+ * disabled device gets its own screen; an unreachable Core API shows the
+ * preparing screen and retries. Reads cookies, so render it inside <Suspense>.
  */
 export async function DeviceGate({
   area,
@@ -33,28 +35,31 @@ export async function DeviceGate({
 }) {
   let config;
   try {
-    config = await asDevice((headers) => coreApi().GET("/v1/devices/me/config", { headers }));
+    config = await getDeviceConfig();
   } catch (error) {
     if (!(error instanceof DeviceAuthError)) throw error;
-    if (error.code === "DEVICE_DISABLED") return <DeviceDisabled {...DISABLED_COPY[area]} />;
-    if (error.code === "NOT_PROVISIONED" || error.code === "INVALID_CREDENTIALS") {
-      redirect("/setup");
+    switch (error.code) {
+      case "NOT_PROVISIONED":
+      case "INVALID_CREDENTIALS":
+        redirect("/setup");
+      case "DEVICE_DISABLED":
+        return <UnavailableScreen {...DISABLED_COPY[area]} />;
+      case "CORE_UNAVAILABLE":
+        return <PreparingScreen />;
     }
-    throw error;
   }
-  if (!config.data) {
-    throw new Error(`Device config failed with HTTP ${config.response.status}`);
-  }
-  return children(config.data);
+  return children(config);
 }
 
-function DeviceDisabled({ title, body }: { title: string; body: string }) {
+/** SCR-KIOSK-01: shown while the config cannot be loaded; retries by itself. */
+export function PreparingScreen() {
   return (
-    <main className="flex flex-1 flex-col justify-center gap-6 bg-ink px-[84px] text-on-accent">
-      <h1 className="font-display text-[120px] font-semibold leading-[0.94] tracking-[-0.03em]">
-        {title}
-      </h1>
-      <p className="max-w-[810px] text-[36px] leading-[1.4] text-on-accent-muted">{body}</p>
-    </main>
+    <>
+      <UnavailableScreen
+        title="Preparando tudo pra você"
+        body="O totem está iniciando e fica pronto em instantes. Se quiser pedir agora, fale com a gente no balcão."
+      />
+      <AutoRefresh everyMs={CONFIG_RETRY_MS} />
+    </>
   );
 }
