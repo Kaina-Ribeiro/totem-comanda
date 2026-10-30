@@ -3,13 +3,12 @@ import { Suspense } from "react";
 
 import { ActionForm, SubmitButton } from "@/components/admin/form";
 import { Card, Checkbox, Field, inputClass, LoadError, PageHeader } from "@/components/admin/ui";
-import { attempt, checked, errorMessage, type FormState, text } from "@/lib/admin/form";
+import { attempt, checked, type FormState, load, text } from "@/lib/admin/form";
 import { uploadImage } from "@/lib/admin/media";
 import { asOwner } from "@/lib/admin/session";
 import { coreApi } from "@/lib/core/client";
 import type { components } from "@/lib/core-api";
 
-type Restaurant = components["schemas"]["Restaurant"];
 type Language = components["schemas"]["LanguageCode"];
 
 async function saveRestaurant(_: FormState, form: FormData): Promise<FormState> {
@@ -62,12 +61,11 @@ export default function StorePage() {
 }
 
 async function StoreForm() {
-  let restaurant: Restaurant;
-  try {
-    restaurant = await asOwner((headers) => coreApi().GET("/v1/admin/restaurant", { headers }));
-  } catch (error) {
-    return <LoadError message={errorMessage(error)} />;
-  }
+  const loaded = await load(() =>
+    asOwner((headers) => coreApi().GET("/v1/admin/restaurant", { headers })),
+  );
+  if ("error" in loaded) return <LoadError message={loaded.error} />;
+  const restaurant = loaded.data;
   const r = restaurant;
   return (
     <ActionForm action={saveRestaurant} className="flex flex-col gap-6">

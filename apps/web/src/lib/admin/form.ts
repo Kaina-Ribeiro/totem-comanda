@@ -5,7 +5,12 @@ import { unstable_rethrow } from "next/navigation";
 import { AdminApiError } from "./session";
 
 /** What a back-office form action returns to its form. */
-export type FormState = { error?: string; saved?: string };
+export type FormState = {
+  error?: string;
+  saved?: string;
+  /** Something shown once and never again, like a new device secret. */
+  reveal?: { label: string; value: string };
+};
 
 const MESSAGES: Partial<Record<AdminApiError["code"], string>> = {
   CORE_UNAVAILABLE: "Não foi possível falar com o servidor. Tente de novo.",
@@ -26,10 +31,11 @@ export function errorMessage(error: unknown): string {
 }
 
 /** Runs a form action's Core API work; failures become a message, redirects pass through. */
-export async function attempt(work: () => Promise<string | void>): Promise<FormState> {
+export async function attempt(work: () => Promise<string | void | FormState>): Promise<FormState> {
   try {
-    const saved = await work();
-    return { saved: saved ?? "Salvo." };
+    const result = await work();
+    if (typeof result === "object") return result;
+    return { saved: result ?? "Salvo." };
   } catch (error) {
     unstable_rethrow(error);
     return { error: errorMessage(error) };
@@ -49,4 +55,17 @@ export function cents(value: string): number | null {
   if (clean === "") return null;
   const number = Number(clean);
   return Number.isFinite(number) && number >= 0 ? Math.round(number * 100) : null;
+}
+
+/**
+ * Loads a page's data: the data, or the owner-facing error message. Redirects
+ * (no session, expired token) pass through instead of becoming an error.
+ */
+export async function load<T>(work: () => Promise<T>): Promise<{ data: T } | { error: string }> {
+  try {
+    return { data: await work() };
+  } catch (error) {
+    unstable_rethrow(error);
+    return { error: errorMessage(error) };
+  }
 }

@@ -34,6 +34,12 @@ export function ActionForm({
           {state.error}
         </p>
       )}
+      {state.reveal && (
+        <div className="flex flex-col gap-1 rounded-xl border border-detail bg-butter p-3">
+          <span className="text-xs font-bold text-detail-text">{state.reveal.label}</span>
+          <code className="text-base font-bold break-all select-all">{state.reveal.value}</code>
+        </div>
+      )}
       {state.saved && (
         <p role="status" className="text-sm font-semibold text-detail-text">
           {state.saved}

@@ -2,6 +2,7 @@ import "server-only";
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 
 import { coreApi, problemCode, type ProblemCode } from "@/lib/core/client";
 import { sealValue, unsealValue } from "@/lib/device/seal";
@@ -101,6 +102,8 @@ export class AdminApiError extends Error {
 export async function asOwner<T>(
   call: (headers: OwnerHeaders) => Promise<{ response: Response; data?: T; error?: unknown }>,
 ): Promise<T> {
+  // Owner calls are per request: never part of a prerendered shell.
+  await connection();
   const session = await readSession();
   if (!session) redirect(ADMIN_LOGIN);
   let result;

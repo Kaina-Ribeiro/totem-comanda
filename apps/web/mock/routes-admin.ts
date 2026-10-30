@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 
 import {
   authOwner,
+  notFound,
   ok,
   problem,
   type Reply,
@@ -95,3 +96,93 @@ function restaurantProblem(input: Partial<Schemas["RestaurantInput"]> | null): s
     return "closedMessage";
   return null;
 }
+
+/** AdminDevice.online: a heartbeat in the last 3 minutes. */
+const ONLINE_MS = 3 * 60_000;
+
+function adminDevice(device: (typeof state.devices)[number]): Schemas["AdminDevice"] {
+  const { secret: _, ...rest } = device;
+  const seen = device.lastSeenAt ? Date.parse(device.lastSeenAt) : 0;
+  return { ...rest, online: Date.now() - seen < ONLINE_MS };
+}
+
+function deviceProblem(input: Partial<Schemas["DeviceInput"]> | null): string | null {
+  if (!input?.name?.trim()) return "name";
+  if (input.kind !== "KIOSK" && input.kind !== "KITCHEN") return "kind";
+  if (input.status !== "ACTIVE" && input.status !== "DISABLED") return "status";
+  if (
+    !Number.isInteger(input.idleTimerIntervalMilliseconds) ||
+    input.idleTimerIntervalMilliseconds! < 0
+  ) {
+    return "idleTimerIntervalMilliseconds";
+  }
+  return null;
+}
+
+const newSecret = () => randomBytes(18).toString("base64url");
+
+/** Drops every token a device holds, so a new secret or a disable takes effect at once. */
+function forgetTokens(deviceId: string) {
+  for (const [token, entry] of state.tokens)
+    if (entry.deviceId === deviceId) state.tokens.delete(token);
+}
+
+adminRoutes.push(
+  ["GET", /^\/v1\/admin\/devices$/, owner(() => ok(state.devices.map(adminDevice)))],
+  [
+    "POST",
+    /^\/v1\/admin\/devices$/,
+    owner((req) => {
+      const input = req.body as Schemas["DeviceInput"];
+      const invalid = deviceProblem(input);
+      if (invalid) return problem(422, "VALIDATION_FAILED", "Validation failed", invalid);
+      const prefix = input.kind === "KIOSK" ? "KIOSK" : "KITCHEN";
+      const count = state.devices.filter((d) => d.kind === input.kind).length + 1;
+      const device = {
+        ...input,
+        id: `${prefix}-TBT-${String(count).padStart(3, "0")}`,
+        secret: newSecret(),
+        appVersion: null,
+        lastSeenAt: null,
+        ip: null,
+        screenResolution: null,
+      };
+      state.devices.push(device);
+      return ok(
+        {
+          device: adminDevice(device),
+          deviceSecret: device.secret,
+        } satisfies Schemas["DeviceCredentials"],
+        201,
+      );
+    }),
+  ],
+  [
+    "PUT",
+    /^\/v1\/admin\/devices\/([^/]+)$/,
+    owner((req, [deviceId]) => {
+      const device = state.devices.find((d) => d.id === deviceId);
+      if (!device) return notFound();
+      const input = req.body as Schemas["DeviceInput"];
+      const invalid = deviceProblem(input);
+      if (invalid) return problem(422, "VALIDATION_FAILED", "Validation failed", invalid);
+      Object.assign(device, input);
+      if (device.status === "DISABLED") forgetTokens(device.id);
+      return ok(adminDevice(device));
+    }),
+  ],
+  [
+    "POST",
+    /^\/v1\/admin\/devices\/([^/]+)\/secret$/,
+    owner((_req, [deviceId]) => {
+      const device = state.devices.find((d) => d.id === deviceId);
+      if (!device) return notFound();
+      device.secret = newSecret();
+      forgetTokens(device.id);
+      return ok({
+        device: adminDevice(device),
+        deviceSecret: device.secret,
+      } satisfies Schemas["DeviceCredentials"]);
+    }),
+  ],
+);
