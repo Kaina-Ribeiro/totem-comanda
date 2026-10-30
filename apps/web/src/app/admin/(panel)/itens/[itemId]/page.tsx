@@ -8,6 +8,7 @@ import { AdminApiError, asOwner } from "@/lib/admin/session";
 import { coreApi } from "@/lib/core/client";
 
 import { ItemForm } from "../item-form";
+import { OptionGroups } from "./option-groups";
 
 export default function EditItemPage({ params, searchParams }: PageProps<"/admin/itens/[itemId]">) {
   return (
@@ -56,6 +57,9 @@ async function EditItem({ params, searchParams }: PageProps<"/admin/itens/[itemI
         </Card>
       )}
       <ItemForm item={item} crossSells={crossSells} />
+      <Suspense>
+        <OptionGroups itemId={item.id} />
+      </Suspense>
     </>
   );
 }

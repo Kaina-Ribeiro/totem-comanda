@@ -17,6 +17,7 @@ import { SEED_MEDIA } from "./catalogue.ts";
 import { authDevice, problem, type Reply, type Request, type Route, type Schemas } from "./http.ts";
 import { adminRoutes } from "./routes-admin.ts";
 import { catalogueRoutes } from "./routes-catalogue.ts";
+import { optionRoutes } from "./routes-options.ts";
 import { kioskRoutes } from "./routes-kiosk.ts";
 import { orderRoutes } from "./routes-orders.ts";
 import { activeMenu, nextOpening } from "./schedule.ts";
@@ -74,6 +75,7 @@ const routes: Route[] = [
   ...orderRoutes,
   ...adminRoutes,
   ...catalogueRoutes,
+  ...optionRoutes,
   [
     "POST",
     /^\/v1\/devices\/auth$/,
