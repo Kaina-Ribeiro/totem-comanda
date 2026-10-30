@@ -61,6 +61,10 @@ function seed() {
         forcedUntil: null,
       },
     ] as MockMenu[],
+    /** The one owner account (test credentials, mock only). */
+    owner: { email: "dono@padaria.test", password: "padaria-teste" },
+    /** Opaque owner tokens: token → expiry (ms). */
+    ownerTokens: new Map<string, number>(),
     catalogue: seedCatalogue(),
     /** Owner-edited UI strings per language (OP-START-02), merged over the kiosk's bundle. */
     languagePacks: { "pt-BR": {}, en: {} } as Record<Schemas["LanguageCode"], Record<string, string>>,

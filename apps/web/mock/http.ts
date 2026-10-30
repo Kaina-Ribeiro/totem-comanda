@@ -51,6 +51,14 @@ export function authDevice(req: Request) {
   return { device } as const;
 }
 
+/** The owner behind the bearer token, or a 401. */
+export function authOwner(req: Request): Reply | null {
+  const token = /^Bearer (.+)$/.exec(req.headers.authorization ?? "")?.[1];
+  const expiresAt = token ? state.ownerTokens.get(token) : undefined;
+  if (!expiresAt || expiresAt < Date.now()) return problem(401, "UNAUTHORIZED", "Unauthorized");
+  return null;
+}
+
 /**
  * Idempotency-Key handling: same key and same body replays the first reply,
  * same key and another body is 409 IDEMPOTENCY_KEY_REUSED.
