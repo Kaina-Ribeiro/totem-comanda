@@ -22,7 +22,7 @@ import { optionRoutes } from "./routes-options.ts";
 import { kioskRoutes } from "./routes-kiosk.ts";
 import { orderRoutes } from "./routes-orders.ts";
 import { activeMenu, nextOpening } from "./schedule.ts";
-import { applyScenario, isScenario, now, SCENARIOS, state } from "./state.ts";
+import { applyScenario, isScenario, now, SCENARIOS, signInDevice, state } from "./state.ts";
 
 const MOCK_PORT = Number(process.env.MOCK_PORT ?? 4020);
 const PRISM_PORT = Number(process.env.PRISM_PORT ?? 4010);
@@ -83,8 +83,8 @@ const routes: Route[] = [
     /^\/v1\/devices\/auth$/,
     (req) => {
       const { deviceId, deviceSecret } = (req.body ?? {}) as Partial<Schemas["DeviceAuthRequest"]>;
-      const device = state.devices.find((d) => d.id === deviceId);
-      if (!device || device.secret !== deviceSecret) {
+      const device = signInDevice(deviceId, deviceSecret);
+      if (!device) {
         return problem(401, "INVALID_CREDENTIALS", "Invalid credentials");
       }
       if (device.status === "DISABLED") return problem(403, "DEVICE_DISABLED", "Device disabled");

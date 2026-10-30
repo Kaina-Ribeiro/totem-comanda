@@ -50,5 +50,13 @@ Project `comanda` on Cubeship builds two apps from `main` of this repo: `web`
 internal only). `web` reaches the mock at `http://cubeship-comanda-production-mock:4010` (Prism) and
 `:4020` (media, kitchen stream). When the Go API exists, point `CORE_API_URL` at it and delete `mock`.
 
+Production is the test environment for now. With `MOCK_AUTO_DEVICES=1` on `mock`, `/setup` accepts any
+device id (letters, digits, `-`, `_`) and any secret: an unknown id registers itself on the first
+"Conectar aparelho", as a kitchen screen if it starts with `KITCHEN` or `COZINHA`, otherwise as a kiosk.
+Use a separate browser (or private window) per device, since each browser holds one device. The
+mock keeps everything in memory, so a restart or deploy clears orders and edits; devices register
+again on their next sign-in. Remove the flag before the pilot. `SIMULATED_PAYMENT_OUTCOME` on `web`
+(`AUTHORISED` by default, `FAILED`, `MANUAL`) sets the simulated card terminal's answer.
+
 `/styleguide` (development only) shows the "Café e trigo" tokens and fonts at 1080x1920, to compare
 with `docs/prototype/screens`.

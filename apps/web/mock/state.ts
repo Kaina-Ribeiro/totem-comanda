@@ -117,6 +117,37 @@ export let state = seed();
 
 export const now = () => new Date(Date.now() + state.clockOffsetMs);
 
+/** Ids a self-registered device may use: they end up in /v1/admin/devices/{deviceId}. */
+const AUTO_DEVICE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+
+/**
+ * The device signing in with this id and secret. With MOCK_AUTO_DEVICES=1
+ * (production used as the test environment, where nobody can pair screens
+ * through the back office yet) an unknown id registers itself with the secret
+ * it sent: ids starting with KITCHEN or COZINHA become kitchen screens, any
+ * other a kiosk. A known id with the wrong secret is still refused.
+ */
+export function signInDevice(
+  deviceId: unknown,
+  secret: unknown,
+  autoRegister = process.env.MOCK_AUTO_DEVICES === "1",
+): MockDevice | null {
+  if (typeof deviceId !== "string" || typeof secret !== "string") return null;
+  const known = state.devices.find((d) => d.id === deviceId);
+  if (known) return known.secret === secret ? known : null;
+  if (!autoRegister || !AUTO_DEVICE_ID.test(deviceId) || !secret) return null;
+  const kitchen = /^(KITCHEN|COZINHA)/i.test(deviceId);
+  const created = device(
+    deviceId,
+    kitchen ? "KITCHEN" : "KIOSK",
+    `${kitchen ? "Cozinha" : "Totem"} ${deviceId} (automático)`,
+    secret,
+  );
+  state.devices.push(created);
+  console.log(`[mock] auto-registered ${created.kind} device ${deviceId}`);
+  return created;
+}
+
 /**
  * Named states the BFF's /dev/mock page can switch to. Each starts from a fresh
  * seed, so they do not pile up.
