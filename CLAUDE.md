@@ -135,7 +135,17 @@ npx @redocly/cli lint contract/openapi.yaml
 
 ## Task tracking
 
-Work is tracked in Linear: project **Comanda** (team `GAB`), one milestone per phase.
-Phase 0 issues are GAB-5 to GAB-13. Start a branch from the issue's suggested branch name,
-reference the issue id (e.g. `GAB-5`) in commits, and move the issue as work progresses.
-GAB-12 is the partner's Go work: do not implement it.
+Work is tracked in Linear, Jira-style (Team → Squad → Epic → Story). Use the `linear-backlog`
+skill (`.claude/skills/linear-backlog`) for any backlog change: types, squads, points, splitting.
+
+| Item | Value |
+|:--|:--|
+| Team | Comanda (`COM`); the workspace also holds another product's team (`BOOK`) |
+| Squads | Free plan, so labels in the `Squad` group: `Web` = `apps/web` (Kai), `Core` = `api/` (partner) |
+| Epics | Linear projects `E0 · Fundação` … `E5 · Piloto`, one per phase; pass ids (`P-COM-12` = E0) |
+| Types | `Type` group: `Story`, `Bug`, `Tech Debt`, `Spike`; Fibonacci points, split over 8 |
+| Issue language | pt-BR |
+
+Phase 0 stories are COM-5 to COM-13 (former GAB-n, same numbers). Start a branch from the issue's
+suggested branch name, reference the issue id (e.g. `COM-9`) in commits, and move the issue as work
+progresses. Issues with the `Core` label are the partner's Go work (e.g. COM-12): do not implement them.
