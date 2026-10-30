@@ -66,7 +66,9 @@ export function MenuScreen({
             className="flex h-[72px] items-center gap-[15px] rounded-full bg-surface px-[27px] text-[25.5px] font-bold"
           >
             <span>{strings[`orderType.${orderType}`]}</span>
-            {canChangeOrderType && <span className="text-detail-text">{strings["menu.change"]}</span>}
+            {canChangeOrderType && (
+              <span className="text-detail-text">{strings["menu.change"]}</span>
+            )}
           </button>
         </div>
         <button
@@ -79,7 +81,10 @@ export function MenuScreen({
       </header>
 
       <div className="flex min-h-0 flex-1">
-        <nav aria-label="Categorias" className="flex w-[264px] shrink-0 flex-col gap-[9px] pt-3 pr-[18px] pl-[30px]">
+        <nav
+          aria-label="Categorias"
+          className="flex w-[264px] shrink-0 flex-col gap-[9px] pt-3 pr-[18px] pl-[30px]"
+        >
           {menu.entities.map((c, index) => {
             const on = index === categoryIndex;
             const cTint = TINTS[index % TINTS.length];
@@ -92,7 +97,9 @@ export function MenuScreen({
                   on ? `${cTint} font-extrabold text-ink` : "font-semibold text-muted"
                 }`}
               >
-                <span className={`size-[15px] shrink-0 rounded-full ${cTint} shadow-[inset_0_0_0_1.5px_rgba(43,33,28,0.15)]`} />
+                <span
+                  className={`size-[15px] shrink-0 rounded-full ${cTint} shadow-[inset_0_0_0_1.5px_rgba(43,33,28,0.15)]`}
+                />
                 <span>{c.name}</span>
               </button>
             );
@@ -101,9 +108,13 @@ export function MenuScreen({
 
         <main className="flex min-w-0 flex-1 flex-col gap-9 overflow-y-auto rounded-tl-[48px] bg-surface pt-12 pr-[42px] pb-12 pl-12">
           <div className="flex items-baseline justify-between">
-            <h1 className="font-display text-[72px] font-semibold tracking-[-0.02em]">{category?.name}</h1>
+            <h1 className="font-display text-[72px] font-semibold tracking-[-0.02em]">
+              {category?.name}
+            </h1>
             <div className="text-[25.5px] font-semibold text-muted">
-              {items.length === 1 ? strings["menu.option"] : format(strings["menu.options"], { n: items.length })}
+              {items.length === 1
+                ? strings["menu.option"]
+                : format(strings["menu.options"], { n: items.length })}
             </div>
           </div>
           {items.length === 0 && <p className="text-[30px] text-muted">{strings["menu.empty"]}</p>}
@@ -113,7 +124,11 @@ export function MenuScreen({
                 key={item.id}
                 item={item}
                 price={formatBRL(cellPrice(item, orderType))}
-                badges={badgesFor(journey.menu!, { id: item.id, categoryId: category.id }, "ITEM_MENU")}
+                badges={badgesFor(
+                  journey.menu!,
+                  { id: item.id, categoryId: category.id },
+                  "ITEM_MENU",
+                )}
                 tint={tint}
                 priority={index < 4}
                 addLabel={format(strings["menu.add"], { name: item.name })}
@@ -168,11 +183,22 @@ function ItemCell({
 }) {
   return (
     <button onClick={onPress} aria-label={addLabel} className="flex flex-col gap-[18px] text-left">
-      <div className={`relative flex h-[240px] items-center justify-center overflow-hidden rounded-[30px] ${tint}`}>
+      <div
+        className={`relative flex h-[240px] items-center justify-center overflow-hidden rounded-[30px] ${tint}`}
+      >
         {item.image ? (
-          <Image src={item.image} alt="" fill sizes="324px" priority={priority} className="object-cover" />
+          <Image
+            src={item.image}
+            alt=""
+            fill
+            sizes="324px"
+            priority={priority}
+            className="object-cover"
+          />
         ) : (
-          <span className="font-display text-[96px] font-semibold text-ink/25">{item.name.charAt(0)}</span>
+          <span className="font-display text-[96px] font-semibold text-ink/25">
+            {item.name.charAt(0)}
+          </span>
         )}
         {badges.length > 0 && (
           <div className="absolute top-[18px] left-[18px] flex flex-wrap gap-2">

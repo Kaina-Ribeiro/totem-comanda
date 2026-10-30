@@ -40,7 +40,11 @@ export const quantityOf = (draft: ItemDraft, group: OptionGroup, option: Option)
 const defaultChoice = (composite: OptionGroup["compositeOptions"][number]): Choice =>
   composite.defaultChoice ?? "POSITIVE";
 
-function defaultPicks(groups: OptionGroup[], picks: ItemDraft["picks"], toggles: ItemDraft["toggles"]) {
+function defaultPicks(
+  groups: OptionGroup[],
+  picks: ItemDraft["picks"],
+  toggles: ItemDraft["toggles"],
+) {
   for (const group of groups.filter(isShown)) {
     const chosen: Record<string, number> = {};
     for (const option of group.options) {
@@ -78,13 +82,18 @@ export function isBlocked(draft: ItemDraft, group: OptionGroup, option: Option):
   return group.maximum > 0 && groupCount(draft, group) >= group.maximum;
 }
 
-function withGroup(draft: ItemDraft, group: OptionGroup, chosen: Record<string, number>): ItemDraft {
+function withGroup(
+  draft: ItemDraft,
+  group: OptionGroup,
+  chosen: Record<string, number>,
+): ItemDraft {
   const picks = { ...draft.picks, [group.id]: chosen };
   // Options that left the group drop their nested picks; new ones get their defaults.
   const toggles = { ...draft.toggles };
   for (const option of group.options) {
     if (chosen[option.id]) {
-      if (!(draft.picks[group.id]?.[option.id] ?? 0)) defaultPicks(option.optionGroups, picks, toggles);
+      if (!(draft.picks[group.id]?.[option.id] ?? 0))
+        defaultPicks(option.optionGroups, picks, toggles);
     } else {
       for (const nested of option.optionGroups) delete picks[nested.id];
     }
@@ -139,12 +148,15 @@ export function setQuantity(draft: ItemDraft, quantity: number): ItemDraft {
 function satisfied(draft: ItemDraft, groups: OptionGroup[]): boolean {
   return groups.filter(isShown).every((group) => {
     if (group.options.length > 0 && groupCount(draft, group) < group.minimum) return false;
-    return group.options.every((o) => !quantityOf(draft, group, o) || satisfied(draft, o.optionGroups));
+    return group.options.every(
+      (o) => !quantityOf(draft, group, o) || satisfied(draft, o.optionGroups),
+    );
   });
 }
 
 /** BR-MENU-13: the add button is enabled once every required choice is made. */
-export const canAdd = (item: MenuEntity, draft: ItemDraft) => satisfied(draft, item.optionGroups ?? []);
+export const canAdd = (item: MenuEntity, draft: ItemDraft) =>
+  satisfied(draft, item.optionGroups ?? []);
 
 function lineOptions(draft: ItemDraft, groups: OptionGroup[]): LineOptionInput[] {
   return groups.filter(isShown).flatMap((group) => [
@@ -166,7 +178,12 @@ function lineOptions(draft: ItemDraft, groups: OptionGroup[]): LineOptionInput[]
 
 /** The basket line for this draft: ids and quantities only. */
 export function draftToLine(item: MenuEntity, draft: ItemDraft, guid: string): BasketLine {
-  return { guid, itemId: item.id, quantity: draft.quantity, options: lineOptions(draft, item.optionGroups ?? []) };
+  return {
+    guid,
+    itemId: item.id,
+    quantity: draft.quantity,
+    options: lineOptions(draft, item.optionGroups ?? []),
+  };
 }
 
 /** Rebuilds a draft from a basket line, to edit it (F-BASKET-01). */

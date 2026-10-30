@@ -26,7 +26,8 @@ export async function GET(_request: Request, { params }: RouteContext<"/media/[.
   } catch {
     return new Response(null, { status: 502 });
   }
-  if (!upstream.ok || !upstream.body) return new Response(null, { status: upstream.status === 404 ? 404 : 502 });
+  if (!upstream.ok || !upstream.body)
+    return new Response(null, { status: upstream.status === 404 ? 404 : 502 });
   return new Response(upstream.body, {
     headers: {
       "Content-Type": upstream.headers.get("Content-Type") ?? "application/octet-stream",

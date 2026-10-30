@@ -21,7 +21,10 @@ export const success = <T>(data: T): Result<T> => ({ ok: true, data });
 /** Maps a failed Core API answer, or a thrown error, to a Result code. */
 export function failure(error: unknown, status?: number): Result<never> {
   if (error instanceof DeviceAuthError) {
-    return { ok: false, code: error.code === "CORE_UNAVAILABLE" ? "CORE_UNAVAILABLE" : "DEVICE_UNAVAILABLE" };
+    return {
+      ok: false,
+      code: error.code === "CORE_UNAVAILABLE" ? "CORE_UNAVAILABLE" : "DEVICE_UNAVAILABLE",
+    };
   }
   const code = problemCode(error);
   if (code) {
@@ -64,7 +67,12 @@ export async function loadActiveMenu(language: Language): Promise<Result<Menu>> 
         headers,
         params: { query: { language }, header: etag ? { "If-None-Match": etag } : {} },
       });
-      const menu = menus.resolve(key, result.response.status, result.response.headers.get("ETag"), result.data);
+      const menu = menus.resolve(
+        key,
+        result.response.status,
+        result.response.headers.get("ETag"),
+        result.data,
+      );
       return { response: result.response, menu, error: result.error };
     });
     if (answer.menu) return success(answer.menu);
@@ -88,6 +96,7 @@ export function reportKeyAction(report: Schemas["DeviceKeyActionReport"]): void 
     const result = await deviceCall((headers) =>
       coreApi().POST("/v1/devices/status", { headers, body: report }),
     );
-    if (!result.ok && result.code !== "CORE_UNAVAILABLE") console.warn(`Key action report: ${result.code}`);
+    if (!result.ok && result.code !== "CORE_UNAVAILABLE")
+      console.warn(`Key action report: ${result.code}`);
   });
 }

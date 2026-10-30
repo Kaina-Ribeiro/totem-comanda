@@ -32,7 +32,9 @@ describe("item draft", () => {
     const draft = initialDraft(croque);
     expect(draft.picks["grp-pao"]).toEqual({ "opt-pao-brioche": 1 });
     expect(canAdd(croque, draft)).toBe(true);
-    expect(draftToLine(croque, draft, "g").options).toEqual([{ optionId: "opt-pao-brioche", quantity: 1 }]);
+    expect(draftToLine(croque, draft, "g").options).toEqual([
+      { optionId: "opt-pao-brioche", quantity: 1 },
+    ]);
   });
 
   it("builds the prototype's croque at R$ 40,90", () => {
@@ -64,7 +66,10 @@ describe("item draft", () => {
 
   it("sends a removed ingredient only when it differs from the default", () => {
     const draft = setToggle(initialDraft(croque), "opt-com-bechamel", "NEGATIVE");
-    expect(draftToLine(croque, draft, "g").options).toContainEqual({ optionId: "opt-sem-bechamel", quantity: 1 });
+    expect(draftToLine(croque, draft, "g").options).toContainEqual({
+      optionId: "opt-sem-bechamel",
+      quantity: 1,
+    });
   });
 
   it("caps option steppers and the item quantity", () => {

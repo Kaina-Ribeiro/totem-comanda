@@ -40,22 +40,24 @@ describe("prices for display", () => {
       { optionId: "opt-ovo-poche", quantity: 1 },
     ];
     expect(unitPrice(croque, options, "TAKE_OUT")).toBe(4090);
-    expect(optionNames(croque, [...options, { optionId: "opt-sem-bechamel", quantity: 1 }])).toEqual([
-      "Brioche",
-      "Ovo pochê",
-      "Sem bechamel",
-    ]);
     expect(
-      basketDisplayTotal(menu, [{ guid: "a", itemId: croque.id, quantity: 2, options }], "TAKE_OUT"),
+      optionNames(croque, [...options, { optionId: "opt-sem-bechamel", quantity: 1 }]),
+    ).toEqual(["Brioche", "Ovo pochê", "Sem bechamel"]);
+    expect(
+      basketDisplayTotal(
+        menu,
+        [{ guid: "a", itemId: croque.id, quantity: 2, options }],
+        "TAKE_OUT",
+      ),
     ).toBe(8180);
   });
 });
 
 describe("badgesFor", () => {
   it("finds owner badges for the page", () => {
-    expect(badgesFor(menu, { id: "itm-fermentacao-natural" }, "ITEM_MENU").map((b) => b.label)).toEqual([
-      "Mais pedido",
-    ]);
+    expect(
+      badgesFor(menu, { id: "itm-fermentacao-natural" }, "ITEM_MENU").map((b) => b.label),
+    ).toEqual(["Mais pedido"]);
     expect(badgesFor(menu, { id: "itm-fermentacao-natural" }, "BASKET")).toEqual([]);
   });
 });

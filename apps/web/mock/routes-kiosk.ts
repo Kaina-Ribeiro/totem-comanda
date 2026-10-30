@@ -2,7 +2,15 @@
 
 import { createHash } from "node:crypto";
 
-import { authDevice, notFound, ok, problem, type Request, type Route, type Schemas } from "./http.ts";
+import {
+  authDevice,
+  notFound,
+  ok,
+  problem,
+  type Request,
+  type Route,
+  type Schemas,
+} from "./http.ts";
 import { applyDiscount, priceBasket, PricingError, resolveMenu } from "./kiosk-menu.ts";
 import { activeMenu, businessDate } from "./schedule.ts";
 import { now, state } from "./state.ts";
@@ -14,8 +22,7 @@ export const today = () => businessDate(now(), state.restaurant.timezone);
 
 export function currentMenu() {
   return activeMenu(state.menus, now(), state.restaurant.timezone)?.menu as
-    | (typeof state.menus)[number]
-    | undefined;
+    (typeof state.menus)[number] | undefined;
 }
 
 /** The menu a device's journey is on: the one it last loaded, else the active one. */
@@ -24,7 +31,8 @@ export function journeyMenuId(deviceId: string): string | null {
 }
 
 export function pricingProblem(error: unknown) {
-  if (error instanceof PricingError) return problem(error.status, error.code, error.title, error.detail);
+  if (error instanceof PricingError)
+    return problem(error.status, error.code, error.title, error.detail);
   throw error;
 }
 
@@ -41,7 +49,8 @@ export const kioskRoutes: Route[] = [
       const { device, error } = authDevice(req);
       if (error) return error;
       const language = req.query.get("language");
-      if (!isLanguage(language)) return problem(422, "VALIDATION_FAILED", "Validation failed", "language");
+      if (!isLanguage(language))
+        return problem(422, "VALIDATION_FAILED", "Validation failed", "language");
       const menu = currentMenu();
       if (!menu) return problem(404, "NO_ACTIVE_MENU", "No menu is active now");
       state.deviceMenus.set(device.id, menu.id);
@@ -144,7 +153,14 @@ export const kioskRoutes: Route[] = [
           { today: today(), at: now(), language },
         );
         return ok(
-          applyDiscount(body.code, total.subtotal, state.catalogue.discounts, now(), language, body.entryMethod),
+          applyDiscount(
+            body.code,
+            total.subtotal,
+            state.catalogue.discounts,
+            now(),
+            language,
+            body.entryMethod,
+          ),
         );
       } catch (e) {
         return pricingProblem(e);

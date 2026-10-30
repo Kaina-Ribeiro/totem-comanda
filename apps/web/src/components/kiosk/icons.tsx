@@ -2,7 +2,12 @@
 
 type IconProps = { size?: number; strokeWidth?: number; className?: string };
 
-function Icon({ size = 36, strokeWidth = 2.2, className, children }: IconProps & { children: React.ReactNode }) {
+function Icon({
+  size = 36,
+  strokeWidth = 2.2,
+  className,
+  children,
+}: IconProps & { children: React.ReactNode }) {
   return (
     <svg
       width={size}

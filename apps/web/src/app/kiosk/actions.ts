@@ -1,6 +1,9 @@
 "use server";
 
+import { after } from "next/server";
+
 import { coreApi } from "@/lib/core/client";
+import type { components } from "@/lib/core-api";
 import {
   deviceCall,
   loadActiveMenu,
@@ -34,7 +37,9 @@ export async function beginJourney(language: Language): Promise<Result<JourneySt
   const orderNonce = crypto.randomUUID();
 
   const [journey, menu, pack] = await Promise.all([
-    deviceCall((headers) => coreApi().POST("/v1/journeys", { headers, body: { orderNonce, language } })),
+    deviceCall((headers) =>
+      coreApi().POST("/v1/journeys", { headers, body: { orderNonce, language } }),
+    ),
     loadActiveMenu(language),
     loadLanguagePack(language),
   ]);
@@ -50,7 +55,11 @@ export async function beginJourney(language: Language): Promise<Result<JourneySt
     });
     return menu;
   }
-  reportKeyAction({ kind: "KEY_ACTION", type: "START_JOURNEY_SUCCESS", kioskStatusType: "TRADING" });
+  reportKeyAction({
+    kind: "KEY_ACTION",
+    type: "START_JOURNEY_SUCCESS",
+    kioskStatusType: "TRADING",
+  });
   return success({
     orderNonce,
     journeyStartedTimestamp: journey.ok ? journey.data.journeyStartedTimestamp : null,
@@ -67,4 +76,42 @@ export async function switchLanguage(
   const [menu, pack] = await Promise.all([loadActiveMenu(language), loadLanguagePack(language)]);
   if (!menu.ok) return menu;
   return success({ menu: menu.data, strings: mergeStrings(language, pack) });
+}
+
+export type OrderTotal = components["schemas"]["OrderTotal"];
+export type QuoteInput = components["schemas"]["QuoteRequest"];
+
+/** Totals for the basket (OP-BASKET-01). Called after every basket or discount change. */
+export async function quoteBasket(input: QuoteInput): Promise<Result<OrderTotal>> {
+  return deviceCall((headers) =>
+    coreApi().POST("/v1/quotes", {
+      headers,
+      body: {
+        orderType: input.orderType,
+        orderItems: input.orderItems,
+        discountCode: input.discountCode ?? null,
+      },
+    }),
+  );
+}
+
+/**
+ * Records how a journey ended without an order (OP-KIOSK-01/02): RESET,
+ * IDLE_TIMEOUT or CANCELLED_BY_GUEST. Fire-and-forget: the kiosk never waits.
+ */
+export async function recordJourneyEvent(
+  orderNonce: string,
+  type: components["schemas"]["JourneyEvent"]["type"],
+  orderTotal: number,
+): Promise<void> {
+  after(async () => {
+    const result = await deviceCall((headers) =>
+      coreApi().POST("/v1/journeys/{orderNonce}/events", {
+        headers,
+        params: { path: { orderNonce } },
+        body: { type, orderTotal },
+      }),
+    );
+    if (!result.ok) console.warn(`Journey event ${type} not recorded: ${result.code}`);
+  });
 }

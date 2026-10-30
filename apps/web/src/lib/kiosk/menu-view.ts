@@ -36,7 +36,10 @@ export function filterMenu(menu: Menu, orderType: OrderType): Menu {
 
 /** Every item in the menu, with the category it was found in. */
 export function* menuItems(menu: Menu): Generator<{ item: MenuEntity; categoryId: string }> {
-  function* walk(entities: MenuEntity[], categoryId: string): Generator<{ item: MenuEntity; categoryId: string }> {
+  function* walk(
+    entities: MenuEntity[],
+    categoryId: string,
+  ): Generator<{ item: MenuEntity; categoryId: string }> {
     for (const entity of entities) {
       if (entity.type === "ITEM") yield { item: entity, categoryId };
       else yield* walk(entity.childEntities, entity.id);
@@ -77,7 +80,11 @@ export function cellPrice(item: MenuEntity, orderType: OrderType): number {
 }
 
 /** Display price of one unit of a line: item plus its chosen options, recursively. */
-export function unitPrice(item: MenuEntity, options: LineOptionInput[], orderType: OrderType): number {
+export function unitPrice(
+  item: MenuEntity,
+  options: LineOptionInput[],
+  orderType: OrderType,
+): number {
   const lookup = new Map<string, Option>();
   const collect = (groups: OptionGroup[] | undefined) => {
     for (const group of groups ?? []) {
@@ -139,7 +146,11 @@ export function basketDisplayTotal(menu: Menu, lines: BasketLine[], orderType: O
 export type Badge = { id: string; label: string; textColour: string; backgroundColour: string };
 
 /** Owner badges (customizedItemTags, F-MENU-05) for an item on a page. */
-export function badgesFor(menu: Menu, item: { id: string; categoryId?: string }, page: TagsPage): Badge[] {
+export function badgesFor(
+  menu: Menu,
+  item: { id: string; categoryId?: string },
+  page: TagsPage,
+): Badge[] {
   return menu.customizedItemTags
     .filter((tag) => tag.tagsPages.length === 0 || tag.tagsPages.includes(page))
     .filter((tag) =>

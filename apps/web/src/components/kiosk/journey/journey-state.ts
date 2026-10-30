@@ -1,4 +1,6 @@
+import type { OrderTotal } from "@/app/kiosk/actions";
 import type { components } from "@/lib/core-api";
+import type { Result } from "@/lib/kiosk/core";
 import type { BasketLine } from "@/lib/kiosk/menu-view";
 import type { Language, Strings } from "@/lib/kiosk/strings";
 
@@ -8,7 +10,7 @@ export type OrderType = Schemas["OrderType"];
 
 /** One journey on the kiosk, held in the browser from tap to reset. */
 export type Journey = {
-  phase: "attract" | "starting" | "startFailed" | "orderType" | "menu" | "item";
+  phase: "attract" | "starting" | "startFailed" | "orderType" | "menu" | "item" | "basket";
   language: Language;
   orderNonce: string | null;
   journeyStartedTimestamp: string | null;
@@ -21,7 +23,11 @@ export type Journey = {
   /** Category open on the menu screen; kept while an item is open (F-MENU-12). */
   categoryId: string | null;
   /** The item open in the builder, and the basket line it edits, if any. */
-  item: { itemId: string; editGuid: string | null } | null;
+  item: { itemId: string; editGuid: string | null; returnTo: "menu" | "basket" } | null;
+  /** Coupon or restaurant discount code on the order (one per order). */
+  discountCode: string | null;
+  /** The Core API's latest totals, for the basket they were asked for (`key`). */
+  quote: { key: string; result: Result<OrderTotal> } | null;
 };
 
 export type JourneyAction =
@@ -45,6 +51,11 @@ export type JourneyAction =
   | { type: "openItem"; itemId: string; editGuid?: string }
   | { type: "closeItem" }
   | { type: "saveItem"; line: BasketLine }
+  | { type: "openBasket" }
+  | { type: "openMenu" }
+  | { type: "lineQuantity"; guid: string; quantity: number }
+  | { type: "removeLine"; guid: string }
+  | { type: "quoted"; key: string; result: Result<OrderTotal> }
   | { type: "reset"; language: Language };
 
 export function initialJourney(language: Language): Journey {
@@ -59,6 +70,8 @@ export function initialJourney(language: Language): Journey {
     basket: [],
     categoryId: null,
     item: null,
+    discountCode: null,
+    quote: null,
   };
 }
 
@@ -90,23 +103,73 @@ export function journeyReducer(state: Journey, action: JourneyAction): Journey {
     case "changeOrderType":
       return { ...state, phase: "orderType" };
     case "addLine":
-      return { ...state, basket: [...state.basket, action.line] };
+      return { ...state, basket: addOrMerge(state.basket, action.line) };
     case "pickCategory":
       return { ...state, categoryId: action.categoryId };
     case "openItem":
-      return { ...state, phase: "item", item: { itemId: action.itemId, editGuid: action.editGuid ?? null } };
+      return {
+        ...state,
+        phase: "item",
+        item: {
+          itemId: action.itemId,
+          editGuid: action.editGuid ?? null,
+          returnTo: state.phase === "basket" ? "basket" : "menu",
+        },
+      };
     case "closeItem":
-      return { ...state, phase: "menu", item: null };
+      return { ...state, phase: state.item?.returnTo ?? "menu", item: null };
     case "saveItem": {
       const editGuid = state.item?.editGuid;
       const basket = editGuid
         ? state.basket.map((line) => (line.guid === editGuid ? action.line : line))
-        : [...state.basket, action.line];
-      return { ...state, phase: "menu", item: null, basket };
+        : addOrMerge(state.basket, action.line);
+      return { ...state, phase: state.item?.returnTo ?? "menu", item: null, basket };
     }
+    case "openBasket":
+      return state.basket.length > 0 ? { ...state, phase: "basket" } : state;
+    case "openMenu":
+      return { ...state, phase: "menu" };
+    case "lineQuantity":
+      return {
+        ...state,
+        basket: state.basket.map((line) =>
+          line.guid === action.guid ? { ...line, quantity: Math.max(1, action.quantity) } : line,
+        ),
+      };
+    case "removeLine":
+      return { ...state, basket: state.basket.filter((line) => line.guid !== action.guid) };
+    case "quoted":
+      // A late answer for an older basket is dropped.
+      return action.key === quoteKey(state)
+        ? { ...state, quote: { key: action.key, result: action.result } }
+        : state;
     case "reset":
       return initialJourney(action.language);
   }
+}
+
+/** Identifies what a quote was asked for: order type, lines and discount. */
+export function quoteKey(state: Pick<Journey, "orderType" | "basket" | "discountCode">): string {
+  return JSON.stringify([state.orderType, state.basket, state.discountCode]);
+}
+
+/** The quote's totals when they match the current basket, else null. */
+export function currentQuote(state: Journey): OrderTotal | null {
+  return state.quote && state.quote.key === quoteKey(state) && state.quote.result.ok
+    ? state.quote.result.data
+    : null;
+}
+
+const sameChoices = (a: BasketLine, b: BasketLine) =>
+  a.itemId === b.itemId && JSON.stringify(a.options) === JSON.stringify(b.options);
+
+/** Adds a line, or bumps the quantity of an identical one (F-BASKET-01 merges them). */
+function addOrMerge(basket: BasketLine[], line: BasketLine): BasketLine[] {
+  const twin = basket.find((existing) => sameChoices(existing, line));
+  if (!twin) return [...basket, line];
+  return basket.map((existing) =>
+    existing === twin ? { ...existing, quantity: existing.quantity + line.quantity } : existing,
+  );
 }
 
 /** Order types the restaurant offers, DINEIN first (BR-START-11). */

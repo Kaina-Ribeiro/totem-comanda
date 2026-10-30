@@ -16,12 +16,7 @@ const l = (pt: string, en?: string): L => (en ? { "pt-BR": pt, en } : { "pt-BR":
 
 const BOTH = { DINEIN: true, TAKE_OUT: true };
 
-function item(
-  id: string,
-  name: L,
-  price: number,
-  extra: Partial<MockItem> = {},
-): MockItem {
+function item(id: string, name: L, price: number, extra: Partial<MockItem> = {}): MockItem {
   return {
     id,
     plu: null,
@@ -290,9 +285,15 @@ export function seedCatalogue() {
       displayOrder: 1,
       compositeOptions: [],
       options: [
-        option("opt-requeijao", l("Requeijão para acompanhar", "Cream cheese on the side"), 300, 1, {
-          maximumQuantity: 2,
-        }),
+        option(
+          "opt-requeijao",
+          l("Requeijão para acompanhar", "Cream cheese on the side"),
+          300,
+          1,
+          {
+            maximumQuantity: 2,
+          },
+        ),
       ],
     },
     milk("itm-cappuccino", "cappuccino"),
@@ -323,7 +324,15 @@ export function seedCatalogue() {
     name: L,
     displayOrder: number,
     links: Schemas["CategoryItemLink"][],
-  ): MockCategory => ({ id, menuId, parentId: null, name, image: null, displayOrder, items: links });
+  ): MockCategory => ({
+    id,
+    menuId,
+    parentId: null,
+    name,
+    image: null,
+    displayOrder,
+    items: links,
+  });
 
   const morning = "mnu-manha";
   const afternoon = "mnu-tarde";
@@ -393,7 +402,11 @@ export function seedCatalogue() {
   ];
 
   const crossSellGroups: MockCrossSell[] = [
-    { id: "xs-cafes", name: l("Que tal um café?", "How about a coffee?"), crossSells: ["itm-cappuccino", "itm-latte"] },
+    {
+      id: "xs-cafes",
+      name: l("Que tal um café?", "How about a coffee?"),
+      crossSells: ["itm-cappuccino", "itm-latte"],
+    },
   ];
 
   const discounts: MockDiscount[] = [

@@ -11,10 +11,10 @@ const ptBR = {
   "language.button": "English",
   "language.title": "Escolha o idioma",
   "language.close": "Fechar",
-  "starting": "Preparando o cardápio…",
+  starting: "Preparando o cardápio…",
   "startFailed.title": "Não deu para abrir o cardápio",
   "startFailed.body": "Tente de novo em instantes ou faça seu pedido no balcão.",
-  "startOver": "Começar de novo",
+  startOver: "Começar de novo",
   "nav.home": "Início",
   "nav.menu": "Cardápio",
   "orderType.title": "Onde você vai comer?",
@@ -41,6 +41,25 @@ const ptBR = {
   "item.less": "Menos",
   "item.more": "Mais",
   "item.remove": "Tirar",
+  "basket.title": "Seu pedido",
+  "basket.edit": "Editar",
+  "basket.remove": "Remover",
+  "basket.total": "Total",
+  "basket.subtotal": "Subtotal",
+  "basket.discount": "Desconto",
+  "basket.pay": "Escolher como pagar",
+  "basket.empty": "Seu pedido está vazio. Volte ao cardápio para escolher.",
+  "basket.updating": "Atualizando o total…",
+  "basket.error": "Não deu para calcular o total. Tente de novo.",
+  "basket.retry": "Tentar de novo",
+  "basket.unavailable": "{name} acabou de esgotar. Remova para continuar.",
+  "basket.unavailableGeneric": "Um item do pedido não está mais disponível. Remova para continuar.",
+  "basket.limit": "Seu pedido passou do limite de itens. Diminua as quantidades.",
+  "cancel.title": "Cancelar o pedido?",
+  "cancel.body": "Os {n} itens serão removidos e o totem volta para a tela inicial.",
+  "cancel.bodyOne": "O item será removido e o totem volta para a tela inicial.",
+  "cancel.keep": "Não, continuar o pedido",
+  "cancel.confirm": "Sim, cancelar",
 } as const;
 
 export type StringKey = keyof typeof ptBR;
@@ -54,10 +73,10 @@ const en: Strings = {
   "language.button": "Português",
   "language.title": "Choose your language",
   "language.close": "Close",
-  "starting": "Getting the menu ready…",
+  starting: "Getting the menu ready…",
   "startFailed.title": "We couldn't open the menu",
   "startFailed.body": "Try again in a moment or order at the counter.",
-  "startOver": "Start over",
+  startOver: "Start over",
   "nav.home": "Start",
   "nav.menu": "Menu",
   "orderType.title": "Where will you eat?",
@@ -84,6 +103,26 @@ const en: Strings = {
   "item.less": "Less",
   "item.more": "More",
   "item.remove": "Remove",
+  "basket.title": "Your order",
+  "basket.edit": "Edit",
+  "basket.remove": "Remove",
+  "basket.total": "Total",
+  "basket.subtotal": "Subtotal",
+  "basket.discount": "Discount",
+  "basket.pay": "Choose how to pay",
+  "basket.empty": "Your order is empty. Go back to the menu to choose.",
+  "basket.updating": "Updating the total…",
+  "basket.error": "We couldn't work out the total. Try again.",
+  "basket.retry": "Try again",
+  "basket.unavailable": "{name} just sold out. Remove it to continue.",
+  "basket.unavailableGeneric":
+    "An item in your order is no longer available. Remove it to continue.",
+  "basket.limit": "Your order is over the item limit. Lower the quantities.",
+  "cancel.title": "Cancel your order?",
+  "cancel.body": "The {n} items will be removed and the kiosk goes back to the start.",
+  "cancel.bodyOne": "The item will be removed and the kiosk goes back to the start.",
+  "cancel.keep": "No, keep ordering",
+  "cancel.confirm": "Yes, cancel",
 };
 
 export type Language = "pt-BR" | "en";
@@ -91,10 +130,14 @@ export type Language = "pt-BR" | "en";
 export const BUNDLED: Record<Language, Strings> = { "pt-BR": ptBR, en };
 
 /** The bundle with the owner's overrides on top; unknown keys are ignored. */
-export function mergeStrings(language: Language, overrides: Record<string, string> | undefined): Strings {
+export function mergeStrings(
+  language: Language,
+  overrides: Record<string, string> | undefined,
+): Strings {
   const merged: Strings = { ...BUNDLED[language] };
   for (const [key, value] of Object.entries(overrides ?? {})) {
-    if (key in merged && typeof value === "string" && value !== "") merged[key as StringKey] = value;
+    if (key in merged && typeof value === "string" && value !== "")
+      merged[key as StringKey] = value;
   }
   return merged;
 }

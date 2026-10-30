@@ -26,7 +26,9 @@ export function OrderTypeScreen({
           <BackPill label={strings["nav.home"]} onPress={onBack} />
           {languageButton}
         </div>
-        <h1 className="font-display text-[75px] font-semibold tracking-[-0.02em]">{strings["orderType.title"]}</h1>
+        <h1 className="font-display text-[75px] font-semibold tracking-[-0.02em]">
+          {strings["orderType.title"]}
+        </h1>
       </header>
       <div className="flex flex-1 flex-col gap-6 px-12 pt-9 pb-12">
         {orderTypes.map((type) => (
@@ -37,7 +39,15 @@ export function OrderTypeScreen({
   );
 }
 
-function OrderTypeCard({ type, strings, onPress }: { type: OrderType; strings: Strings; onPress: () => void }) {
+function OrderTypeCard({
+  type,
+  strings,
+  onPress,
+}: {
+  type: OrderType;
+  strings: Strings;
+  onPress: () => void;
+}) {
   const dark = type === "DINEIN";
   return (
     <button

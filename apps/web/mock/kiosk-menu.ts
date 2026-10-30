@@ -67,7 +67,9 @@ function groupsOf(
 ): MockOptionGroup[] {
   return byOrder(
     catalogue.optionGroups.filter((g) =>
-      "itemId" in owner ? g.itemId === owner.itemId && !g.parentOptionId : g.parentOptionId === owner.parentOptionId,
+      "itemId" in owner
+        ? g.itemId === owner.itemId && !g.parentOptionId
+        : g.parentOptionId === owner.parentOptionId,
     ),
   );
 }
@@ -114,7 +116,9 @@ export function resolveMenu(
   today: string,
 ): Schemas["Menu"] {
   const items = new Map(catalogue.items.map((i) => [i.id, i]));
-  const categories = byOrder(catalogue.categories.filter((c) => c.menuId === menu.id && !c.parentId));
+  const categories = byOrder(
+    catalogue.categories.filter((c) => c.menuId === menu.id && !c.parentId),
+  );
   const entities = categories
     .map((category): Schemas["MenuEntity"] => ({
       id: category.id,
@@ -125,7 +129,9 @@ export function resolveMenu(
       displayOrder: category.displayOrder,
       childEntities: byOrder(category.items).flatMap((link) => {
         const item = items.get(link.itemId);
-        return item && !isSoldOut(item, today) ? [resolveItem(item, link, catalogue, language)] : [];
+        return item && !isSoldOut(item, today)
+          ? [resolveItem(item, link, catalogue, language)]
+          : [];
       }),
     }))
     .filter((c) => c.childEntities.length > 0);
@@ -250,7 +256,9 @@ function priceOptions(
     if (group.options.length === 0) continue;
     const count = perGroup.get(group.id) ?? 0;
     if (count < group.minimum || (group.maximum > 0 && count > group.maximum)) {
-      throw validation(`${where}: ${group.id} needs ${group.minimum}..${group.maximum || "∞"} choices`);
+      throw validation(
+        `${where}: ${group.id} needs ${group.minimum}..${group.maximum || "∞"} choices`,
+      );
     }
   }
   return { total, lines };
@@ -306,7 +314,8 @@ export function priceBasket(
   ctx: { today: string; at: Date; language: Language },
 ): { lines: PricedLine[]; total: Schemas["OrderTotal"] } {
   if (!input.menuId) throw new PricingError(422, "NO_ACTIVE_MENU", "No menu is active now");
-  const typeOpen = input.orderType === "DINEIN" ? restaurant.isDineInAvailable : restaurant.isTakeOutAvailable;
+  const typeOpen =
+    input.orderType === "DINEIN" ? restaurant.isDineInAvailable : restaurant.isTakeOutAvailable;
   if (!typeOpen) {
     throw new PricingError(422, "ORDER_TYPE_UNAVAILABLE", "Order type unavailable");
   }
@@ -321,7 +330,12 @@ export function priceBasket(
     }
     const found = findItem(input.menuId!, catalogue, line.itemId);
     const item = found?.item;
-    if (!found || !item || isSoldOut(item, ctx.today) || !item.serviceAvailability[input.orderType]) {
+    if (
+      !found ||
+      !item ||
+      isSoldOut(item, ctx.today) ||
+      !item.serviceAvailability[input.orderType]
+    ) {
       throw new PricingError(
         422,
         "ITEM_UNAVAILABLE",
@@ -337,7 +351,8 @@ export function priceBasket(
       ctx.language,
       `orderItems[${index}]`,
     );
-    const base = found.link.priceOverride ?? priceFor(item.price, item.servicePriceOverride, input.orderType);
+    const base =
+      found.link.priceOverride ?? priceFor(item.price, item.servicePriceOverride, input.orderType);
     const unitPrice = base + options.total;
     return {
       guid: line.guid,
@@ -368,4 +383,3 @@ export function priceBasket(
     },
   };
 }
-

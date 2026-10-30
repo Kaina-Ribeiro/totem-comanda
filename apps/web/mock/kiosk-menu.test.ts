@@ -4,7 +4,11 @@ import { seedCatalogue } from "./catalogue.ts";
 import { priceBasket, PricingError, resolveMenu } from "./kiosk-menu.ts";
 
 const restaurant = { isDineInAvailable: true, isTakeOutAvailable: true };
-const ctx = { today: "2026-10-30", at: new Date("2026-10-30T12:00:00Z"), language: "pt-BR" as const };
+const ctx = {
+  today: "2026-10-30",
+  at: new Date("2026-10-30T12:00:00Z"),
+  language: "pt-BR" as const,
+};
 const morning = { id: "mnu-manha", name: { "pt-BR": "Manhã" }, showCategoriesPrice: false };
 
 // The prototype's basket (docs/prototype/README.md).
@@ -93,12 +97,16 @@ describe("priceBasket", () => {
     expect(codeOf(() => price({ discountCode: "NATAL2025" }))).toBe("INVALID_COUPON");
     expect(
       codeOf(() =>
-        price({ orderItems: [{ ...basket[0], options: [{ optionId: "opt-ovo-poche", quantity: 1 }] }] }),
+        price({
+          orderItems: [{ ...basket[0], options: [{ optionId: "opt-ovo-poche", quantity: 1 }] }],
+        }),
       ),
     ).toBe("VALIDATION_FAILED");
     expect(
       codeOf(() =>
-        price({ orderItems: [{ guid: "x", itemId: "itm-refrigerante", quantity: 1, options: [] }] }),
+        price({
+          orderItems: [{ guid: "x", itemId: "itm-refrigerante", quantity: 1, options: [] }],
+        }),
       ),
     ).toBe("ITEM_UNAVAILABLE");
   });

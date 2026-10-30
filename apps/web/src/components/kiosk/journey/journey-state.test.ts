@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { BUNDLED, format, mergeStrings } from "@/lib/kiosk/strings";
 
-import { availableOrderTypes, initialJourney, type Journey, journeyReducer, type Menu } from "./journey-state";
+import {
+  availableOrderTypes,
+  initialJourney,
+  type Journey,
+  journeyReducer,
+  type Menu,
+} from "./journey-state";
 
 const menu = { id: "mnu-manha", entities: [] } as unknown as Menu;
 const started = {
@@ -42,19 +48,84 @@ describe("journeyReducer", () => {
   });
 });
 
+describe("basket", () => {
+  const inMenu = journeyReducer(
+    journeyReducer(journeyReducer(initialJourney("pt-BR"), { type: "start" }), started),
+    { type: "orderType", orderType: "TAKE_OUT" },
+  );
+  const line = (guid: string, options: { optionId: string; quantity: number }[] = []) => ({
+    guid,
+    itemId: "itm-croque-monsieur",
+    quantity: 1,
+    options,
+  });
+
+  it("merges identical lines and keeps different choices apart (F-BASKET-01)", () => {
+    let state = journeyReducer(inMenu, { type: "addLine", line: line("a") });
+    state = journeyReducer(state, { type: "addLine", line: line("b") });
+    state = journeyReducer(state, {
+      type: "addLine",
+      line: line("c", [{ optionId: "opt-ovo-poche", quantity: 1 }]),
+    });
+    expect(state.basket.map((l) => [l.guid, l.quantity])).toEqual([
+      ["a", 2],
+      ["c", 1],
+    ]);
+  });
+
+  it("edits a line from the basket and returns there", () => {
+    let state = journeyReducer(inMenu, { type: "addLine", line: line("a") });
+    state = journeyReducer(state, { type: "openBasket" });
+    state = journeyReducer(state, {
+      type: "openItem",
+      itemId: "itm-croque-monsieur",
+      editGuid: "a",
+    });
+    state = journeyReducer(state, {
+      type: "saveItem",
+      line: { ...line("a", [{ optionId: "opt-ovo-poche", quantity: 1 }]), quantity: 3 },
+    });
+    expect(state.phase).toBe("basket");
+    expect(state.basket).toEqual([
+      { ...line("a", [{ optionId: "opt-ovo-poche", quantity: 1 }]), quantity: 3 },
+    ]);
+  });
+
+  it("drops a quote that answers an older basket", () => {
+    const state = journeyReducer(inMenu, { type: "addLine", line: line("a") });
+    const total = {
+      subtotal: 1,
+      discountTotal: 0,
+      total: 1,
+      taxInclusive: true,
+      tax: null,
+      currency: "BRL" as const,
+    };
+    expect(
+      journeyReducer(state, { type: "quoted", key: "old", result: { ok: true, data: total } }),
+    ).toBe(state);
+  });
+});
+
 describe("availableOrderTypes", () => {
   it("puts DINEIN first and leaves out closed ones (BR-START-11)", () => {
     expect(availableOrderTypes({ isDineInAvailable: true, isTakeOutAvailable: true })).toEqual([
       "DINEIN",
       "TAKE_OUT",
     ]);
-    expect(availableOrderTypes({ isDineInAvailable: false, isTakeOutAvailable: true })).toEqual(["TAKE_OUT"]);
+    expect(availableOrderTypes({ isDineInAvailable: false, isTakeOutAvailable: true })).toEqual([
+      "TAKE_OUT",
+    ]);
   });
 });
 
 describe("strings", () => {
   it("merges the owner's overrides over the bundle, ignoring unknown keys", () => {
-    const merged = mergeStrings("pt-BR", { "attract.cta": "Toque aqui", "made.up": "x", "nav.home": "" });
+    const merged = mergeStrings("pt-BR", {
+      "attract.cta": "Toque aqui",
+      "made.up": "x",
+      "nav.home": "",
+    });
     expect(merged["attract.cta"]).toBe("Toque aqui");
     expect(merged["nav.home"]).toBe(BUNDLED["pt-BR"]["nav.home"]);
     expect(merged).not.toHaveProperty("made.up");

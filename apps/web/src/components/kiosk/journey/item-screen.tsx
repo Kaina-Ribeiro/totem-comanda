@@ -66,7 +66,9 @@ export function ItemScreen({
   const total = unitPrice(item, line.options, orderType) * draft.quantity;
   const ready = canAdd(item, draft);
   const badges = badgesFor(menu, { id: item.id }, "ITEM_PAGE");
-  const groups = (item.optionGroups ?? []).filter((g) => g.role !== "COMBO_MAIN" && !isInvisible(g));
+  const groups = (item.optionGroups ?? []).filter(
+    (g) => g.role !== "COMBO_MAIN" && !isInvisible(g),
+  );
 
   return (
     <div className="flex h-dvh flex-col bg-surface text-ink">
@@ -107,7 +109,9 @@ export function ItemScreen({
                 {formatBRL(itemPrice(item, orderType))}
               </span>
             </div>
-            {item.description && <p className="text-[30px] leading-[1.45] text-muted">{item.description}</p>}
+            {item.description && (
+              <p className="text-[30px] leading-[1.45] text-muted">{item.description}</p>
+            )}
           </div>
 
           {groups.map((group) => (
@@ -132,8 +136,13 @@ export function ItemScreen({
           >
             <Minus size={36} />
           </StepButton>
-          <span className="w-[72px] text-center font-display text-[54px] font-semibold">{draft.quantity}</span>
-          <StepButton label={strings["item.more"]} onPress={() => setDraft(setQuantity(draft, draft.quantity + 1))}>
+          <span className="w-[72px] text-center font-display text-[54px] font-semibold">
+            {draft.quantity}
+          </span>
+          <StepButton
+            label={strings["item.more"]}
+            onPress={() => setDraft(setQuantity(draft, draft.quantity + 1))}
+          >
             <Plus size={36} />
           </StepButton>
         </div>
@@ -142,8 +151,12 @@ export function ItemScreen({
           disabled={!ready}
           className="flex h-button flex-1 items-center justify-between rounded-full bg-accent px-[54px] text-on-accent transition-opacity disabled:opacity-50"
         >
-          <span className="text-[36px] font-bold">{editing ? strings["item.update"] : strings["item.add"]}</span>
-          <span className="font-display text-[51px] font-semibold tracking-[-0.02em]">{formatBRL(total)}</span>
+          <span className="text-[36px] font-bold">
+            {editing ? strings["item.update"] : strings["item.add"]}
+          </span>
+          <span className="font-display text-[51px] font-semibold tracking-[-0.02em]">
+            {formatBRL(total)}
+          </span>
         </button>
       </div>
     </div>
@@ -180,7 +193,9 @@ function GroupSection({
       <div className="flex items-baseline justify-between">
         <h2 className="font-display text-[45px] font-semibold">{group.name}</h2>
         {hint && (
-          <span className={`text-[24px] font-bold ${single ? "text-detail-text" : "text-muted"}`}>{hint}</span>
+          <span className={`text-[24px] font-bold ${single ? "text-detail-text" : "text-muted"}`}>
+            {hint}
+          </span>
         )}
       </div>
 
@@ -199,7 +214,9 @@ function GroupSection({
                 }`}
               >
                 {option.name}
-                {price > 0 && <span className="text-[22px] font-semibold opacity-80">+ {formatBRL(price)}</span>}
+                {price > 0 && (
+                  <span className="text-[22px] font-semibold opacity-80">+ {formatBRL(price)}</span>
+                )}
               </button>
             );
           })}
@@ -230,15 +247,21 @@ function GroupSection({
               <li key={composite.positiveOption.id} className="border-b border-line last:border-0">
                 <button
                   onClick={() =>
-                    onChange(setToggle(draft, composite.positiveOption.id, kept ? "NEGATIVE" : "POSITIVE"))
+                    onChange(
+                      setToggle(draft, composite.positiveOption.id, kept ? "NEGATIVE" : "POSITIVE"),
+                    )
                   }
                   aria-pressed={kept}
                   className="flex h-[114px] w-full items-center gap-[27px] text-left text-[30px] font-semibold"
                 >
                   <CheckBox on={kept} />
-                  <span className={kept ? "" : "text-muted line-through"}>{composite.positiveOption.name}</span>
+                  <span className={kept ? "" : "text-muted line-through"}>
+                    {composite.positiveOption.name}
+                  </span>
                   {!kept && (
-                    <span className="ml-auto text-[24px] font-bold text-danger">{composite.negativeOption.name}</span>
+                    <span className="ml-auto text-[24px] font-bold text-danger">
+                      {composite.negativeOption.name}
+                    </span>
                   )}
                 </button>
               </li>
@@ -254,7 +277,13 @@ function GroupSection({
         .filter((nested) => !isInvisible(nested))
         .map((nested) => (
           <div key={nested.id} className="border-l-[6px] border-wheat pl-9">
-            <GroupSection group={nested} draft={draft} orderType={orderType} strings={strings} onChange={onChange} />
+            <GroupSection
+              group={nested}
+              draft={draft}
+              orderType={orderType}
+              strings={strings}
+              onChange={onChange}
+            />
           </div>
         ))}
     </section>
