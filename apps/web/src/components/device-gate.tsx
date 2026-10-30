@@ -8,6 +8,8 @@ import { type DeviceConfig, getDeviceConfig } from "@/lib/device/config";
 import { gateState } from "@/lib/device/gate";
 import { DeviceAuthError } from "@/lib/device/session";
 
+const AREA_KIND = { kiosk: "KIOSK", kitchen: "KITCHEN" } as const;
+
 /** BR-KIOSK-02: a failed configuration load retries every 5 s. */
 const CONFIG_RETRY_MS = 5_000;
 
@@ -24,8 +26,8 @@ const DISABLED_COPY = {
 
 /**
  * Authenticates this browser as its device and hands its config to
- * `children`. Unprovisioned or rejected credentials go back to /setup; a
- * disabled device gets its own screen; an unreachable Core API shows the
+ * `children`. Unprovisioned or rejected credentials go back to /setup, a
+ * device opened in the other area goes to its own, a disabled device gets its own screen; an unreachable Core API shows the
  * preparing screen and retries. Reads cookies, so render it inside <Suspense>.
  */
 export async function DeviceGate({
@@ -43,6 +45,7 @@ export async function DeviceGate({
     switch (error.code) {
       case "NOT_PROVISIONED":
       case "INVALID_CREDENTIALS":
+      case "WRONG_DEVICE":
         redirect("/setup");
       case "DEVICE_DISABLED":
         return <UnavailableScreen {...DISABLED_COPY[area]} />;
@@ -50,6 +53,8 @@ export async function DeviceGate({
         return <PreparingScreen />;
     }
   }
+  // Each device has one area: a kiosk never shows the kitchen, and back.
+  if (config.kind !== AREA_KIND[area]) redirect(config.kind === "KITCHEN" ? "/kitchen" : "/kiosk");
   return (
     <>
       {children(config)}

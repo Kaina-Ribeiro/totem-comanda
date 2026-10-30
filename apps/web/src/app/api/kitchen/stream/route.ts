@@ -1,3 +1,4 @@
+import { requireDeviceKind } from "@/lib/device/config";
 import { asDevice } from "@/lib/device/session";
 import { kitchenStreamUrl } from "@/lib/kitchen/core";
 
@@ -9,6 +10,7 @@ import { kitchenStreamUrl } from "@/lib/kitchen/core";
 export async function GET(request: Request) {
   let upstream: Response;
   try {
+    await requireDeviceKind("KITCHEN");
     ({ response: upstream } = await asDevice(async (headers) => ({
       response: await fetch(kitchenStreamUrl(), {
         headers: { ...headers, Accept: "text/event-stream" },

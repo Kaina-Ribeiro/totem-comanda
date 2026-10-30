@@ -6,6 +6,7 @@ import { coreApi } from "@/lib/core/client";
 import type { components } from "@/lib/core-api";
 import {
   deviceCall,
+  deviceCallAs,
   loadActiveMenu,
   loadLanguagePack,
   type Menu,
@@ -38,7 +39,7 @@ export async function beginJourney(language: Language): Promise<Result<JourneySt
   const orderNonce = crypto.randomUUID();
 
   const [journey, menu, pack] = await Promise.all([
-    deviceCall((headers) =>
+    deviceCallAs("KIOSK", (headers) =>
       coreApi().POST("/v1/journeys", { headers, body: { orderNonce, language } }),
     ),
     loadActiveMenu(language),
@@ -159,7 +160,7 @@ export async function createOrder(
   idempotencyKey: string,
   order: Schemas["CreateOrderRequest"],
 ): Promise<Result<Order>> {
-  return deviceCall((headers) =>
+  return deviceCallAs("KIOSK", (headers) =>
     coreApi().POST("/v1/orders", {
       headers,
       params: { header: { "Idempotency-Key": idempotencyKey } },

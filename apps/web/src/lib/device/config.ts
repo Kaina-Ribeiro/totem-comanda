@@ -45,3 +45,12 @@ export async function getDeviceConfig(): Promise<DeviceConfig> {
   if (!config) throw new DeviceAuthError("CORE_UNAVAILABLE");
   return config;
 }
+
+/**
+ * Throws DeviceAuthError("WRONG_DEVICE") unless this browser is a `kind`
+ * device. The contract has no such check, so the BFF keeps a kiosk out of the
+ * kitchen and the other way round. The config costs a 304 once it is cached.
+ */
+export async function requireDeviceKind(kind: DeviceConfig["kind"]): Promise<void> {
+  if ((await getDeviceConfig()).kind !== kind) throw new DeviceAuthError("WRONG_DEVICE");
+}

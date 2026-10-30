@@ -11,6 +11,8 @@ export type DeviceAuthErrorCode =
   | "NOT_PROVISIONED"
   | "INVALID_CREDENTIALS"
   | "DEVICE_DISABLED"
+  /** A kiosk calling kitchen operations, or a kitchen screen calling kiosk ones. */
+  | "WRONG_DEVICE"
   | "CORE_UNAVAILABLE";
 
 export class DeviceAuthError extends Error {

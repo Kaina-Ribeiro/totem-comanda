@@ -2,14 +2,14 @@ import "server-only";
 
 import { coreApi } from "@/lib/core/client";
 import type { components } from "@/lib/core-api";
-import { deviceCall, type Result } from "@/lib/kiosk/core";
+import { deviceCallAs, type Result } from "@/lib/kiosk/core";
 
 export type KitchenOrder = components["schemas"]["KitchenOrder"];
 export type KitchenStatus = components["schemas"]["KitchenStatusUpdate"]["status"];
 
 /** Paid orders not yet collected, oldest first. */
 export function listKitchenOrders(): Promise<Result<KitchenOrder[]>> {
-  return deviceCall((headers) =>
+  return deviceCallAs("KITCHEN", (headers) =>
     coreApi().GET("/v1/kitchen/orders", { headers, params: { query: { status: "open" } } }),
   );
 }

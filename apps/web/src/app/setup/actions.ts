@@ -12,6 +12,7 @@ const ERRORS: Record<DeviceAuthError["code"], string> = {
   NOT_PROVISIONED: "Informe o ID e o código secreto do aparelho.",
   INVALID_CREDENTIALS: "ID ou código secreto incorretos.",
   DEVICE_DISABLED: "Este aparelho está desativado no back office.",
+  WRONG_DEVICE: "Este aparelho é de outro tipo.",
   CORE_UNAVAILABLE: "Não foi possível falar com o servidor. Tente de novo.",
 };
 

@@ -5,6 +5,7 @@ import { after } from "next/server";
 import { coreApi, problemCode, type ProblemCode } from "@/lib/core/client";
 import { EtagCache } from "@/lib/core/etag-cache";
 import type { components } from "@/lib/core-api";
+import { type DeviceConfig, requireDeviceKind } from "@/lib/device/config";
 import { asDevice, DeviceAuthError, type DeviceAuthHeaders } from "@/lib/device/session";
 
 import type { Language } from "./strings";
@@ -50,6 +51,19 @@ export async function deviceCall<T>(
   } catch (error) {
     return failure(error);
   }
+}
+
+/** deviceCall for operations that only one kind of device may run. */
+export async function deviceCallAs<T>(
+  kind: DeviceConfig["kind"],
+  call: Parameters<typeof deviceCall<T>>[0],
+): Promise<Result<T>> {
+  try {
+    await requireDeviceKind(kind);
+  } catch (error) {
+    return failure(error);
+  }
+  return deviceCall(call);
 }
 
 const menus = new EtagCache<Menu>();
