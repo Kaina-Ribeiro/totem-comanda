@@ -26,7 +26,7 @@ function seed() {
   return {
     restaurant: {
       id: "rst-padaria-01",
-      name: "[Nome da padaria]",
+      name: "Padaria do Pai do Brunera",
       logo: null,
       cnpj: "12345678000190",
       timezone: "America/Sao_Paulo",

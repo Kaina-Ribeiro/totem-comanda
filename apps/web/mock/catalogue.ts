@@ -422,6 +422,17 @@ export function seedCatalogue() {
       active: true,
     },
     {
+      id: "dsc-desconto5",
+      type: "COMANDA_COUPON",
+      code: "DESCONTO5",
+      title: l("5% de desconto", "5% off"),
+      kind: "PERCENT",
+      value: 5,
+      validFrom: null,
+      validTo: null,
+      active: true,
+    },
+    {
       id: "dsc-cafe5",
       type: "RESTAURANT_DISCOUNT",
       code: "CAFE5",
