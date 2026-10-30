@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
 import { AdminNav } from "@/components/admin/nav";
 import { ADMIN_LOGIN, signOut } from "@/lib/admin/session";
@@ -18,7 +19,10 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
           <span className="font-display text-xl italic">Comanda</span>
           <span className="text-xs font-semibold text-muted">Back office</span>
         </div>
-        <AdminNav />
+        {/* The active link reads the URL: render it per request. */}
+        <Suspense>
+          <AdminNav />
+        </Suspense>
         <form action={logout} className="lg:mt-auto">
           <button className="text-sm font-bold text-muted hover:text-ink">Sair</button>
         </form>
