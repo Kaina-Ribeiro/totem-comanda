@@ -1,7 +1,7 @@
 import type { Order, OrderTotal, PlacedOrder } from "@/app/kiosk/actions";
 import type { components } from "@/lib/core-api";
 import type { Result } from "@/lib/kiosk/core";
-import type { BasketLine } from "@/lib/kiosk/menu-view";
+import { type BasketLine, findItem } from "@/lib/kiosk/menu-view";
 import type { Language, Strings } from "@/lib/kiosk/strings";
 
 type Schemas = components["schemas"];
@@ -45,6 +45,9 @@ export type Journey = {
    * second order and a changed basket gets a new one.
    */
   checkout: { basketKey: string; orderKey: string; placeKey: string; order: Order | null } | null;
+  /** Cross-sell group to suggest now (F-MENU-11), and whether the guest turned them off. */
+  crossSell: { groupId: string } | null;
+  crossSellOff: boolean;
   /** The placed order: its number comes from the Core API (OP-PAY-03). */
   placed: PlacedOrder | null;
 };
@@ -80,6 +83,8 @@ export type JourneyAction =
   | { type: "openCheckout"; orderKey: string; placeKey: string }
   | { type: "orderCreated"; order: Order }
   | { type: "placed"; placed: PlacedOrder }
+  | { type: "crossSellAccepted"; lines: BasketLine[] }
+  | { type: "crossSellDismissed" }
   | { type: "reset"; language: Language };
 
 export function initialJourney(language: Language): Journey {
@@ -98,6 +103,8 @@ export function initialJourney(language: Language): Journey {
     discountCode: null,
     quote: null,
     checkout: null,
+    crossSell: null,
+    crossSellOff: false,
     placed: null,
   };
 }
@@ -130,7 +137,10 @@ export function journeyReducer(state: Journey, action: JourneyAction): Journey {
     case "changeOrderType":
       return { ...state, phase: "orderType" };
     case "addLine":
-      return { ...state, basket: addOrMerge(state.basket, action.line) };
+      return withCrossSell(
+        { ...state, basket: addOrMerge(state.basket, action.line) },
+        action.line.itemId,
+      );
     case "pickCategory":
       return { ...state, categoryId: action.categoryId };
     case "openItem":
@@ -150,8 +160,17 @@ export function journeyReducer(state: Journey, action: JourneyAction): Journey {
       const basket = editGuid
         ? state.basket.map((line) => (line.guid === editGuid ? action.line : line))
         : addOrMerge(state.basket, action.line);
-      return { ...state, phase: state.item?.returnTo ?? "menu", item: null, basket };
+      const saved = { ...state, phase: state.item?.returnTo ?? "menu", item: null, basket };
+      return editGuid ? saved : withCrossSell(saved, action.line.itemId);
     }
+    case "crossSellAccepted":
+      return {
+        ...state,
+        crossSell: null,
+        basket: action.lines.reduce(addOrMerge, state.basket),
+      };
+    case "crossSellDismissed":
+      return { ...state, crossSell: null, crossSellOff: true };
     case "openBasket":
       return state.basket.length > 0 ? { ...state, phase: "basket" } : state;
     case "openMenu":
@@ -178,7 +197,9 @@ export function journeyReducer(state: Journey, action: JourneyAction): Journey {
       };
     }
     case "orderCreated":
-      return state.checkout ? { ...state, checkout: { ...state.checkout, order: action.order } } : state;
+      return state.checkout
+        ? { ...state, checkout: { ...state.checkout, order: action.order } }
+        : state;
     case "placed":
       return { ...state, phase: "success", placed: action.placed };
     case "discount":
@@ -210,6 +231,23 @@ export function currentQuote(state: Journey): OrderTotal | null {
   return state.quote && state.quote.key === quoteKey(state) && state.quote.result.ok
     ? state.quote.result.data
     : null;
+}
+
+/**
+ * After an item is added, suggests its cross-sell group (F-MENU-11) unless the
+ * guest turned suggestions off or none of the group's items are in the basket's
+ * order type. Only the first group is used, as in the specs.
+ */
+function withCrossSell(state: Journey, itemId: string): Journey {
+  if (state.crossSellOff || !state.menu) return state;
+  const groupId = findItem(state.menu, itemId)?.crossSellGroupId;
+  const group = groupId && state.menu.crossSellGroups.find((g) => g.id === groupId);
+  if (!group) return state;
+  const offered = group.crossSells.filter((id) => {
+    const item = findItem(state.menu!, id);
+    return item && (item.serviceAvailability?.[state.orderType ?? "DINEIN"] ?? true);
+  });
+  return offered.length > 0 ? { ...state, crossSell: { groupId: group.id } } : state;
 }
 
 const sameChoices = (a: BasketLine, b: BasketLine) =>

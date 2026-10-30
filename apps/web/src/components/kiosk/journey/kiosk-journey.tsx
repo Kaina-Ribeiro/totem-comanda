@@ -12,6 +12,7 @@ import { Globe } from "../icons";
 import { BasketScreen, CancelDialog } from "./basket-screen";
 import { CheckoutFlow } from "./checkout-flow";
 import { CouponRow, CouponSheet } from "./coupon-sheet";
+import { CrossSellSheet } from "./cross-sell-sheet";
 import { IdleGuard } from "./idle-guard";
 import { ItemScreen } from "./item-screen";
 import {
@@ -173,6 +174,16 @@ export function KioskJourney({
           strings={strings}
           onKeep={() => setConfirmCancel(false)}
           onConfirm={() => endJourney("CANCELLED_BY_GUEST")}
+        />
+      )}
+      {journey.crossSell && phase === "menu" && journey.menu && journey.orderType && (
+        <CrossSellSheet
+          menu={journey.menu}
+          groupId={journey.crossSell.groupId}
+          orderType={journey.orderType}
+          strings={strings}
+          onAccept={(lines) => dispatch({ type: "crossSellAccepted", lines })}
+          onDismiss={() => dispatch({ type: "crossSellDismissed" })}
         />
       )}
       {couponOpen && phase === "basket" && journey.orderType && (

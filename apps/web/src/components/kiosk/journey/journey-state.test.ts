@@ -117,14 +117,22 @@ describe("checkout", () => {
   );
 
   it("keeps the order's idempotency keys while the basket is the same", () => {
-    const first = journeyReducer(inBasket, { type: "openCheckout", orderKey: "k1", placeKey: "p1" });
+    const first = journeyReducer(inBasket, {
+      type: "openCheckout",
+      orderKey: "k1",
+      placeKey: "p1",
+    });
     const back = journeyReducer(first, { type: "openBasket" });
     const again = journeyReducer(back, { type: "openCheckout", orderKey: "k2", placeKey: "p2" });
     expect(again.checkout).toMatchObject({ orderKey: "k1", placeKey: "p1" });
   });
 
   it("starts a new order when the basket changed", () => {
-    const first = journeyReducer(inBasket, { type: "openCheckout", orderKey: "k1", placeKey: "p1" });
+    const first = journeyReducer(inBasket, {
+      type: "openCheckout",
+      orderKey: "k1",
+      placeKey: "p1",
+    });
     const changed = journeyReducer(journeyReducer(first, { type: "openBasket" }), {
       type: "lineQuantity",
       guid: "a",
@@ -132,6 +140,56 @@ describe("checkout", () => {
     });
     const again = journeyReducer(changed, { type: "openCheckout", orderKey: "k2", placeKey: "p2" });
     expect(again.checkout).toMatchObject({ orderKey: "k2", order: null });
+  });
+});
+
+describe("cross-sell", () => {
+  const coffeeMenu = {
+    id: "m",
+    entities: [
+      {
+        id: "c",
+        type: "CATEGORY",
+        displayOrder: 1,
+        childEntities: [
+          {
+            id: "croque",
+            type: "ITEM",
+            displayOrder: 1,
+            childEntities: [],
+            crossSellGroupId: "xs",
+          },
+          { id: "cafe", type: "ITEM", displayOrder: 2, childEntities: [] },
+        ],
+      },
+    ],
+    crossSellGroups: [{ id: "xs", name: "Que tal um café?", crossSells: ["cafe"] }],
+  } as unknown as Menu;
+  const inMenu = journeyReducer(
+    journeyReducer(journeyReducer(initialJourney("pt-BR"), { type: "start" }), {
+      ...started,
+      menu: coffeeMenu,
+    }),
+    { type: "orderType", orderType: "TAKE_OUT" },
+  );
+  const croque = { guid: "a", itemId: "croque", quantity: 1, options: [] };
+
+  it("suggests the group after adding an item, and adds what is accepted", () => {
+    const suggested = journeyReducer(inMenu, { type: "addLine", line: croque });
+    expect(suggested.crossSell).toEqual({ groupId: "xs" });
+    const accepted = journeyReducer(suggested, {
+      type: "crossSellAccepted",
+      lines: [{ guid: "b", itemId: "cafe", quantity: 1, options: [] }],
+    });
+    expect(accepted.crossSell).toBeNull();
+    expect(accepted.basket.map((l) => l.itemId)).toEqual(["croque", "cafe"]);
+  });
+
+  it("stops suggesting after the guest says no", () => {
+    const dismissed = journeyReducer(journeyReducer(inMenu, { type: "addLine", line: croque }), {
+      type: "crossSellDismissed",
+    });
+    expect(journeyReducer(dismissed, { type: "addLine", line: croque }).crossSell).toBeNull();
   });
 });
 
