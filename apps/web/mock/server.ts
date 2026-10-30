@@ -61,7 +61,9 @@ function deviceConfig(device: (typeof state.devices)[number]): Schemas["DeviceCo
           until: active.until.toISOString(),
         }
       : null,
-    nextOpeningAt: active ? null : (nextOpening(state.menus, at, r.timezone)?.toISOString() ?? null),
+    nextOpeningAt: active
+      ? null
+      : (nextOpening(state.menus, at, r.timezone)?.toISOString() ?? null),
     serverTime: at.toISOString(),
   };
 }
@@ -81,7 +83,10 @@ const routes: Route[] = [
       }
       if (device.status === "DISABLED") return problem(403, "DEVICE_DISABLED", "Device disabled");
       const accessToken = randomBytes(24).toString("base64url");
-      state.tokens.set(accessToken, { deviceId: device.id, expiresAt: Date.now() + TOKEN_TTL_S * 1000 });
+      state.tokens.set(accessToken, {
+        deviceId: device.id,
+        expiresAt: Date.now() + TOKEN_TTL_S * 1000,
+      });
       return { status: 200, body: { accessToken, tokenType: "Bearer", expiresIn: TOKEN_TTL_S } };
     },
   ],
@@ -154,12 +159,16 @@ const routes: Route[] = [
   ],
 ];
 
-async function readBody(req: IncomingMessage): Promise<unknown> {
+async function readRaw(req: IncomingMessage): Promise<Buffer> {
   const chunks: Buffer[] = [];
   for await (const chunk of req) chunks.push(chunk as Buffer);
-  if (chunks.length === 0) return null;
+  return Buffer.concat(chunks);
+}
+
+function parseJson(raw: Buffer): unknown {
+  if (raw.length === 0) return null;
   try {
-    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    return JSON.parse(raw.toString("utf8"));
   } catch {
     return null;
   }
@@ -167,7 +176,8 @@ async function readBody(req: IncomingMessage): Promise<unknown> {
 
 function send(res: ServerResponse, reply: Reply) {
   const headers = { ...reply.headers };
-  if (reply.body !== undefined && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
+  if (reply.body !== undefined && !headers["Content-Type"])
+    headers["Content-Type"] = "application/json";
   res.writeHead(reply.status, headers);
   res.end(reply.body === undefined ? undefined : JSON.stringify(reply.body));
 }
@@ -197,12 +207,14 @@ async function serveMedia(path: string, res: ServerResponse): Promise<boolean> {
 const server = createServer({ insecureHTTPParser: true }, async (incoming, res) => {
   const url = new URL(incoming.url ?? "/", "http://mock");
   if (incoming.method === "GET" && (await serveMedia(url.pathname, res))) return;
+  const raw = await readRaw(incoming);
   const req: Request = {
     method: incoming.method ?? "GET",
     path: url.pathname,
     query: url.searchParams,
     headers: incoming.headers,
-    body: await readBody(incoming),
+    raw,
+    body: parseJson(raw),
     ip: incoming.socket.remoteAddress ?? "",
   };
   for (const [method, pattern, handler] of routes) {
@@ -220,7 +232,9 @@ server.on("clientError", (error: NodeJS.ErrnoException & { rawPacket?: Buffer },
 });
 
 server.listen(MOCK_PORT, () => {
-  console.log(`[mock] Core API mock on http://localhost:${MOCK_PORT} (scenario: ${state.scenario})`);
+  console.log(
+    `[mock] Core API mock on http://localhost:${MOCK_PORT} (scenario: ${state.scenario})`,
+  );
   if (process.env.MOCK_NO_PRISM) return;
   // Prism validates every request and response against the contract.
   const prismCli = fileURLToPath(
@@ -229,7 +243,15 @@ server.listen(MOCK_PORT, () => {
   const contract = fileURLToPath(new URL("../../../contract/openapi.yaml", import.meta.url));
   const prism = spawn(
     process.execPath,
-    [prismCli, "proxy", contract, `http://localhost:${MOCK_PORT}`, "-p", String(PRISM_PORT), "--errors"],
+    [
+      prismCli,
+      "proxy",
+      contract,
+      `http://localhost:${MOCK_PORT}`,
+      "-p",
+      String(PRISM_PORT),
+      "--errors",
+    ],
     { stdio: "inherit" },
   );
   const stop = () => {

@@ -76,8 +76,8 @@ function GateScreen({ config }: { config: DeviceConfig }) {
             idleMs: config.idleTimerIntervalMilliseconds,
           }}
           attract={{
-            "pt-BR": <AttractScreen brand={brand} language="pt-BR" />,
-            en: <AttractScreen brand={brand} language="en" />,
+            "pt-BR": <AttractScreen brand={brand} logo={restaurant.logo} language="pt-BR" />,
+            en: <AttractScreen brand={brand} logo={restaurant.logo} language="en" />,
           }}
         />
       );

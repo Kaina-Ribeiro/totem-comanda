@@ -13,6 +13,8 @@ export type Request = {
   path: string;
   query: URLSearchParams;
   headers: IncomingMessage["headers"];
+  /** The body as sent (multipart uploads); `body` is it parsed as JSON, or null. */
+  raw: Buffer;
   body: unknown;
   ip: string;
 };

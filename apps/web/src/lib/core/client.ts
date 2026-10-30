@@ -33,3 +33,19 @@ export function problemCode(error: unknown): ProblemCode | undefined {
   }
   return undefined;
 }
+
+let mediaClient: CoreApi | undefined;
+
+/**
+ * Client for media: uploads (uploadMedia) and the /media files. Same Core API,
+ * but CORE_MEDIA_URL may point past Prism, whose proxy re-encodes binary
+ * bodies as UTF-8 and corrupts images. Falls back to CORE_API_URL.
+ */
+export function coreMediaApi(): CoreApi {
+  if (!mediaClient) {
+    const baseUrl = process.env.CORE_MEDIA_URL ?? process.env.CORE_API_URL;
+    if (!baseUrl) throw new Error("CORE_API_URL is not set (see apps/web/.env.example)");
+    mediaClient = createClient<paths>({ baseUrl });
+  }
+  return mediaClient;
+}

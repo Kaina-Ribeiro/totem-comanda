@@ -40,7 +40,7 @@ function seed() {
       },
       posCheckNumberDisplayLength: 2,
       receiptFooter: { "pt-BR": "Obrigado e volte sempre!", en: "Thank you!" },
-    } satisfies Schemas["Restaurant"],
+    } as Schemas["Restaurant"],
     devices: [
       device("KIOSK-TBT-001", "KIOSK", "Totem da entrada", "s3cr3t-from-provisioning"),
       device("KITCHEN-TBT-001", "KITCHEN", "Tela da cozinha", "kitchen-s3cr3t"),
@@ -67,7 +67,10 @@ function seed() {
     ownerTokens: new Map<string, number>(),
     catalogue: seedCatalogue(),
     /** Owner-edited UI strings per language (OP-START-02), merged over the kiosk's bundle. */
-    languagePacks: { "pt-BR": {}, en: {} } as Record<Schemas["LanguageCode"], Record<string, string>>,
+    languagePacks: { "pt-BR": {}, en: {} } as Record<
+      Schemas["LanguageCode"],
+      Record<string, string>
+    >,
     /**
      * Menu each device last loaded. QuoteRequest carries no journey or menu id,
      * so the mock prices a device's quotes on the menu its journey started with.
@@ -92,12 +95,7 @@ function seed() {
   };
 }
 
-function device(
-  id: string,
-  kind: Schemas["DeviceKind"],
-  name: string,
-  secret: string,
-): MockDevice {
+function device(id: string, kind: Schemas["DeviceKind"], name: string, secret: string): MockDevice {
   return {
     id,
     kind,

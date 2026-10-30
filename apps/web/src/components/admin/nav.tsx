@@ -4,7 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 /** Back-office sections. Order follows how the owner sets the shop up. */
-export const ADMIN_SECTIONS = [{ href: "/admin", label: "Início" }] as const;
+export const ADMIN_SECTIONS = [
+  { href: "/admin", label: "Início" },
+  { href: "/admin/loja", label: "Loja" },
+] as const;
 
 export function AdminNav() {
   const path = usePathname();

@@ -33,7 +33,11 @@ describe("activeMenu", () => {
 
   it("runs an overnight window past midnight", () => {
     const night: ScheduledMenu[] = [
-      { id: "noite", schedules: [{ weekday: "FRI", timeStart: "22:00", timeEnd: "02:00" }], forcedUntil: null },
+      {
+        id: "noite",
+        schedules: [{ weekday: "FRI", timeStart: "22:00", timeEnd: "02:00" }],
+        forcedUntil: null,
+      },
     ];
     expect(activeMenu(night, at("23:00"), tz)?.menu.id).toBe("noite");
     expect(activeMenu(night, new Date("2026-10-31T01:30:00-03:00"), tz)?.menu.id).toBe("noite");
