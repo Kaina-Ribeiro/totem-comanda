@@ -21,15 +21,18 @@
   },
   "devDependencies": {
     "@redocly/cli": "^2.72.1",
+    "@serwist/turbopack": "^9.5.13",
     "@stoplight/prism-cli": "^5.14.2",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^24.19.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
+    "esbuild": "^0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
     "openapi-typescript": "7.13",
+    "serwist": "^9.5.13",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^5.0.5"

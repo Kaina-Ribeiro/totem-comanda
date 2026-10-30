@@ -1,5 +1,9 @@
-import type { Metadata } from "next";
+import { SerwistProvider } from "@serwist/turbopack/react";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, Manrope } from "next/font/google";
+
+import { OfflineOverlay } from "@/components/offline/offline-overlay";
+
 import "./globals.css";
 
 // Variable fonts: Fraunces covers weights 500-600 and the italic brand name,
@@ -18,6 +22,11 @@ const manrope = Manrope({
 
 export const metadata: Metadata = {
   title: "Comanda",
+  applicationName: "Comanda",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#4e3426",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -26,7 +35,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="pt-BR"
       className={`${fraunces.variable} ${manrope.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <SerwistProvider swUrl="/serwist/sw.js">
+          {children}
+          <OfflineOverlay />
+        </SerwistProvider>
+      </body>
     </html>
   );
 }
