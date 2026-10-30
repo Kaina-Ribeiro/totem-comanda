@@ -132,3 +132,10 @@ npx @redocly/cli lint contract/openapi.yaml
 - Out of scope for the MVP: loyalty, Scan-and-Go and staff age approval, split bill, guest walks
   away, accessibility mode, tips, other payment methods, digital receipts, multi-brand.
 - Keep changes small and phase by phase. After each step, say what changed and how to check it.
+
+## Task tracking
+
+Work is tracked in Linear: project **Comanda** (team `GAB`), one milestone per phase.
+Phase 0 issues are GAB-5 to GAB-13. Start a branch from the issue's suggested branch name,
+reference the issue id (e.g. `GAB-5`) in commits, and move the issue as work progresses.
+GAB-12 is the partner's Go work: do not implement it.
