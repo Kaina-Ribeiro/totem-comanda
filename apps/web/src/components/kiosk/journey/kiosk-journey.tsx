@@ -23,6 +23,7 @@ import {
 } from "./journey-state";
 import { MenuScreen } from "./menu-screen";
 import { OrderTypeScreen } from "./order-type-screen";
+import { SuccessScreen } from "./success-screen";
 import { TaxIdRow, TaxIdSheet } from "./tax-id-sheet";
 
 export type KioskSettings = {
@@ -30,6 +31,8 @@ export type KioskSettings = {
   defaultLanguage: Language;
   languages: Language[];
   orderTypes: OrderType[];
+  /** posCheckNumberDisplayLength (BR-POST-01). */
+  checkNumberDigits: number;
 };
 
 /** FR-137: the attract screen re-reads the config every 45 s, so the kiosk closes by itself. */
@@ -342,17 +345,14 @@ export function KioskJourney({
           />
         );
       case "success":
-        return (
-          <main className="flex flex-1 flex-col items-center justify-center gap-6 bg-accent text-on-accent">
-            <span className="text-[36px]">#</span>
-            <span className="font-display text-[300px] font-semibold">
-              {journey.placed?.posCheckNumber}
-            </span>
-            <button onClick={reset} className="text-[36px] font-bold">
-              {strings["nav.home"]}
-            </button>
-          </main>
-        );
+        return journey.placed ? (
+          <SuccessScreen
+            placed={journey.placed}
+            displayLength={settings.checkNumberDigits}
+            strings={strings}
+            onDone={reset}
+          />
+        ) : null;
     }
   }
 }

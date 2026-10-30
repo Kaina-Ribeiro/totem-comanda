@@ -120,6 +120,12 @@ const ptBR = {
   "pay.basketBody": "Algum item não está mais disponível. Volte ao pedido para revisar.",
   "pay.toBasket": "Voltar ao pedido",
   "pay.placing": "Confirmando o pedido…",
+  "success.tag": "Pagamento aprovado",
+  "success.lead": "Seu número é o",
+  "success.body": "Já estamos preparando. Retire no balcão quando o seu número for chamado.",
+  "success.wait": "Fica pronto em cerca de {n} min.",
+  "success.done": "Concluir",
+  "success.countdown": "Volta ao início em {n} s",
 } as const;
 
 export type StringKey = keyof typeof ptBR;
@@ -243,6 +249,12 @@ const en: Strings = {
   "pay.basketBody": "An item is no longer available. Go back to your order to review it.",
   "pay.toBasket": "Back to my order",
   "pay.placing": "Confirming your order…",
+  "success.tag": "Payment approved",
+  "success.lead": "Your number is",
+  "success.body": "We're already on it. Collect at the counter when your number is called.",
+  "success.wait": "Ready in about {n} min.",
+  "success.done": "Done",
+  "success.countdown": "Back to the start in {n} s",
 };
 
 export type Language = "pt-BR" | "en";
