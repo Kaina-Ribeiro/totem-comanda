@@ -11,7 +11,8 @@
     "gen:api": "openapi-typescript ../../contract/openapi.yaml -o src/lib/core-api.d.ts",
     "mock": "prism mock ../../contract/openapi.yaml -p 4010",
     "lint:contract": "redocly lint ../../contract/openapi.yaml",
-    "test": "vitest run"
+    "test": "vitest run",
+    "analyze": "next analyze"
   },
   "dependencies": {
     "next": "16.4.3",
