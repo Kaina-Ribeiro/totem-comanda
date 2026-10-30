@@ -1,5 +1,4 @@
 import Image from "next/image";
-import { useState } from "react";
 
 import { formatBRL } from "@/lib/format/money";
 import {
@@ -30,6 +29,7 @@ export function MenuScreen({
   strings,
   canChangeOrderType,
   onChangeOrderType,
+  onPickCategory,
   onPickItem,
   onOpenBasket,
   onCancel,
@@ -39,16 +39,16 @@ export function MenuScreen({
   strings: Strings;
   canChangeOrderType: boolean;
   onChangeOrderType: () => void;
+  onPickCategory: (categoryId: string) => void;
   onPickItem: (item: MenuEntity) => void;
   onOpenBasket: () => void;
   onCancel: () => void;
 }) {
   const orderType = journey.orderType ?? "DINEIN";
   const menu = filterMenu(journey.menu!, orderType);
-  const [picked, setPicked] = useState<string | null>(null);
   const categoryIndex = Math.max(
     0,
-    menu.entities.findIndex((c) => c.id === picked),
+    menu.entities.findIndex((c) => c.id === journey.categoryId),
   );
   const category = menu.entities[categoryIndex];
   const tint = TINTS[categoryIndex % TINTS.length];
@@ -86,7 +86,7 @@ export function MenuScreen({
             return (
               <button
                 key={c.id}
-                onClick={() => setPicked(c.id)}
+                onClick={() => onPickCategory(c.id)}
                 aria-pressed={on}
                 className={`flex min-h-[108px] w-full items-center gap-[18px] rounded-[27px] px-[21px] text-left text-[30px] ${
                   on ? `${cTint} font-extrabold text-ink` : "font-semibold text-muted"

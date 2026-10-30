@@ -5,9 +5,11 @@ import { type ReactNode, useEffect, useReducer, useTransition } from "react";
 
 import { beginJourney, switchLanguage } from "@/app/kiosk/actions";
 import { AutoRefresh } from "@/components/auto-refresh";
+import { findItem } from "@/lib/kiosk/menu-view";
 import { BUNDLED, type Language } from "@/lib/kiosk/strings";
 
 import { Globe } from "../icons";
+import { ItemScreen } from "./item-screen";
 import { initialJourney, journeyReducer, type OrderType } from "./journey-state";
 import { MenuScreen } from "./menu-screen";
 import { OrderTypeScreen } from "./order-type-screen";
@@ -153,19 +155,40 @@ export function KioskJourney({
           strings={strings}
           canChangeOrderType={settings.orderTypes.length > 1}
           onChangeOrderType={() => dispatch({ type: "changeOrderType" })}
+          onPickCategory={(categoryId) => dispatch({ type: "pickCategory", categoryId })}
           onPickItem={(item) => {
-            // Items with nothing to choose go straight in (F-MENU-03); the item builder is COM-35.
+            // Items with nothing to choose go straight in (F-MENU-03).
             if ((item.optionGroups ?? []).length === 0) {
               dispatch({
                 type: "addLine",
                 line: { guid: crypto.randomUUID(), itemId: item.id, quantity: 1, options: [] },
               });
+            } else {
+              dispatch({ type: "openItem", itemId: item.id });
             }
           }}
           onOpenBasket={() => {}}
           onCancel={reset}
         />
       );
+    case "item": {
+      const item = journey.item && journey.menu && findItem(journey.menu, journey.item.itemId);
+      if (!item) return null;
+      const editGuid = journey.item?.editGuid;
+      return (
+        <ItemScreen
+          key={`${item.id}:${editGuid ?? "new"}`}
+          menu={journey.menu!}
+          item={item}
+          editing={journey.basket.find((line) => line.guid === editGuid) ?? null}
+          orderType={journey.orderType ?? "DINEIN"}
+          strings={strings}
+          backLabel={strings["nav.menu"]}
+          onBack={() => dispatch({ type: "closeItem" })}
+          onSave={(line) => dispatch({ type: "saveItem", line })}
+        />
+      );
+    }
   }
 }
 

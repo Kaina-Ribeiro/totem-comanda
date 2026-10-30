@@ -8,7 +8,7 @@ export type OrderType = Schemas["OrderType"];
 
 /** One journey on the kiosk, held in the browser from tap to reset. */
 export type Journey = {
-  phase: "attract" | "starting" | "startFailed" | "orderType" | "menu";
+  phase: "attract" | "starting" | "startFailed" | "orderType" | "menu" | "item";
   language: Language;
   orderNonce: string | null;
   journeyStartedTimestamp: string | null;
@@ -18,6 +18,10 @@ export type Journey = {
   orderType: OrderType | null;
   /** What the kiosk sends: item and option ids with quantities, never prices. */
   basket: BasketLine[];
+  /** Category open on the menu screen; kept while an item is open (F-MENU-12). */
+  categoryId: string | null;
+  /** The item open in the builder, and the basket line it edits, if any. */
+  item: { itemId: string; editGuid: string | null } | null;
 };
 
 export type JourneyAction =
@@ -37,6 +41,10 @@ export type JourneyAction =
   | { type: "orderType"; orderType: OrderType }
   | { type: "changeOrderType" }
   | { type: "addLine"; line: BasketLine }
+  | { type: "pickCategory"; categoryId: string }
+  | { type: "openItem"; itemId: string; editGuid?: string }
+  | { type: "closeItem" }
+  | { type: "saveItem"; line: BasketLine }
   | { type: "reset"; language: Language };
 
 export function initialJourney(language: Language): Journey {
@@ -49,6 +57,8 @@ export function initialJourney(language: Language): Journey {
     strings: null,
     orderType: null,
     basket: [],
+    categoryId: null,
+    item: null,
   };
 }
 
@@ -81,6 +91,19 @@ export function journeyReducer(state: Journey, action: JourneyAction): Journey {
       return { ...state, phase: "orderType" };
     case "addLine":
       return { ...state, basket: [...state.basket, action.line] };
+    case "pickCategory":
+      return { ...state, categoryId: action.categoryId };
+    case "openItem":
+      return { ...state, phase: "item", item: { itemId: action.itemId, editGuid: action.editGuid ?? null } };
+    case "closeItem":
+      return { ...state, phase: "menu", item: null };
+    case "saveItem": {
+      const editGuid = state.item?.editGuid;
+      const basket = editGuid
+        ? state.basket.map((line) => (line.guid === editGuid ? action.line : line))
+        : [...state.basket, action.line];
+      return { ...state, phase: "menu", item: null, basket };
+    }
     case "reset":
       return initialJourney(action.language);
   }

@@ -32,6 +32,15 @@ const ptBR = {
   "basketBar.item": "1 item",
   "basketBar.cta": "Ver meu pedido",
   "basketBar.empty": "Seu pedido está vazio",
+  "item.chooseOne": "Escolha um",
+  "item.chooseN": "Escolha {n}",
+  "item.count": "{count} de {max}",
+  "item.optional": "Opcional",
+  "item.add": "Adicionar",
+  "item.update": "Atualizar",
+  "item.less": "Menos",
+  "item.more": "Mais",
+  "item.remove": "Tirar",
 } as const;
 
 export type StringKey = keyof typeof ptBR;
@@ -66,6 +75,15 @@ const en: Strings = {
   "basketBar.item": "1 item",
   "basketBar.cta": "View my order",
   "basketBar.empty": "Your order is empty",
+  "item.chooseOne": "Choose one",
+  "item.chooseN": "Choose {n}",
+  "item.count": "{count} of {max}",
+  "item.optional": "Optional",
+  "item.add": "Add",
+  "item.update": "Update",
+  "item.less": "Less",
+  "item.more": "More",
+  "item.remove": "Remove",
 };
 
 export type Language = "pt-BR" | "en";
