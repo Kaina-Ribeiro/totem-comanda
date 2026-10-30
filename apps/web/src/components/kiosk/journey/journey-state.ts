@@ -1,4 +1,4 @@
-import type { OrderTotal } from "@/app/kiosk/actions";
+import type { Order, OrderTotal, PlacedOrder } from "@/app/kiosk/actions";
 import type { components } from "@/lib/core-api";
 import type { Result } from "@/lib/kiosk/core";
 import type { BasketLine } from "@/lib/kiosk/menu-view";
@@ -10,7 +10,16 @@ export type OrderType = Schemas["OrderType"];
 
 /** One journey on the kiosk, held in the browser from tap to reset. */
 export type Journey = {
-  phase: "attract" | "starting" | "startFailed" | "orderType" | "menu" | "item" | "basket";
+  phase:
+    | "attract"
+    | "starting"
+    | "startFailed"
+    | "orderType"
+    | "menu"
+    | "item"
+    | "basket"
+    | "checkout"
+    | "success";
   language: Language;
   orderNonce: string | null;
   journeyStartedTimestamp: string | null;
@@ -30,6 +39,14 @@ export type Journey = {
   discountCode: string | null;
   /** The Core API's latest totals, for the basket they were asked for (`key`). */
   quote: { key: string; result: Result<OrderTotal> } | null;
+  /**
+   * The order created for checkout and the Idempotency-Keys that made it and
+   * will place it. Kept per basket (`basketKey`), so a retry never makes a
+   * second order and a changed basket gets a new one.
+   */
+  checkout: { basketKey: string; orderKey: string; placeKey: string; order: Order | null } | null;
+  /** The placed order: its number comes from the Core API (OP-PAY-03). */
+  placed: PlacedOrder | null;
 };
 
 export type JourneyAction =
@@ -60,6 +77,9 @@ export type JourneyAction =
   | { type: "quoted"; key: string; result: Result<OrderTotal> }
   | { type: "taxId"; cpfCnpj: string | null }
   | { type: "discount"; code: string | null }
+  | { type: "openCheckout"; orderKey: string; placeKey: string }
+  | { type: "orderCreated"; order: Order }
+  | { type: "placed"; placed: PlacedOrder }
   | { type: "reset"; language: Language };
 
 export function initialJourney(language: Language): Journey {
@@ -77,6 +97,8 @@ export function initialJourney(language: Language): Journey {
     cpfCnpj: null,
     discountCode: null,
     quote: null,
+    checkout: null,
+    placed: null,
   };
 }
 
@@ -143,6 +165,22 @@ export function journeyReducer(state: Journey, action: JourneyAction): Journey {
       };
     case "removeLine":
       return { ...state, basket: state.basket.filter((line) => line.guid !== action.guid) };
+    case "openCheckout": {
+      if (state.basket.length === 0) return state;
+      const basketKey = orderKey(state);
+      const keep = state.checkout?.basketKey === basketKey;
+      return {
+        ...state,
+        phase: "checkout",
+        checkout: keep
+          ? state.checkout
+          : { basketKey, orderKey: action.orderKey, placeKey: action.placeKey, order: null },
+      };
+    }
+    case "orderCreated":
+      return state.checkout ? { ...state, checkout: { ...state.checkout, order: action.order } } : state;
+    case "placed":
+      return { ...state, phase: "success", placed: action.placed };
     case "discount":
       return { ...state, discountCode: action.code };
     case "taxId":
@@ -160,6 +198,11 @@ export function journeyReducer(state: Journey, action: JourneyAction): Journey {
 /** Identifies what a quote was asked for: order type, lines and discount. */
 export function quoteKey(state: Pick<Journey, "orderType" | "basket" | "discountCode">): string {
   return JSON.stringify([state.orderType, state.basket, state.discountCode]);
+}
+
+/** Identifies the order a checkout creates: the quote's inputs plus the CPF/CNPJ. */
+export function orderKey(state: Journey): string {
+  return JSON.stringify([quoteKey(state), state.cpfCnpj]);
 }
 
 /** The quote's totals when they match the current basket, else null. */

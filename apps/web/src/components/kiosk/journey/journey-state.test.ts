@@ -107,6 +107,34 @@ describe("basket", () => {
   });
 });
 
+describe("checkout", () => {
+  const inBasket = journeyReducer(
+    journeyReducer(
+      journeyReducer(journeyReducer(initialJourney("pt-BR"), { type: "start" }), started),
+      { type: "orderType", orderType: "TAKE_OUT" },
+    ),
+    { type: "addLine", line: { guid: "a", itemId: "itm-agua", quantity: 1, options: [] } },
+  );
+
+  it("keeps the order's idempotency keys while the basket is the same", () => {
+    const first = journeyReducer(inBasket, { type: "openCheckout", orderKey: "k1", placeKey: "p1" });
+    const back = journeyReducer(first, { type: "openBasket" });
+    const again = journeyReducer(back, { type: "openCheckout", orderKey: "k2", placeKey: "p2" });
+    expect(again.checkout).toMatchObject({ orderKey: "k1", placeKey: "p1" });
+  });
+
+  it("starts a new order when the basket changed", () => {
+    const first = journeyReducer(inBasket, { type: "openCheckout", orderKey: "k1", placeKey: "p1" });
+    const changed = journeyReducer(journeyReducer(first, { type: "openBasket" }), {
+      type: "lineQuantity",
+      guid: "a",
+      quantity: 2,
+    });
+    const again = journeyReducer(changed, { type: "openCheckout", orderKey: "k2", placeKey: "p2" });
+    expect(again.checkout).toMatchObject({ orderKey: "k2", order: null });
+  });
+});
+
 describe("availableOrderTypes", () => {
   it("puts DINEIN first and leaves out closed ones (BR-START-11)", () => {
     expect(availableOrderTypes({ isDineInAvailable: true, isTakeOutAvailable: true })).toEqual([

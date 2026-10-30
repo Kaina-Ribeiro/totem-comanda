@@ -10,6 +10,7 @@ import { BUNDLED, type Language } from "@/lib/kiosk/strings";
 
 import { Globe } from "../icons";
 import { BasketScreen, CancelDialog } from "./basket-screen";
+import { CheckoutFlow } from "./checkout-flow";
 import { CouponRow, CouponSheet } from "./coupon-sheet";
 import { ItemScreen } from "./item-screen";
 import {
@@ -320,8 +321,37 @@ export function KioskJourney({
             }
             onRemove={(line) => dispatch({ type: "removeLine", guid: line.guid })}
             onRetryQuote={() => setQuoteAttempt((n) => n + 1)}
-            onPay={() => {}}
+            onPay={() =>
+              dispatch({
+                type: "openCheckout",
+                orderKey: crypto.randomUUID(),
+                placeKey: crypto.randomUUID(),
+              })
+            }
           />
+        );
+      case "checkout":
+        return (
+          <CheckoutFlow
+            journey={journey}
+            strings={strings}
+            onOrderCreated={(order) => dispatch({ type: "orderCreated", order })}
+            onPlaced={(placed) => dispatch({ type: "placed", placed })}
+            onBack={() => dispatch({ type: "openBasket" })}
+            onCancelOrder={askCancel}
+          />
+        );
+      case "success":
+        return (
+          <main className="flex flex-1 flex-col items-center justify-center gap-6 bg-accent text-on-accent">
+            <span className="text-[36px]">#</span>
+            <span className="font-display text-[300px] font-semibold">
+              {journey.placed?.posCheckNumber}
+            </span>
+            <button onClick={reset} className="text-[36px] font-bold">
+              {strings["nav.home"]}
+            </button>
+          </main>
         );
     }
   }

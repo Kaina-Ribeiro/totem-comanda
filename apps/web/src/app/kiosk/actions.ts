@@ -13,6 +13,7 @@ import {
   type Result,
   success,
 } from "@/lib/kiosk/core";
+import { simulatedOutcome, terminalAnswered } from "@/lib/kiosk/simulated-payment";
 import { type Language, mergeStrings, type Strings } from "@/lib/kiosk/strings";
 
 // Server Actions of the kiosk journey. The browser holds the journey state;
@@ -140,6 +141,97 @@ export async function validateCoupon(input: {
         orderItems: input.orderItems,
         currentDiscountCode: input.currentDiscountCode,
       },
+    }),
+  );
+}
+
+type Schemas = components["schemas"];
+export type Order = Schemas["Order"];
+export type Payment = Schemas["Payment"];
+export type PaymentMethod = Schemas["PaymentMethod"];
+export type PlacedOrder = Schemas["PlacedOrder"];
+
+/**
+ * Stores the order as AWAITING_PAYMENT (first half of OP-PAY-01). The Core
+ * API reprices every line; `idempotencyKey` makes a retry return the same order.
+ */
+export async function createOrder(
+  idempotencyKey: string,
+  order: Schemas["CreateOrderRequest"],
+): Promise<Result<Order>> {
+  return deviceCall((headers) =>
+    coreApi().POST("/v1/orders", {
+      headers,
+      params: { header: { "Idempotency-Key": idempotencyKey } },
+      body: {
+        orderNonce: order.orderNonce,
+        orderType: order.orderType,
+        language: order.language,
+        orderItems: order.orderItems,
+        discountCode: order.discountCode ?? null,
+        cpfCnpj: order.cpfCnpj ?? null,
+        journeyStartedTimestamp: order.journeyStartedTimestamp ?? null,
+      },
+    }),
+  );
+}
+
+/** Starts a payment for the order total; one key per attempt (second half of OP-PAY-01). */
+export async function startPayment(
+  orderId: string,
+  method: PaymentMethod,
+  idempotencyKey: string,
+): Promise<Result<Payment>> {
+  return deviceCall((headers) =>
+    coreApi().POST("/v1/orders/{orderId}/payments", {
+      headers,
+      params: { path: { orderId }, header: { "Idempotency-Key": idempotencyKey } },
+      body: { method },
+    }),
+  );
+}
+
+/**
+ * Polls a payment (OP-PAY-02), at most once a second. While the gateway is
+ * SIMULATED, the BFF answers for the terminal once it has "waited" long enough.
+ */
+export async function pollPayment(paymentId: string): Promise<Result<Payment>> {
+  const result = await deviceCall((headers) =>
+    coreApi().GET("/v1/payments/{paymentId}", { headers, params: { path: { paymentId } } }),
+  );
+  if (!result.ok) return result;
+  const payment = result.data;
+  if (payment.gatewayType !== "SIMULATED") return result;
+  if (!terminalAnswered(payment.id, payment.paymentStatus !== "AUTHORISING")) return result;
+
+  const outcome = await simulatedOutcome();
+  if (outcome === "MANUAL") return result;
+  const simulated = await deviceCall((headers) =>
+    coreApi().POST("/v1/payments/{paymentId}/simulate", {
+      headers,
+      params: { path: { paymentId } },
+      body: { outcome },
+    }),
+  );
+  return simulated.ok ? simulated : result;
+}
+
+/** Cancels a payment still AUTHORISING; `PAYMENT_NOT_CANCELLABLE` once it is final. */
+export async function cancelPayment(paymentId: string): Promise<Result<Payment>> {
+  return deviceCall((headers) =>
+    coreApi().POST("/v1/payments/{paymentId}/cancel", { headers, params: { path: { paymentId } } }),
+  );
+}
+
+/** Places a paid order (OP-PAY-03): the Core API assigns the order number. */
+export async function placeOrder(
+  orderId: string,
+  idempotencyKey: string,
+): Promise<Result<PlacedOrder>> {
+  return deviceCall((headers) =>
+    coreApi().POST("/v1/orders/{orderId}/place", {
+      headers,
+      params: { path: { orderId }, header: { "Idempotency-Key": idempotencyKey } },
     }),
   );
 }

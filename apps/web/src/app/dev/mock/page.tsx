@@ -9,6 +9,11 @@ import {
   setMockScenario,
 } from "@/lib/core/mock-scenarios";
 import { forgetDeviceTokens } from "@/lib/device/session";
+import {
+  SIMULATED_OUTCOME_COOKIE,
+  SIMULATED_OUTCOMES,
+  simulatedOutcome,
+} from "@/lib/kiosk/simulated-payment";
 
 // Development only: switch the stateful mock's scenario (apps/web/mock) and
 // simulate the Core API being down.
@@ -29,6 +34,21 @@ async function toggleCoreDown() {
   else jar.set(CORE_DOWN_COOKIE, "1", { httpOnly: true, path: "/" });
 }
 
+async function choosePayment(form: FormData) {
+  "use server";
+  if (process.env.NODE_ENV !== "development") return;
+  const outcome = form.get("outcome");
+  if (typeof outcome === "string" && (SIMULATED_OUTCOMES as readonly string[]).includes(outcome)) {
+    (await cookies()).set(SIMULATED_OUTCOME_COOKIE, outcome, { httpOnly: true, path: "/" });
+  }
+}
+
+const PAYMENT_LABELS = {
+  AUTHORISED: "Pagamento simulado: aprova",
+  FAILED: "Pagamento simulado: recusa",
+  MANUAL: "Pagamento simulado: maquininha não responde",
+} as const;
+
 const buttonClass = (active: boolean) =>
   `h-[96px] rounded-card-sm px-8 text-left text-[28px] font-semibold ${
     active ? "bg-accent text-on-accent" : "bg-surface text-ink"
@@ -48,13 +68,22 @@ export default function MockScenarioPage() {
 }
 
 async function Controls() {
-  const [mock, coreDown] = await Promise.all([readMockState(), isCoreDownSimulated()]);
+  const [mock, coreDown, payment] = await Promise.all([
+    readMockState(),
+    isCoreDownSimulated(),
+    simulatedOutcome(),
+  ]);
   return (
     <>
       {mock ? (
         <form action={chooseScenario} className="flex flex-col gap-4">
           {Object.entries(mock.scenarios).map(([id, label]) => (
-            <button key={id} name="scenario" value={id} className={buttonClass(id === mock.scenario)}>
+            <button
+              key={id}
+              name="scenario"
+              value={id}
+              className={buttonClass(id === mock.scenario)}
+            >
               {label}
             </button>
           ))}
@@ -64,6 +93,18 @@ async function Controls() {
           Mock fora do ar ou MOCK_CONTROL_URL vazio. Rode `npm run mock` em apps/web.
         </p>
       )}
+      <form action={choosePayment} className="flex flex-col gap-4">
+        {SIMULATED_OUTCOMES.map((outcome) => (
+          <button
+            key={outcome}
+            name="outcome"
+            value={outcome}
+            className={buttonClass(outcome === payment)}
+          >
+            {PAYMENT_LABELS[outcome]}
+          </button>
+        ))}
+      </form>
       <form action={toggleCoreDown}>
         <button className={buttonClass(coreDown)}>
           {coreDown ? "Core API fora do ar (ligado)" : "Simular Core API fora do ar"}
