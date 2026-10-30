@@ -1,18 +1,23 @@
 import { Suspense } from "react";
 
 import { DeviceGate } from "@/components/device-gate";
+import { UnavailableScreen } from "@/components/kiosk/unavailable-screen";
+import { KitchenBoard } from "@/components/kitchen/kitchen-board";
+import { listKitchenOrders } from "@/lib/kitchen/core";
 
 export default function KitchenPage() {
   return (
     <Suspense>
-      <DeviceGate area="kitchen">
-        {(config) => (
-          <main className="flex flex-1 flex-col items-center justify-center gap-4">
-            <h1 className="font-display text-7xl font-semibold">Cozinha</h1>
-            <p className="text-3xl text-muted">{config.kioskID}</p>
-          </main>
-        )}
-      </DeviceGate>
+      <DeviceGate area="kitchen">{() => <Board />}</DeviceGate>
     </Suspense>
   );
+}
+
+/** First paint with the open orders; the board keeps itself current from there. */
+async function Board() {
+  const orders = await listKitchenOrders();
+  if (!orders.ok) {
+    return <UnavailableScreen title="Cozinha sem conexão" body="Tentando de novo em instantes." />;
+  }
+  return <KitchenBoard initial={orders.data} />;
 }

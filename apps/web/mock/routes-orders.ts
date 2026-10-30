@@ -14,6 +14,7 @@ import {
   type Schemas,
 } from "./http.ts";
 import { priceBasket } from "./kiosk-menu.ts";
+import { broadcastKitchen } from "./routes-kitchen.ts";
 import { journeyMenuId, pricingProblem, today } from "./routes-kiosk.ts";
 import { now, state } from "./state.ts";
 
@@ -225,6 +226,7 @@ export const orderRoutes: Route[] = [
             placedAt: now().toISOString(),
           });
           console.log(`[mock] order ${order.id} placed: #${order.posCheckNumber}`);
+          broadcastKitchen("order.paid", order);
         }
         return ok({
           orderId,

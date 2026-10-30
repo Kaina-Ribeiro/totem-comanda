@@ -17,6 +17,7 @@ import { SEED_MEDIA } from "./catalogue.ts";
 import { authDevice, problem, type Reply, type Request, type Route, type Schemas } from "./http.ts";
 import { adminRoutes } from "./routes-admin.ts";
 import { catalogueRoutes } from "./routes-catalogue.ts";
+import { serveKitchenStream, kitchenRoutes } from "./routes-kitchen.ts";
 import { optionRoutes } from "./routes-options.ts";
 import { kioskRoutes } from "./routes-kiosk.ts";
 import { orderRoutes } from "./routes-orders.ts";
@@ -76,6 +77,7 @@ const routes: Route[] = [
   ...adminRoutes,
   ...catalogueRoutes,
   ...optionRoutes,
+  ...kitchenRoutes,
   [
     "POST",
     /^\/v1\/devices\/auth$/,
@@ -221,6 +223,7 @@ const server = createServer({ insecureHTTPParser: true }, async (incoming, res) 
     body: parseJson(raw),
     ip: incoming.socket.remoteAddress ?? "",
   };
+  if (serveKitchenStream(req, res)) return;
   for (const [method, pattern, handler] of routes) {
     const match = pattern.exec(req.path);
     if (match && method === req.method) return send(res, handler(req, match.slice(1)));
@@ -230,6 +233,8 @@ const server = createServer({ insecureHTTPParser: true }, async (incoming, res) 
 
 // Malformed requests get Node's bare 400; log why, since Prism only sees the status.
 server.on("clientError", (error: NodeJS.ErrnoException & { rawPacket?: Buffer }, socket) => {
+  // A client hanging up (e.g. a closed event stream) is not a bad request.
+  if (error.code === "ECONNRESET") return socket.destroy();
   console.warn(`[mock] bad request: ${error.code} ${error.message}`);
   if (error.rawPacket) console.warn(error.rawPacket.toString("latin1").slice(0, 600));
   socket.end("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n");
