@@ -10,7 +10,8 @@
     "typecheck": "next typegen && tsc --noEmit",
     "gen:api": "openapi-typescript ../../contract/openapi.yaml -o src/lib/core-api.d.ts",
     "mock": "prism mock ../../contract/openapi.yaml -p 4010",
-    "lint:contract": "redocly lint ../../contract/openapi.yaml"
+    "lint:contract": "redocly lint ../../contract/openapi.yaml",
+    "test": "vitest run"
   },
   "dependencies": {
     "next": "16.4.3",
@@ -22,7 +23,7 @@
     "@redocly/cli": "^2.72.1",
     "@stoplight/prism-cli": "^5.14.2",
     "@tailwindcss/turbopack": "^4",
-    "@types/node": "^20",
+    "@types/node": "^24.19.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
@@ -30,6 +31,7 @@
     "eslint-config-next": "16.4.3",
     "openapi-typescript": "7.13",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.5"
   }
 }
