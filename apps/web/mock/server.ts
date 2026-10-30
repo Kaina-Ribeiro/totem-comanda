@@ -259,6 +259,9 @@ server.listen(MOCK_PORT, () => {
       `http://localhost:${MOCK_PORT}`,
       "-p",
       String(PRISM_PORT),
+      // 0.0.0.0 when the BFF runs in another container (deploy/cubeship).
+      "-h",
+      process.env.PRISM_HOST ?? "127.0.0.1",
       "--errors",
     ],
     { stdio: "inherit" },

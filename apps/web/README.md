@@ -43,5 +43,12 @@ maintenance, at capacity, device disabled, secret rotated) and can simulate the 
 `/api/dev/core` (development only) authenticates against the mock and returns the
 device config and the active menu.
 
+## Deploy (Cubeship)
+
+Project `comanda` on Cubeship builds two apps from `main` of this repo: `web`
+(`deploy/cubeship/web.Dockerfile`, port 3000, HTTPS) and `mock` (`deploy/cubeship/mock.Dockerfile`,
+internal only). `web` reaches the mock at `http://cubeship-comanda-production-mock:4010` (Prism) and
+`:4020` (media, kitchen stream). When the Go API exists, point `CORE_API_URL` at it and delete `mock`.
+
 `/styleguide` (development only) shows the "Café e trigo" tokens and fonts at 1080x1920, to compare
 with `docs/prototype/screens`.
