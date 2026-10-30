@@ -10,6 +10,7 @@ import { BUNDLED, type Language } from "@/lib/kiosk/strings";
 
 import { Globe } from "../icons";
 import { BasketScreen, CancelDialog } from "./basket-screen";
+import { CouponRow, CouponSheet } from "./coupon-sheet";
 import { ItemScreen } from "./item-screen";
 import {
   currentQuote,
@@ -54,6 +55,7 @@ export function KioskJourney({
   const { phase, language } = journey;
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [taxIdOpen, setTaxIdOpen] = useState(false);
+  const [couponOpen, setCouponOpen] = useState(false);
   const [quoteAttempt, setQuoteAttempt] = useState(0);
   const key = quoteKey(journey);
   const needsQuote = phase === "basket" && journey.basket.length > 0;
@@ -103,6 +105,7 @@ export function KioskJourney({
   function reset() {
     setConfirmCancel(false);
     setTaxIdOpen(false);
+    setCouponOpen(false);
     dispatch({ type: "reset", language: settings.defaultLanguage });
   }
 
@@ -150,6 +153,19 @@ export function KioskJourney({
           strings={strings}
           onKeep={() => setConfirmCancel(false)}
           onConfirm={() => endJourney("CANCELLED_BY_GUEST")}
+        />
+      )}
+      {couponOpen && phase === "basket" && journey.orderType && (
+        <CouponSheet
+          current={journey.discountCode}
+          orderType={journey.orderType}
+          basket={journey.basket}
+          strings={strings}
+          onClose={() => setCouponOpen(false)}
+          onApplied={(discount) => {
+            dispatch({ type: "discount", code: discount.value });
+            setCouponOpen(false);
+          }}
         />
       )}
       {taxIdOpen && phase === "basket" && (
@@ -279,11 +295,20 @@ export function KioskJourney({
             journey={journey}
             strings={strings}
             extras={
-              <TaxIdRow
-                digits={journey.cpfCnpj}
-                strings={strings}
-                onOpen={() => setTaxIdOpen(true)}
-              />
+              <>
+                <CouponRow
+                  code={journey.discountCode}
+                  title={currentQuote(journey)?.discount?.title ?? null}
+                  strings={strings}
+                  onOpen={() => setCouponOpen(true)}
+                  onRemove={() => dispatch({ type: "discount", code: null })}
+                />
+                <TaxIdRow
+                  digits={journey.cpfCnpj}
+                  strings={strings}
+                  onOpen={() => setTaxIdOpen(true)}
+                />
+              </>
             }
             onBack={() => dispatch({ type: "openMenu" })}
             onCancel={askCancel}

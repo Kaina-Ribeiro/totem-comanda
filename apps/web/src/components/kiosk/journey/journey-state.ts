@@ -59,6 +59,7 @@ export type JourneyAction =
   | { type: "removeLine"; guid: string }
   | { type: "quoted"; key: string; result: Result<OrderTotal> }
   | { type: "taxId"; cpfCnpj: string | null }
+  | { type: "discount"; code: string | null }
   | { type: "reset"; language: Language };
 
 export function initialJourney(language: Language): Journey {
@@ -142,6 +143,8 @@ export function journeyReducer(state: Journey, action: JourneyAction): Journey {
       };
     case "removeLine":
       return { ...state, basket: state.basket.filter((line) => line.guid !== action.guid) };
+    case "discount":
+      return { ...state, discountCode: action.code };
     case "taxId":
       return { ...state, cpfCnpj: action.cpfCnpj };
     case "quoted":

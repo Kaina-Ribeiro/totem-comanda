@@ -115,3 +115,31 @@ export async function recordJourneyEvent(
     if (!result.ok) console.warn(`Journey event ${type} not recorded: ${result.code}`);
   });
 }
+
+export type DiscountItem = components["schemas"]["DiscountItem"];
+
+/**
+ * Checks a coupon or restaurant discount code against this basket (OP-DISC-01).
+ * One discount per order: when replacing, `currentDiscountCode` is the one on it.
+ */
+export async function validateCoupon(input: {
+  code: string;
+  orderType: components["schemas"]["OrderType"];
+  orderItems: components["schemas"]["OrderLineInput"][];
+  currentDiscountCode: string | null;
+}): Promise<Result<DiscountItem>> {
+  const code = input.code.trim().toUpperCase();
+  if (!code) return { ok: false, code: "INVALID_COUPON" };
+  return deviceCall((headers) =>
+    coreApi().POST("/v1/discounts/validate", {
+      headers,
+      body: {
+        code,
+        entryMethod: "MANUAL",
+        orderType: input.orderType,
+        orderItems: input.orderItems,
+        currentDiscountCode: input.currentDiscountCode,
+      },
+    }),
+  );
+}

@@ -101,8 +101,12 @@ export function BasketScreen({
 
         {failed && (
           <div className="flex items-center justify-between gap-6 rounded-card-sm bg-danger/10 px-[42px] py-[33px] text-[28.5px] font-semibold text-danger">
-            <span>{quoteErrorMessage(failed.code, failed.detail, strings)}</span>
-            {failed.code !== "ITEM_UNAVAILABLE" && failed.code !== "BASKET_ITEM_LIMIT_EXCEEDED" && (
+            <span>
+              {quoteErrorMessage(failed.code, failed.detail, journey.discountCode, strings)}
+            </span>
+            {!["ITEM_UNAVAILABLE", "BASKET_ITEM_LIMIT_EXCEEDED", "INVALID_COUPON"].includes(
+              failed.code,
+            ) && (
               <button onClick={onRetryQuote} className="shrink-0 underline">
                 {strings["basket.retry"]}
               </button>
@@ -152,8 +156,15 @@ export function BasketScreen({
   );
 }
 
-function quoteErrorMessage(code: string, detail: string | undefined, strings: Strings): string {
+function quoteErrorMessage(
+  code: string,
+  detail: string | undefined,
+  discountCode: string | null,
+  strings: Strings,
+): string {
   switch (code) {
+    case "INVALID_COUPON":
+      return format(strings["basket.couponGone"], { code: discountCode ?? "" });
     case "ITEM_UNAVAILABLE":
       return detail
         ? format(strings["basket.unavailable"], { name: detail })
