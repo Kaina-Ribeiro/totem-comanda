@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+/*
+ * "Café e trigo" tokens from docs/prototype/README.md.
+ * Sizes are for the real 1080x1920 screen: prototype canvas values x 1.5.
+ */
+@theme {
+  --color-ground: #f3efe8;
+  --color-surface: #ffffff;
+  --color-ink: #2b211c;
+  --color-muted: #625750;
+  --color-line: #e5ddd2;
+  --color-accent: #4e3426;
+  --color-on-accent: #faf6f0;
+  --color-on-accent-muted: #d9c8b8;
+  --color-detail: #b07a3a;
+  --color-detail-light: #d8b98a;
+  --color-detail-text: #8a5a2b;
+  --color-price: #6b4430;
+  --color-danger: #a3472f;
+  --color-wheat: #ead9c6;
+  --color-butter: #efe4c9;
+  --color-sage: #dcdfd2;
+  --color-oat: #e2ded8;
+  --color-image-bg: #e9e2d7;
+
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-sans: var(--font-manrope), system-ui, sans-serif;
+
+  /* Primary button: full width, 108px tall on the canvas. */
+  --spacing-button: 162px;
+  /* Cards: 28-36px corner radius on the canvas. */
+  --radius-card-sm: 42px;
+  --radius-card: 54px;
+}
+
+body {
+  background: var(--color-ground);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
