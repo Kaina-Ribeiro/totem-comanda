@@ -264,7 +264,7 @@ function MethodScreen({
   onChoose: (method: PaymentMethod) => void;
 }) {
   return (
-    <main className="flex h-dvh flex-col bg-ground px-[66px] pt-[42px] pb-[96px] text-ink">
+    <main className="flex h-full flex-col bg-ground px-[66px] pt-[42px] pb-[96px] text-ink">
       <button
         onClick={onBack}
         className="flex h-[84px] items-center gap-3 self-start rounded-full bg-surface pr-[33px] pl-[21px] text-[28.5px] font-bold"
@@ -340,7 +340,7 @@ function TerminalScreen({
   onCancel?: () => void;
 }) {
   return (
-    <main className="flex h-dvh flex-col bg-accent px-[84px] pt-[108px] pb-[72px] text-on-accent">
+    <main className="flex h-full flex-col bg-accent px-[84px] pt-[108px] pb-[72px] text-on-accent">
       <span className="text-[30px] font-semibold text-on-accent-muted">
         {strings[`pay.${method}`]}, {formatBRL(total)}
       </span>
@@ -403,7 +403,7 @@ function ProblemScreen({
   onCancelOrder: () => void;
 }) {
   return (
-    <main className="flex h-dvh flex-col bg-ground px-[84px] pt-[108px] pb-[72px] text-ink">
+    <main className="flex h-full flex-col bg-ground px-[84px] pt-[108px] pb-[72px] text-ink">
       <span className="flex items-center gap-[21px] text-[31.5px] font-bold">
         <span className="flex size-[66px] items-center justify-center rounded-full bg-danger text-on-accent">
           <svg

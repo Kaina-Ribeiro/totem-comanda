@@ -36,7 +36,7 @@ export function SuccessScreen({
   }, [left, onDone]);
 
   return (
-    <main className="flex h-dvh flex-col items-center bg-ground px-[18px] pt-[108px] pb-[72px] text-ink">
+    <main className="flex h-full flex-col items-center bg-ground px-[18px] pt-[108px] pb-[72px] text-ink">
       <span className="flex h-[84px] items-center gap-[18px] rounded-full bg-surface pr-[33px] pl-[15px] text-[28.5px] font-bold">
         <span className="flex size-[54px] items-center justify-center rounded-full bg-accent text-on-accent">
           <Check size={30} strokeWidth={3} />

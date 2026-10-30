@@ -52,7 +52,7 @@ export function BasketScreen({
   const empty = journey.basket.length === 0;
 
   return (
-    <div className="flex h-dvh flex-col bg-ground text-ink">
+    <div className="flex h-full flex-col bg-ground text-ink">
       <header className="flex shrink-0 items-center justify-between px-12 pt-[42px]">
         <button
           onClick={onBack}

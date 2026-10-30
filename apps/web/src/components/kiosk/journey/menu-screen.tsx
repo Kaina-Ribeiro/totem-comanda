@@ -56,7 +56,7 @@ export function MenuScreen({
   const units = basketUnits(journey.basket);
 
   return (
-    <div className="flex h-dvh flex-col bg-ground text-ink">
+    <div className="flex h-full flex-col bg-ground text-ink">
       <header className="flex shrink-0 items-center justify-between px-12 pt-[42px] pb-[30px]">
         <div className="flex items-center gap-[30px]">
           <div className="font-display text-[39px] font-medium italic">{brand}</div>

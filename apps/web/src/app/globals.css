@@ -39,3 +39,12 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
 }
+
+/* The 1080x1920 kiosk stage (app/kiosk/layout.tsx), shrunk to fit smaller or
+   landscape windows; never enlarged. The value goes through a custom property
+   because Lightning CSS drops the declaration otherwise (it does not know
+   typed arithmetic). A browser without it renders the stage at its real size. */
+.kiosk-stage {
+  --kiosk-scale: min(1, calc(100vw / 1080px), calc(100dvh / 1920px));
+  scale: var(--kiosk-scale);
+}

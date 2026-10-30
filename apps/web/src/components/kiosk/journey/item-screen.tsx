@@ -71,7 +71,7 @@ export function ItemScreen({
   );
 
   return (
-    <div className="flex h-dvh flex-col bg-surface text-ink">
+    <div className="flex h-full flex-col bg-surface text-ink">
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="relative h-[570px] bg-wheat">
           {item.image && (
