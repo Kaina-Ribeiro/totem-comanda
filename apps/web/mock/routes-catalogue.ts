@@ -243,3 +243,123 @@ catalogueRoutes.push(
     }),
   ],
 );
+
+const HEX = /^#[0-9a-fA-F]{6}$/;
+const PAGES = new Set(["ITEM_MENU", "ITEM_PAGE", "BASKET"]);
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+function tagProblem(input: Partial<Schemas["TagInput"]> | null): string | null {
+  if (!input?.badgeName?.["pt-BR"]?.trim()) return "badgeName";
+  if (!HEX.test(input.textColour ?? "")) return "textColour";
+  if (!HEX.test(input.backgroundColour ?? "")) return "backgroundColour";
+  if (!Array.isArray(input.tagsPages) || input.tagsPages.some((p) => !PAGES.has(p)))
+    return "tagsPages";
+  if (typeof input.scheduleEnabled !== "boolean") return "scheduleEnabled";
+  if (input.startDate && !DATE.test(input.startDate)) return "startDate";
+  if (input.endDate && !DATE.test(input.endDate)) return "endDate";
+  if (!Array.isArray(input.links)) return "links";
+  const bad = input.links.findIndex(
+    (l) =>
+      (l.menuItemId && !catalogue().items.some((i) => i.id === l.menuItemId)) ||
+      (l.categoryId && !catalogue().categories.some((c) => c.id === l.categoryId)),
+  );
+  return bad === -1 ? null : `links[${bad}]`;
+}
+
+function crossSellProblem(input: Partial<Schemas["CrossSellGroupInput"]> | null): string | null {
+  if (!input?.name?.["pt-BR"]?.trim()) return "name";
+  if (!Array.isArray(input.crossSells)) return "crossSells";
+  const bad = input.crossSells.findIndex((id) => !catalogue().items.some((i) => i.id === id));
+  return bad === -1 ? null : `crossSells[${bad}]`;
+}
+
+const tagOf = (input: Schemas["TagInput"], id: string): Schemas["AdminTag"] => ({
+  id,
+  badgeName: input.badgeName,
+  textColour: input.textColour,
+  backgroundColour: input.backgroundColour,
+  tagsPages: input.tagsPages,
+  scheduleEnabled: input.scheduleEnabled,
+  startDate: input.startDate ?? null,
+  endDate: input.endDate ?? null,
+  links: input.links.map((l) => ({
+    menuItemId: l.menuItemId ?? null,
+    categoryId: l.categoryId ?? null,
+    enabled: l.enabled,
+  })),
+});
+
+catalogueRoutes.push(
+  ["GET", /^\/v1\/admin\/tags$/, owner(() => ok(catalogue().tags))],
+  [
+    "POST",
+    /^\/v1\/admin\/tags$/,
+    owner((req) => {
+      const input = req.body as Schemas["TagInput"];
+      const bad = tagProblem(input);
+      if (bad) return invalid(bad);
+      const tag = tagOf(input, newId("tag"));
+      catalogue().tags.push(tag);
+      return ok(tag, 201);
+    }),
+  ],
+  [
+    "PUT",
+    /^\/v1\/admin\/tags\/([^/]+)$/,
+    owner((req, [tagId]) => {
+      const index = catalogue().tags.findIndex((t) => t.id === tagId);
+      if (index === -1) return notFound();
+      const input = req.body as Schemas["TagInput"];
+      const bad = tagProblem(input);
+      if (bad) return invalid(bad);
+      catalogue().tags[index] = tagOf(input, tagId);
+      return ok(catalogue().tags[index]);
+    }),
+  ],
+  [
+    "DELETE",
+    /^\/v1\/admin\/tags\/([^/]+)$/,
+    owner((_req, [tagId]) => {
+      if (!catalogue().tags.some((t) => t.id === tagId)) return notFound();
+      catalogue().tags = catalogue().tags.filter((t) => t.id !== tagId);
+      return { status: 204 };
+    }),
+  ],
+  [
+    "POST",
+    /^\/v1\/admin\/cross-sells$/,
+    owner((req) => {
+      const input = req.body as Schemas["CrossSellGroupInput"];
+      const bad = crossSellProblem(input);
+      if (bad) return invalid(bad);
+      const group = { id: newId("xs"), name: input.name, crossSells: input.crossSells };
+      catalogue().crossSellGroups.push(group);
+      return ok(group, 201);
+    }),
+  ],
+  [
+    "PUT",
+    /^\/v1\/admin\/cross-sells\/([^/]+)$/,
+    owner((req, [groupId]) => {
+      const group = catalogue().crossSellGroups.find((g) => g.id === groupId);
+      if (!group) return notFound();
+      const input = req.body as Schemas["CrossSellGroupInput"];
+      const bad = crossSellProblem(input);
+      if (bad) return invalid(bad);
+      Object.assign(group, { name: input.name, crossSells: input.crossSells });
+      return ok(group);
+    }),
+  ],
+  [
+    "DELETE",
+    /^\/v1\/admin\/cross-sells\/([^/]+)$/,
+    owner((_req, [groupId]) => {
+      if (!catalogue().crossSellGroups.some((g) => g.id === groupId)) return notFound();
+      catalogue().crossSellGroups = catalogue().crossSellGroups.filter((g) => g.id !== groupId);
+      for (const item of catalogue().items) {
+        if (item.crossSellGroupId === groupId) item.crossSellGroupId = null;
+      }
+      return { status: 204 };
+    }),
+  ],
+);

@@ -10,6 +10,7 @@ export const ADMIN_SECTIONS = [
   { href: "/admin/cardapios", label: "Cardápios" },
   { href: "/admin/categorias", label: "Categorias" },
   { href: "/admin/itens", label: "Itens" },
+  { href: "/admin/selos", label: "Selos e sugestões" },
   { href: "/admin/aparelhos", label: "Aparelhos" },
   { href: "/admin/loja", label: "Loja" },
 ] as const;
