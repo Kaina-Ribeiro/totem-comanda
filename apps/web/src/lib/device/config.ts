@@ -2,7 +2,7 @@ import "server-only";
 
 import { coreApi } from "@/lib/core/client";
 import { EtagCache } from "@/lib/core/etag-cache";
-import { activeMockScenario } from "@/lib/core/mock-scenarios";
+import { isCoreDownSimulated } from "@/lib/core/mock-scenarios";
 import type { components } from "@/lib/core-api";
 
 import { asDevice, DeviceAuthError } from "./session";
@@ -17,8 +17,7 @@ const configs = new EtagCache<DeviceConfig>();
  * when the Core API cannot answer; callers retry (BR-KIOSK-02).
  */
 export async function getDeviceConfig(): Promise<DeviceConfig> {
-  const scenario = await activeMockScenario();
-  if (scenario.coreDown) throw new DeviceAuthError("CORE_UNAVAILABLE");
+  if (await isCoreDownSimulated()) throw new DeviceAuthError("CORE_UNAVAILABLE");
 
   let config: DeviceConfig | undefined;
   try {
@@ -44,5 +43,5 @@ export async function getDeviceConfig(): Promise<DeviceConfig> {
   }
 
   if (!config) throw new DeviceAuthError("CORE_UNAVAILABLE");
-  return scenario.config ? scenario.config(config) : config;
+  return config;
 }

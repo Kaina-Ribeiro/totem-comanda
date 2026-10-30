@@ -9,10 +9,11 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "gen:api": "openapi-typescript ../../contract/openapi.yaml -o src/lib/core-api.d.ts",
-    "mock": "prism mock ../../contract/openapi.yaml -p 4010",
+    "mock": "node mock/server.ts",
     "lint:contract": "redocly lint ../../contract/openapi.yaml",
     "test": "vitest run",
-    "analyze": "next analyze"
+    "analyze": "next analyze",
+    "mock:raw": "prism mock ../../contract/openapi.yaml -p 4010"
   },
   "dependencies": {
     "next": "16.4.3",

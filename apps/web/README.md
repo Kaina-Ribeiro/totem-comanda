@@ -7,7 +7,7 @@ office (`/admin`), plus the BFF that talks to the Go Core API. See `../../CLAUDE
 ```bash
 npm install
 cp .env.example .env.local
-npm run mock       # Prism mock of the Core API on :4010, from contract/openapi.yaml
+npm run mock       # stateful mock Core API (mock/) behind Prism on :4010, validated against the contract
 npm run dev        # http://localhost:3000
 npm run typecheck
 npm run lint
@@ -28,7 +28,17 @@ the back office (with the mock: `KIOSK-TBT-001` and any secret). The BFF keeps t
 an HttpOnly cookie (`DEVICE_COOKIE_SECRET`) and exchanges them for a short-lived token kept in
 server memory (`src/lib/device`). `/kiosk` and `/kitchen` send unprovisioned browsers to `/setup`.
 
-`/dev/mock` (development only) switches how the Prism mock answers, e.g. a disabled device.
+## Mock Core API
+
+`mock/` is an in-memory Core API seeded with the prototype's bakery (devices, morning and afternoon
+menus by schedule). Prism runs in front of it in proxy mode with `--errors`, so any request or response
+that breaks `contract/openapi.yaml` fails loudly. Each story adds the operations it needs to
+`mock/server.ts`; unmocked ones answer `404 NOT_FOUND`.
+
+Seeded devices: `KIOSK-TBT-001` / `s3cr3t-from-provisioning` and `KITCHEN-TBT-001` / `kitchen-s3cr3t`.
+`/dev/mock` (development only) switches the mock's scenario (open morning or afternoon, closed,
+maintenance, at capacity, device disabled, secret rotated) and can simulate the Core API being down.
+`npm run mock:raw` is the old stateless Prism mock from the contract examples.
 
 `/api/dev/core` (development only) authenticates against the mock and returns the
 device config and the active menu.

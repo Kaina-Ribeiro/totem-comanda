@@ -115,8 +115,10 @@ language.
 ## Commands
 
 ```bash
-# Mock Core API from the contract examples (front-end work before the Go API exists)
-npx @stoplight/prism-cli mock contract/openapi.yaml -p 4010      # CORE_API_URL=http://localhost:4010
+# Stateful mock Core API (apps/web/mock) behind Prism, which validates every call against the
+# contract. Front end and BFF are built against it until the Go API exists. In apps/web:
+npm run mock        # CORE_API_URL=http://localhost:4010, MOCK_CONTROL_URL=http://localhost:4020/__mock
+# Extend apps/web/mock with the operations each story needs; Prism flags any drift from the contract.
 
 # Regenerate API types after any contract change
 npx openapi-typescript contract/openapi.yaml -o apps/web/src/lib/core-api.d.ts
@@ -153,3 +155,11 @@ skill (`.claude/skills/linear-backlog`) for any backlog change: types, squads, p
 Phase 0 stories are COM-5 to COM-13 (former GAB-n, same numbers). Start a branch from the issue's
 suggested branch name, reference the issue id (e.g. `COM-9`) in commits, and move the issue as work
 progresses. Issues with the `Core` label are the partner's Go work (e.g. COM-12): do not implement them.
+
+Batch Linear updates to save tokens:
+- At the start of a plan, move its story to In Progress (one call). Nothing else in Linear mid-work.
+- While working, append each bug, tech debt or follow-up found to `docs/backlog-pending.md`: type,
+  pt-BR title, 1–2 lines of context, related story id, and whether it was fixed in this plan.
+- At the end of the plan, hand that file to one Haiku subagent (fresh, short brief, `effort: low`;
+  Sonnet only if descriptions need real writing). It creates, closes and moves the issues per the
+  `linear-backlog` skill and reports the ids in ≤5 lines. Check the result, then clear the file.
