@@ -124,6 +124,11 @@ async function DiscountList() {
   );
 }
 
+/** Rendered per request (the owner's data), so reading the clock here is fine. */
+function isExpired(validTo: string | null | undefined): boolean {
+  return !!validTo && Date.parse(validTo) < Date.now();
+}
+
 function summary(discount: Discount): string {
   return discount.kind === "PERCENT"
     ? `${discount.value}% de desconto`
@@ -131,7 +136,7 @@ function summary(discount: Discount): string {
 }
 
 function DiscountForm({ discount }: { discount: Discount | null }) {
-  const expired = discount?.validTo ? Date.parse(discount.validTo) < Date.now() : false;
+  const expired = isExpired(discount?.validTo);
   return (
     <Card className="flex flex-col gap-4">
       {discount ? (
