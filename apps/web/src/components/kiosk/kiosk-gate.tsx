@@ -73,6 +73,7 @@ function GateScreen({ config }: { config: DeviceConfig }) {
             languages,
             orderTypes: availableOrderTypes(restaurant),
             checkNumberDigits: restaurant.posCheckNumberDisplayLength,
+            idleMs: config.idleTimerIntervalMilliseconds,
           }}
           attract={{
             "pt-BR": <AttractScreen brand={brand} language="pt-BR" />,

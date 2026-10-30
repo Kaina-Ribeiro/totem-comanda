@@ -12,6 +12,7 @@ import { Globe } from "../icons";
 import { BasketScreen, CancelDialog } from "./basket-screen";
 import { CheckoutFlow } from "./checkout-flow";
 import { CouponRow, CouponSheet } from "./coupon-sheet";
+import { IdleGuard } from "./idle-guard";
 import { ItemScreen } from "./item-screen";
 import {
   currentQuote,
@@ -33,7 +34,12 @@ export type KioskSettings = {
   orderTypes: OrderType[];
   /** posCheckNumberDisplayLength (BR-POST-01). */
   checkNumberDigits: number;
+  /** idleTimerIntervalMilliseconds; 0 turns the idle warning off (BR-KIOSK-11). */
+  idleMs: number;
 };
+
+/** Phases where idle checking runs (BR-KIOSK-14: not on attract, payment or success). */
+const IDLE_PHASES = new Set(["startFailed", "orderType", "menu", "item", "basket", "checkout"]);
 
 /** FR-137: the attract screen re-reads the config every 45 s, so the kiosk closes by itself. */
 const GATE_RECHECK_MS = 45_000;
@@ -60,6 +66,8 @@ export function KioskJourney({
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [taxIdOpen, setTaxIdOpen] = useState(false);
   const [couponOpen, setCouponOpen] = useState(false);
+  // True while the checkout waits on the terminal or the Core API (no idle reset there).
+  const [paying, setPaying] = useState(false);
   const [quoteAttempt, setQuoteAttempt] = useState(0);
   const key = quoteKey(journey);
   const needsQuote = phase === "basket" && journey.basket.length > 0;
@@ -108,6 +116,7 @@ export function KioskJourney({
 
   function reset() {
     setConfirmCancel(false);
+    setPaying(false);
     setTaxIdOpen(false);
     setCouponOpen(false);
     dispatch({ type: "reset", language: settings.defaultLanguage });
@@ -151,6 +160,13 @@ export function KioskJourney({
   return (
     <>
       {screen()}
+      <IdleGuard
+        active={IDLE_PHASES.has(phase) && !(phase === "checkout" && paying) && !confirmCancel}
+        timeoutMs={settings.idleMs}
+        strings={strings}
+        onTimeout={() => endJourney("IDLE_TIMEOUT")}
+        onCancel={() => endJourney("CANCELLED_BY_GUEST")}
+      />
       {confirmCancel && (
         <CancelDialog
           units={basketUnits(journey.basket)}
@@ -342,6 +358,7 @@ export function KioskJourney({
             onPlaced={(placed) => dispatch({ type: "placed", placed })}
             onBack={() => dispatch({ type: "openBasket" })}
             onCancelOrder={askCancel}
+            onBusy={setPaying}
           />
         );
       case "success":

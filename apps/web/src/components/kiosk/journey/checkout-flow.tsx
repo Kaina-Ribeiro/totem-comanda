@@ -52,6 +52,7 @@ export function CheckoutFlow({
   onPlaced,
   onBack,
   onCancelOrder,
+  onBusy,
 }: {
   journey: Journey;
   strings: Strings;
@@ -59,8 +60,12 @@ export function CheckoutFlow({
   onPlaced: (placed: PlacedOrder) => void;
   onBack: () => void;
   onCancelOrder: () => void;
+  /** Told while waiting on the terminal or the Core API, when idle checking stops. */
+  onBusy: (busy: boolean) => void;
 }) {
   const [step, setStep] = useState<Step>({ kind: "method" });
+  const busy = step.kind === "working" || step.kind === "authorising";
+  useEffect(() => onBusy(busy), [busy, onBusy]);
   // One key per payment attempt; a retry after an error reuses it, a new attempt gets a new one.
   const [paymentKey, setPaymentKey] = useState(() => crypto.randomUUID());
   const checkout = journey.checkout!;
