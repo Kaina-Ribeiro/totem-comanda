@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Back office · Datas especiais</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+:root{--paper:#F3EFE8;--surface:#FFFFFF;--ink:#2B211C;--muted:#625750;--line:#E5DDD2;--espresso:#4E3426;--night:#2A1C16;--crema:#B07A3A;--cremaText:#8A5A2B;--cremaBg:#EFE4C9;--leaf:#4F6B45;--leafBg:#DCDFD2;--danger:#A3472F;--dangerBg:#F4E1DB;--hover:#EFE9E1}
+body{margin:0;background:var(--paper)}
+*{box-sizing:border-box}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--crema);outline-offset:2px}
+.app{min-height:100vh;background:var(--paper);color:var(--ink);font-family:Manrope,system-ui,sans-serif;font-feature-settings:"tnum" 1;display:flex;flex-wrap:wrap;align-items:stretch;-webkit-font-smoothing:antialiased}
+.tap{transition:transform .12s ease,background-color .15s ease,border-color .15s ease,color .15s ease}
+.tap:active{transform:scale(.98)}
+.side{flex:1 1 236px;max-width:236px;background:var(--surface);border-right:1px solid var(--line);padding:20px 12px;display:flex;flex-direction:column;gap:16px}
+.brand{padding:0 10px;display:flex;flex-direction:column;gap:1px}
+.brand b{font-family:Fraunces,Georgia,serif;font-style:italic;font-weight:500;font-size:22px;letter-spacing:-0.01em}
+.brand span{font-size:12.5px;font-weight:600;color:var(--muted)}
+.navgroups{display:flex;flex-direction:column;gap:14px;scrollbar-width:none}.navgroups::-webkit-scrollbar{display:none}
+.navgroup{display:flex;flex-direction:column;gap:1px}
+.navhead{padding:0 10px 4px;font-size:12px;font-weight:600;color:var(--muted)}
+.nav-link{height:36px;padding:0 10px;border-radius: 9px;display:flex;align-items:center;gap:10px;white-space:nowrap;font-size:14px;font-weight:600;color:#4A3F38}
+.nav-link svg{width:18px;height:18px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;opacity:.75}
+.nav-link:hover{background:var(--hover);color:var(--ink)}
+.nav-link[aria-current=page]{background:var(--espresso);color:#FAF6F0;font-weight:700}
+.nav-link[aria-current=page] svg{opacity:1}
+.sair{margin-top:auto;padding:0 10px;font-size:13.5px;font-weight:700;color:var(--muted)}
+.main{flex:999 1 560px;min-width:0;max-width:1160px;padding:28px 36px 48px;display:flex;flex-direction:column;gap:18px}
+.card{border-radius: 14px;background:var(--surface);border:1px solid var(--line);padding:18px 20px;display:flex;flex-direction:column;gap:10px}
+.cardhead{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:28px}
+h1{margin:0;font-weight:700;font-size:28px;letter-spacing:-0.02em;line-height:1.15}
+h2{margin:0;font-weight:700;font-size:16px;letter-spacing:-0.01em}
+.sub{margin:0;font-size:14px;font-weight:500;color:var(--muted)}
+.link{font-size:13.5px;font-weight:700;color:var(--cremaText);white-space:nowrap}
+.link:hover{color:var(--espresso)}
+.btn{height:40px;padding:0 16px;border-radius: 10px;border:1px solid var(--line);background:var(--surface);display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:700;white-space:nowrap}
+.btn:hover{border-color:#D9CFC3;background:var(--hover)}
+.btn.sm{height:34px;padding:0 12px;font-size:13px}
+.list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column}
+.list>li{border-top:1px solid var(--line)}
+.list>li:first-child{border-top:0}
+.chip{height:24px;padding:0 10px;border-radius: 999px;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.row:hover{background:#FBF8F3}
+@media (max-width: 820px){.side{min-width:0;max-width:none;flex-basis:100%;border-right:0;border-bottom:1px solid var(--line);padding:12px 16px;gap:10px;flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:space-between}.side>.chip{order:2}.navgroups{order:3;flex-basis:100%;flex-direction:row;overflow-x:auto;gap:2px;margin:0 -16px;padding:0 16px}.navgroup{flex-direction:row}.navhead{display:none}.sair{display:none}.main{padding:20px 16px 40px}h1{font-size:24px}}
+@media (prefers-reduced-motion: reduce){.tap{transition:none}.tap:active{transform:none}}
+body{margin:0;background:#F3EFE8}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+.tap{transition:transform .12s ease,background-color .15s ease,box-shadow .15s ease}
+.tap:active{transform:scale(.98)}
+.row:hover{background:#FBF8F3}
+</style>
+</helmet>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><b>Comanda</b><span>Padaria Café e Trigo</span></div>
+    <span class="chip" style="margin: 0 6px; align-self: flex-start; height: 28px; background: #DCDFD2; color: #4F6B45"><span class="dot" style="background: #4F6B45"></span>Totem aberto</span>
+    <nav aria-label="Back office" class="navgroups">
+      <sc-for list="{{nav}}" as="g" hint-placeholder-count="4">
+        <div class="navgroup">
+          <sc-if value="{{g.hasTitle}}" hint-placeholder-val="{{true}}"><span class="navhead">{{g.title}}</span></sc-if>
+          <sc-for list="{{g.items}}" as="n" hint-placeholder-count="3"><a href="{{n.href}}" class="nav-link tap" aria-current="{{n.current}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="{{n.icon}}"/></svg>{{n.label}}</a></sc-for>
+        </div>
+      </sc-for>
+    </nav>
+    <a href="#sair" class="sair">Sair</a>
+  </aside>
+
+  <main class="main">
+    <header style="display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <h1 style="margin: 0; font-family: Manrope, system-ui, sans-serif; font-weight: 700; font-size: 28px; letter-spacing: -0.02em">Horários</h1>
+        <p style="margin: 0; font-size: 15px; font-weight: 600; color: #625750">Feriados e dias com horário diferente. Valem para todos os cardápios daquele dia.</p>
+      </div>
+      <nav aria-label="Horários" style="display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: #E6DED2; align-self: flex-start">
+        <a href="#cardapios" style="height: 38px; padding: 0 16px; border-radius: 19px; display: flex; align-items: center; font-size: 14px; font-weight: 800; color: #625750">Cardápios por horário</a>
+        <a href="A5-Datas.dc.html" aria-current="page" style="height: 38px; padding: 0 16px; border-radius: 19px; display: flex; align-items: center; font-size: 14px; font-weight: 800; background: #FFFFFF">Datas especiais</a>
+      </nav>
+    </header>
+
+    <div style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px">
+      <section aria-labelledby="lista-h" style="flex: 2 1 360px; min-width: 0; border-radius: 14px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 18px 18px 10px; display: flex; flex-direction: column; gap: 8px">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px">
+          <h2 id="lista-h" style="margin: 0; font-family: Manrope, system-ui, sans-serif; font-weight: 700; font-size: 18px; letter-spacing: -0.02em">Próximas</h2>
+          <button type="button" class="tap" style="height: 40px; padding: 0 16px; border-radius: 12px; border: 0; background: #4E3426; color: #FAF6F0; display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 800"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nova data</button>
+        </div>
+        <ul style="margin: 0; padding: 0; list-style: none">
+          <sc-for list="{{dates}}" as="d" hint-placeholder-count="5">
+            <li class="row" style="{{d.rowStyle}}">
+              <span style="width: 54px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; padding: 6px 0; border-radius: 12px; background: #F3EFE8"><span style="font-family: Manrope, system-ui, sans-serif; font-weight: 700; font-size: 17px; line-height: 1; letter-spacing: -0.02em">{{d.day}}</span><span style="font-size: 11px; font-weight: 600; color: #625750">{{d.month}}</span></span>
+              <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 800">{{d.name}}</span><span style="font-size: 13px; font-weight: 600; color: #625750">{{d.hours}}</span></span>
+              <span style="{{d.chipStyle}}">{{d.state}}</span>
+            </li>
+          </sc-for>
+        </ul>
+        <a href="#passadas" style="padding: 8px 4px; font-size: 14px; font-weight: 800; color: #8A5A2B">Ver datas passadas</a>
+      </section>
+
+      <section aria-labelledby="form-h" style="flex: 3 1 480px; min-width: 0; border-radius: 14px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 22px; display: flex; flex-wrap: wrap; gap: 22px">
+        <div style="flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <h2 id="form-h" style="margin: 0; font-family: Manrope, system-ui, sans-serif; font-weight: 700; font-size: 18px; letter-spacing: -0.02em">Natal</h2>
+          <label style="display: flex; flex-direction: column; gap: 6px">
+            <span style="font-size: 13px; font-weight: 700; color: #625750">Nome (só você vê)</span>
+            <input type="text" value="Natal" style="height: 44px; box-sizing: border-box; border-radius: 12px; border: 1px solid #E5DDD2; padding: 0 12px; font-size: 15px; font-weight: 600">
+          </label>
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <span style="font-size: 13px; font-weight: 700; color: #625750">Quando</span>
+            <div role="radiogroup" aria-label="Um dia ou vários" style="display: flex; gap: 4px; padding: 4px; border-radius: 16px; background: #F3EFE8">
+              <sc-for list="{{spans}}" as="s" hint-placeholder-count="2">
+                <button type="button" role="radio" aria-checked="{{s.checked}}" onClick="{{s.pick}}" class="tap" style="{{s.style}}">{{s.label}}</button>
+              </sc-for>
+            </div>
+            <div style="display: flex; gap: 8px">
+              <input type="text" inputmode="numeric" value="25/12/2026" aria-label="Data" style="flex: 1 1 0; min-width: 0; height: 44px; box-sizing: border-box; border-radius: 12px; border: 1px solid #E5DDD2; padding: 0 12px; font-size: 15px; font-weight: 600">
+              <sc-if value="{{isRange}}" hint-placeholder-val="{{false}}">
+                <input type="text" inputmode="numeric" value="26/12/2026" aria-label="Até" style="flex: 1 1 0; min-width: 0; height: 44px; box-sizing: border-box; border-radius: 12px; border: 1px solid #E5DDD2; padding: 0 12px; font-size: 15px; font-weight: 600">
+              </sc-if>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <span style="font-size: 13px; font-weight: 700; color: #625750">Como fica</span>
+            <div role="radiogroup" aria-label="Como fica" style="display: flex; flex-direction: column; gap: 6px">
+              <sc-for list="{{modes}}" as="m" hint-placeholder-count="2">
+                <button type="button" role="radio" aria-checked="{{m.checked}}" onClick="{{m.pick}}" class="tap" style="{{m.style}}"><span style="{{m.ringStyle}}"><span style="{{m.dotStyle}}"></span></span>{{m.label}}</button>
+              </sc-for>
+            </div>
+            <sc-if value="{{special}}" hint-placeholder-val="{{false}}">
+              <div style="display: flex; align-items: center; gap: 8px">
+                <input type="text" inputmode="numeric" value="06:00" aria-label="Abre" style="flex: 1 1 0; min-width: 0; height: 44px; box-sizing: border-box; border-radius: 12px; border: 1px solid #E5DDD2; padding: 0 12px; font-size: 15px; font-weight: 600">
+                <span style="font-weight: 700; color: #625750">até</span>
+                <input type="text" inputmode="numeric" value="14:00" aria-label="Fecha" style="flex: 1 1 0; min-width: 0; height: 44px; box-sizing: border-box; border-radius: 12px; border: 1px solid #E5DDD2; padding: 0 12px; font-size: 15px; font-weight: 600">
+              </div>
+            </sc-if>
+          </div>
+          <label style="display: flex; flex-direction: column; gap: 6px">
+            <span style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: #625750"><span>Aviso no totem (português)</span><span>46 / 140</span></span>
+            <textarea rows="2" style="box-sizing: border-box; border-radius: 12px; border: 1px solid #E5DDD2; padding: 10px 12px; font-size: 15px; font-weight: 600; resize: vertical">Fechado hoje: Natal. Voltamos sábado às 06:00.</textarea>
+          </label>
+          <label style="display: flex; flex-direction: column; gap: 6px">
+            <span style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: #625750"><span>Aviso no totem (inglês)</span><span>47 / 140</span></span>
+            <textarea rows="2" style="box-sizing: border-box; border-radius: 12px; border: 1px solid #E5DDD2; padding: 10px 12px; font-size: 15px; font-weight: 600; resize: vertical">Closed today for Christmas. Back Saturday, 6am.</textarea>
+          </label>
+          <p style="margin: 0; padding: 12px 14px; border-radius: 14px; background: #F3EFE8; font-size: 13px; font-weight: 600; color: #625750; line-height: 1.45">Data especial vale mais que o horário dos cardápios. Se você forçar um cardápio nesse dia, o forçado continua valendo.</p>
+          <div style="display: flex; align-items: center; gap: 10px">
+            <button type="button" class="tap" style="height: 46px; padding: 0 6px; border: 0; background: transparent; font-size: 15px; font-weight: 800; color: #A3472F">Excluir</button>
+            <span style="flex-grow: 1"></span>
+            <button type="button" class="tap" style="height: 46px; padding: 0 18px; border-radius: 14px; border: 1px solid #E5DDD2; background: #FFFFFF; font-size: 15px; font-weight: 800">Cancelar</button>
+            <button type="button" class="tap" style="height: 46px; padding: 0 22px; border-radius: 14px; border: 0; background: #4E3426; color: #FAF6F0; font-size: 15px; font-weight: 800">Salvar</button>
+          </div>
+        </div>
+
+        <figure style="margin: 0; flex: 0 0 196px; display: flex; flex-direction: column; gap: 8px">
+          <figcaption style="font-size: 13px; font-weight: 700; color: #625750">No totem, em 25/12</figcaption>
+          <div style="width: 196px; height: 348px; box-sizing: border-box; border-radius: 12px; background: #2A1C16; color: #FAF6F0; padding: 18px 16px 22px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 0 0 6px #E9E2D7">
+            <span style="font-family: Fraunces, Georgia, serif; font-style: italic; font-size: 12px">Café e Trigo</span>
+            <div style="display: flex; flex-direction: column; gap: 10px">
+              <span style="font-family: Manrope, system-ui, sans-serif; font-weight: 700; font-size: 20px; line-height: 0.98; letter-spacing: -0.02em">{{previewTitle}}</span>
+              <span style="font-size: 10px; line-height: 1.4; color: #E6DACB">{{previewBody}}</span>
+              <span style="align-self: flex-start; padding: 6px 10px; border-radius: 12px; background: rgba(250,246,240,.1); font-size: 9px; font-weight: 800; color: #D8B98A">{{previewNote}}</span>
+            </div>
+          </div>
+        </figure>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1120}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { span: 'one', mode: 'closed' };
+  }
+  renderVals() {
+    const ACTIVE = 'horarios';
+    const NAV = [
+      { title: '', items: [['Início', 'A1-Inicio.dc.html', 'inicio']] },
+      { title: 'Operação', items: [['Pedidos', 'A2-Pedidos.dc.html', 'pedidos'], ['Esgotados', 'A4-Esgotados.dc.html', 'esgotados'], ['Relatório', 'A9-Relatorio.dc.html', 'relatorio']] },
+      { title: 'Cardápio', items: [['Cardápios', '#cardapios', 'cardapios'], ['Categorias', '#categorias', 'categorias'], ['Itens', 'A6-Item.dc.html', 'itens'], ['Selos e sugestões', '#selos', 'selos'], ['Cupons', 'A8-Cupom.dc.html', 'cupons']] },
+      { title: 'Loja', items: [['Horários', 'A5-Datas.dc.html', 'horarios'], ['Tela do totem', 'A7-TelaTotem.dc.html', 'tela'], ['Aparelhos', '#aparelhos', 'aparelhos'], ['Loja e conta', '#loja', 'loja']] }
+    ];
+    const ICON = {
+      inicio: 'M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z',
+      pedidos: 'M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3',
+      esgotados: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM5.6 5.6l12.8 12.8',
+      relatorio: 'M4 20h16M7 16v-5M12 16V7M17 16v-8',
+      cardapios: 'M5 4h12a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2zM9 8h6M9 12h4',
+      categorias: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+      itens: 'M3 12V4h8l10 10-8 8zM7.5 7.5h.01',
+      selos: 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z',
+      cupons: 'M3 7h18v3a2 2 0 0 0 0 4v3H3v-3a2 2 0 0 0 0-4zM14 7v10',
+      horarios: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 7v5l3 2',
+      tela: 'M7 2h10a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zM10 18h4',
+      aparelhos: 'M4 5h16v11H4zM9 20h6M12 16v4',
+      loja: 'M4 9l1.5-5h13L20 9M4 9h16v11H4zM10 20v-6h4v6'
+    };
+    const nav = NAV.map((g) => ({ title: g.title, hasTitle: !!g.title, items: g.items.map(([label, href, id]) => ({ label, href, icon: ICON[id], current: id === ACTIVE ? 'page' : 'false' })) }));
+
+    const chip = (bg, fg) => 'height: 26px; padding: 0 10px; border-radius: 13px; display: inline-flex; align-items: center; font-size: 12px; font-weight: 800; white-space: nowrap; flex-shrink: 0; background: ' + bg + '; color: ' + (fg || '#2B211C') + ';';
+    const D = [
+      ['24', 'dez', 'Véspera de Natal', 'qui · 06:00 – 14:00', 'Agendada'],
+      ['25', 'dez', 'Natal', 'sex · fechado o dia todo', 'Agendada'],
+      ['31', 'dez', 'Réveillon', 'qui · 06:00 – 15:00', 'Agendada'],
+      ['1', 'jan', 'Ano-novo', 'sex · fechado o dia todo', 'Agendada'],
+      ['5', 'jan', 'Férias coletivas', 'ter a seg, 5 a 11 jan · fechado', 'Agendada']
+    ];
+    const dates = D.map(([day, month, name, hours, state]) => ({
+      day, month, name, hours, state,
+      chipStyle: chip('#EFE4C9'),
+      rowStyle: 'display: flex; align-items: center; gap: 12px; padding: 8px 6px; border-top: 1px solid #E5DDD2; border-radius: 12px;' + (name === 'Natal' ? ' background: #FBF5EC; box-shadow: inset 3px 0 0 #4E3426;' : '')
+    }));
+    const seg = (on) => 'flex: 1 1 0; height: 40px; border-radius: 12px; border: 0; font-size: 14px; font-weight: 800; ' + (on ? 'background: #FFFFFF; box-shadow: 0 1px 3px rgba(28,28,26,.14);' : 'background: transparent; color: #625750;');
+    const span = this.state.span;
+    const spans = [{ id: 'one', label: 'Um dia' }, { id: 'range', label: 'Vários dias' }].map((s) => ({ label: s.label, checked: s.id === span ? 'true' : 'false', pick: () => this.setState({ span: s.id }), style: seg(s.id === span) }));
+    const mode = this.state.mode;
+    const radio = (on) => ({
+      style: 'min-height: 48px; padding: 0 12px; border-radius: 14px; display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 700; text-align: left; ' + (on ? 'border: 2px solid #4E3426; background: #FBF8F3;' : 'border: 1.5px solid #E5DDD2; background: #FFFFFF;'),
+      ringStyle: 'width: 22px; height: 22px; flex-shrink: 0; box-sizing: border-box; border-radius: 11px; border: 2px solid ' + (on ? '#4E3426' : '#B5ADA3') + '; display: flex; align-items: center; justify-content: center;',
+      dotStyle: 'width: 10px; height: 10px; border-radius: 5px; background: ' + (on ? '#4E3426' : 'transparent') + ';'
+    });
+    const modes = [{ id: 'closed', label: 'Fechado o dia todo' }, { id: 'special', label: 'Horário especial' }].map((m) => ({ label: m.label, checked: m.id === mode ? 'true' : 'false', pick: () => this.setState({ mode: m.id }), ...radio(m.id === mode) }));
+    const special = mode === 'special';
+    return {
+      nav, dates, spans, modes, special,
+      isRange: span === 'range',
+      previewTitle: special ? 'Abrimos até 14:00 hoje' : 'Fechado hoje: Natal',
+      previewBody: special ? 'Horário especial de Natal. Peça até as 13:45.' : 'Voltamos sábado às 06:00. Boas festas!',
+      previewNote: special ? 'Fecha às 14:00' : 'Abre sábado às 06:00'
+    };
+  }
+}
+</script>
+</body>
+</html>

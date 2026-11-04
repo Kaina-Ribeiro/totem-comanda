@@ -67,9 +67,25 @@ examples use the same data, so the Prism mock matches the screens.
   Before that there is no printer; show only the number.
 - **Authorizing screen**: shows a card terminal. Until phase 4 the payment is simulated.
 
+## Second canvas: what is left (proposal, 4 Nov 2026)
+
+Kitchen screen, back office and the kiosk screens added by the gap plan are drawn in a second
+canvas, **pending Kai's approval**: https://claude.ai/artifact/NARUZVhf5tz1Xe4vexq344.
+Sources in `ops/project/`; the gaps behind each artboard are in `../plan-next.md`. This approved
+canvas was not changed.
+
+Work screens (kitchen and back office) keep the café colour tokens above but use a sans-serif
+type system (Kai, 4 Nov 2026, after comparing a grey, a green and a blue palette): Manrope carries
+every heading and number, with tabular figures and smaller title sizes (page titles 28 px);
+Fraunces stays only in the "Comanda" wordmark. The back office has an icon sidebar with the active
+item in `accent`, sentence-case group labels and smaller corner radii (cards 14 px, controls
+10 px). The kiosk screens, and kiosk previews inside the back office, keep Fraunces. The back office
+already built in `apps/web` still uses Fraunces headings and must be brought in line.
+
 ## Screens not drawn yet
 
-Design them with the same tokens and patterns:
+The kitchen screen and back office now have the proposal above. Still without a drawing (built in
+code from these tokens):
 - Language selector (PT/EN) on the attract screen.
 - Coupon entry and the "replace current coupon?" warning (SCR-DISC-05).
 - Lane Closed ("Fechado agora, voltamos às 06:00") from `closedMessage` and `nextOpeningAt`.
