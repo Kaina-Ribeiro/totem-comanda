@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { applyOrder, waitingMinutes } from "./board";
+import { applyOrder, moveErrorMessage, waitingMinutes } from "./board";
 
 const order = (id: string, status: string, placedAt: string) =>
   ({
@@ -32,5 +32,26 @@ describe("kitchen board", () => {
 
   it("counts whole waiting minutes", () => {
     expect(waitingMinutes("2026-10-30T12:00:00Z", Date.parse("2026-10-30T12:07:59Z"))).toBe(7);
+  });
+
+  it("offers a retry when Go could not be reached", () => {
+    const message = moveErrorMessage({
+      order: order("41", "PREPARING", "2026-10-30T12:00:00Z"),
+      status: "READY",
+      code: "CORE_UNAVAILABLE",
+    });
+    expect(message).toEqual({
+      text: "Não deu para marcar o pedido 41 como Pronto. Verifique a conexão.",
+      retry: true,
+    });
+  });
+
+  it("does not offer a retry when another screen moved the order first", () => {
+    const message = moveErrorMessage({
+      order: order("41", "PREPARING", "2026-10-30T12:00:00Z"),
+      status: "READY",
+      code: "INVALID_STATUS_TRANSITION",
+    });
+    expect(message.retry).toBe(false);
   });
 });
