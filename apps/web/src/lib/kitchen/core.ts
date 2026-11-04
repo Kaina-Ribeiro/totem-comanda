@@ -6,6 +6,7 @@ import { deviceCallAs, type Result } from "@/lib/kiosk/core";
 
 export type KitchenOrder = components["schemas"]["KitchenOrder"];
 export type KitchenStatus = components["schemas"]["KitchenStatusUpdate"]["status"];
+export type KitchenAvailability = components["schemas"]["KitchenAvailability"];
 
 /** Paid orders not yet collected, oldest first. */
 export function listKitchenOrders(): Promise<Result<KitchenOrder[]>> {

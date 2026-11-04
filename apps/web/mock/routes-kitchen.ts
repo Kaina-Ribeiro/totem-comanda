@@ -12,6 +12,8 @@ import {
   type Route,
   type Schemas,
 } from "./http.ts";
+import { soldOutOptions } from "./kiosk-menu.ts";
+import { today } from "./routes-kiosk.ts";
 import { now, state } from "./state.ts";
 
 type StoredOrder = Schemas["Order"] & { deviceId: string; menuId: string };
@@ -157,6 +159,33 @@ export const kitchenRoutes: Route[] = [
       historyOf(order).push({ status, at: now().toISOString(), by: "KITCHEN" });
       broadcastKitchen("order.status_changed", order);
       return ok(kitchenOrder(order));
+    },
+  ],
+  [
+    "PUT",
+    /^\/v1\/kitchen\/availability$/,
+    (req) => {
+      const { error } = authDevice(req);
+      if (error) return error;
+      const body = req.body as Partial<Schemas["KitchenAvailabilityUpdate"]> | null;
+      if (typeof body?.itemId !== "string" || typeof body.soldOut !== "boolean") {
+        return problem(422, "VALIDATION_FAILED", "Validation failed", "itemId");
+      }
+      const item = state.catalogue.items.find((i) => i.id === body.itemId);
+      if (!item) return notFound();
+      const optionId = body.optionId ?? null;
+      const date = body.soldOut ? today() : null;
+      if (optionId) {
+        const known = state.catalogue.optionGroups.some((g) =>
+          g.options.some((o) => o.id === optionId),
+        );
+        if (!known) return notFound();
+        if (date) soldOutOptions.set(optionId, date);
+        else soldOutOptions.delete(optionId);
+      } else {
+        item.soldOutDate = date;
+      }
+      return ok({ itemId: item.id, optionId, soldOutDate: date });
     },
   ],
 ];
