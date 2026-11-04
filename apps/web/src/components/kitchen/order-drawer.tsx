@@ -43,6 +43,7 @@ export function OrderDrawer({
   secondary,
   lineAction,
   lineExtra,
+  footnote,
 }: {
   order: KitchenOrder;
   now: number;
@@ -55,6 +56,8 @@ export function OrderDrawer({
   lineAction?: (line: KitchenOrder["lines"][number], index: number) => ReactNode;
   /** A panel under a line (the "Acabou" confirmation). */
   lineExtra?: (line: KitchenOrder["lines"][number], index: number) => ReactNode;
+  /** Under the history: the rare actions ("Cancelar pedido"). */
+  footnote?: ReactNode;
 }) {
   const close = useRef<HTMLButtonElement>(null);
   const column = order.status as keyof typeof STATUS_CHIP;
@@ -183,6 +186,7 @@ export function OrderDrawer({
               ))}
             </ol>
           </section>
+          {footnote}
         </div>
 
         <div className="flex gap-3 border-t border-line px-7 pt-[18px] pb-[26px]">

@@ -2,7 +2,7 @@
 
 import { useEffect, useEffectEvent, useRef, useState, useTransition } from "react";
 
-import { moveOrder, setSoldOut } from "@/app/kitchen/actions";
+import { cancelOrder, moveOrder, setSoldOut } from "@/app/kitchen/actions";
 import type { components } from "@/lib/core-api";
 import {
   accept,
@@ -17,6 +17,7 @@ import {
   type Seen,
 } from "@/lib/kitchen/board";
 
+import { CancelDialog, cancelErrorText } from "./cancel-dialog";
 import { NewOrdersBar, SoundButton, SoundDialog, useNewOrderAlert } from "./new-order-alert";
 import { OrderCard } from "./order-card";
 import { OrderDrawer } from "./order-drawer";
@@ -77,7 +78,10 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const opened = orders.find((o) => o.id === openId) ?? null;
   // The last action that can be undone for 5 s (prototype K1 toast): a move or an "Acabou".
-  const [undo, setUndo] = useState<{ key: string; label: string; run: () => void } | null>(null);
+  const [undo, setUndo] = useState<{ key: string; label: string; run?: () => void } | null>(null);
+  // "Cancelar pedido" (G-K11): the order asked about and the last error.
+  const [cancelling, setCancelling] = useState<KitchenOrder | null>(null);
+  const [cancelError, setCancelError] = useState<string | null>(null);
   // "Acabou" (G-K4): the line being asked about, and what this tablet marked today.
   const [soldOutAsk, setSoldOutAsk] = useState<{ line: number; target: SoldOutTarget } | null>(
     null,
@@ -276,6 +280,32 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
     });
   }
 
+  /** Cancels `order` with the owner's login; it leaves the board on success. */
+  function confirmCancel(
+    order: KitchenOrder,
+    input: { email: string; password: string; reason: Parameters<typeof cancelOrder>[3] },
+  ) {
+    setCancelError(null);
+    startTransition(async () => {
+      const result = await cancelOrder(order.id, input.email, input.password, input.reason).catch(
+        () => ({ ok: false, code: "NETWORK" }) as const,
+      );
+      if (!result.ok) {
+        setCancelError(cancelErrorText(result.code));
+        if (result.code === "INVALID_STATUS_TRANSITION" || result.code === "NOT_FOUND") {
+          await refresh();
+        }
+        return;
+      }
+      if (accept(seen.current, result.data, Date.now())) {
+        setOrders((current) => applyOrder(current, result.data));
+      }
+      setCancelling(null);
+      openOrder(null);
+      setUndo({ key: `cancel:${order.id}`, label: `Pedido ${order.posCheckNumber} cancelado` });
+    });
+  }
+
   /** One step back: "Desfazer" after a move, or "Voltar uma etapa" in the detail. */
   function stepBack(order: KitchenOrder) {
     const status = PREVIOUS_STATUS[order.status as keyof typeof PREVIOUS_STATUS];
@@ -430,6 +460,17 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
           now={now}
           busy={pending && busy === opened.id}
           onClose={() => openOrder(null)}
+          footnote={
+            <button
+              onClick={() => {
+                setCancelError(null);
+                setCancelling(opened);
+              }}
+              className="self-start rounded-xl px-1 py-2 text-[15px] font-extrabold text-danger underline-offset-4 transition-colors hover:underline active:text-detail-text"
+            >
+              Não dá para fazer? Cancelar pedido
+            </button>
+          }
           lineAction={(line, index) => (
             <SoldOutButton
               marked={marked.has(soldOutKey({ itemId: line.itemId, optionId: null }))}
@@ -480,6 +521,20 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
               </button>
             )
           }
+        />
+      )}
+      {cancelling && (
+        <CancelDialog
+          number={cancelling.posCheckNumber}
+          defaultReason={
+            cancelling.lines.some((l) => lineTargets(l).some((t) => marked.has(soldOutKey(t))))
+              ? "ITEM_SOLD_OUT"
+              : "CANNOT_PREPARE"
+          }
+          busy={pending}
+          error={cancelError}
+          onBack={() => setCancelling(null)}
+          onConfirm={(input) => confirmCancel(cancelling, input)}
         />
       )}
       {undo && (
