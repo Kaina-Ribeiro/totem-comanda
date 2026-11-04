@@ -31,6 +31,8 @@
   /* Kitchen: column trays and the tab bar (K1). */
   --color-tray: #eae3d8;
   --color-tabs: #e6ded2;
+  /* Kitchen undo toast button (K1). */
+  --color-toast-button: #3d312a;
 
   --font-display: var(--font-fraunces), Georgia, serif;
   --font-sans: var(--font-manrope), system-ui, sans-serif;

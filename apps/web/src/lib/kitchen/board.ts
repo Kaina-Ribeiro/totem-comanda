@@ -15,12 +15,68 @@ export function applyOrder(orders: KitchenOrder[], order: KitchenOrder): Kitchen
   return [...rest, order].sort(byPlacedAt);
 }
 
+/**
+ * What the board knows about each order it has seen, collected ones too:
+ * the highest `version` and when it arrived (stale-event guard, plan G-K3).
+ */
+export type Seen = Map<string, { version: number; at: number }>;
+
+/**
+ * True when `order` is not older than what the board already saw; then it is
+ * remembered. An event or answer for an older version is a late one: a card
+ * moved back by it would show a status Go no longer has.
+ */
+export function accept(seen: Seen, order: KitchenOrder, at: number): boolean {
+  const known = seen.get(order.id);
+  if (known && order.version < known.version) return false;
+  if (!known || order.version > known.version) seen.set(order.id, { version: order.version, at });
+  return true;
+}
+
+/**
+ * The board after a full reload that was requested at `startedAt`. The list
+ * is Go's open orders at some moment after that, so a card in it older than
+ * what the board saw since keeps the board's copy, and a card missing from
+ * it stays only if the board learned about it after the reload started.
+ */
+export function mergeSnapshot(
+  current: KitchenOrder[],
+  snapshot: KitchenOrder[],
+  seen: Seen,
+  startedAt: number,
+  at: number,
+): KitchenOrder[] {
+  const byId = new Map(current.map((o) => [o.id, o]));
+  const listed = new Set(snapshot.map((o) => o.id));
+  let board: KitchenOrder[] = [];
+  for (const order of snapshot) {
+    if (accept(seen, order, at)) board = applyOrder(board, order);
+    else if (byId.has(order.id)) board = applyOrder(board, byId.get(order.id)!);
+  }
+  for (const order of current) {
+    if (!listed.has(order.id) && (seen.get(order.id)?.at ?? 0) > startedAt) {
+      board = applyOrder(board, order);
+    }
+  }
+  return board;
+}
+
 /** The next step for each column's button. */
 export const NEXT_STATUS = {
   PAID: "PREPARING",
   PREPARING: "READY",
   READY: "COLLECTED",
 } as const;
+
+/** One step back (plan decision 2): only these two, and only the same business day (Go checks). */
+export const PREVIOUS_STATUS = { READY: "PREPARING", COLLECTED: "READY" } as const;
+
+/** Toast after a move that can be undone (prototype K1): "Pedido 38 retirado". */
+export function movedLabel(order: KitchenOrder): string | null {
+  if (order.status === "READY") return `Pedido ${order.posCheckNumber} pronto`;
+  if (order.status === "COLLECTED") return `Pedido ${order.posCheckNumber} retirado`;
+  return null;
+}
 
 /** Whole minutes since the order was placed. */
 export function waitingMinutes(placedAt: string, now: number): number {
@@ -43,7 +99,7 @@ export const waitLabel = (minutes: number) => (minutes < 1 ? "agora" : `${minute
 /** A status change Go did not take. */
 export type MoveError = {
   order: KitchenOrder;
-  status: (typeof NEXT_STATUS)[keyof typeof NEXT_STATUS];
+  status: components["schemas"]["KitchenStatusUpdate"]["status"];
   code: string;
 };
 
@@ -56,7 +112,11 @@ const STEP_LABEL = { PREPARING: "Preparando", READY: "Pronto", COLLECTED: "Retir
  */
 export function moveErrorMessage(error: MoveError): { text: string; retry: boolean } {
   const number = error.order.posCheckNumber;
-  if (error.code === "INVALID_STATUS_TRANSITION" || error.code === "NOT_FOUND") {
+  if (
+    error.code === "INVALID_STATUS_TRANSITION" ||
+    error.code === "STALE_ORDER_VERSION" ||
+    error.code === "NOT_FOUND"
+  ) {
     return {
       text: `O pedido ${number} já mudou em outro aparelho. O quadro foi atualizado.`,
       retry: false,

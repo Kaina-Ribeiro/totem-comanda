@@ -5,17 +5,23 @@ import { useEffect, useEffectEvent, useRef, useState, useTransition } from "reac
 import { moveOrder } from "@/app/kitchen/actions";
 import type { components } from "@/lib/core-api";
 import {
+  accept,
   applyOrder,
   COLUMNS,
+  mergeSnapshot,
   moveErrorMessage,
+  movedLabel,
   type MoveError,
   NEXT_STATUS,
+  PREVIOUS_STATUS,
+  type Seen,
 } from "@/lib/kitchen/board";
 
 import { NewOrdersBar, SoundButton, SoundDialog, useNewOrderAlert } from "./new-order-alert";
 import { OrderCard } from "./order-card";
 import { OrderDrawer } from "./order-drawer";
 import { ProductionView } from "./production-view";
+import { UndoToast } from "./undo-toast";
 
 type KitchenOrder = components["schemas"]["KitchenOrder"];
 
@@ -34,6 +40,13 @@ async function fetchOpenOrders(): Promise<KitchenOrder[] | null> {
   } catch {
     return null; // Offline: the next tick tries again.
   }
+}
+
+/** The open orders with the time the request left, for `mergeSnapshot`. */
+async function fetchSnapshot(): Promise<{ open: KitchenOrder[]; startedAt: number } | null> {
+  const startedAt = Date.now();
+  const open = await fetchOpenOrders();
+  return open && { open, startedAt };
 }
 
 const COLUMN_LABEL = { PAID: "Novos", PREPARING: "Preparando", READY: "Prontos" } as const;
@@ -62,6 +75,10 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
   // The order open in the detail drawer (K2); it follows the board's copy.
   const [openId, setOpenId] = useState<string | null>(null);
   const opened = orders.find((o) => o.id === openId) ?? null;
+  // The last move that can be undone for 5 s (prototype K1 toast).
+  const [undo, setUndo] = useState<KitchenOrder | null>(null);
+  // Highest version seen per order, so late events and reloads cannot move a card back (G-K3).
+  const seen = useRef<Seen>(new Map(initial.map((o) => [o.id, { version: o.version, at: 0 }])));
   const alert = useNewOrderAlert();
   // Orders the board has shown; a PAID one not in here is new (G-K1).
   const known = useRef(new Set(initial.map((o) => o.id)));
@@ -76,12 +93,13 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
 
   /** Reloads the open orders from Go; the board then shows where each card really is. */
   const refresh = async () => {
-    const open = await fetchOpenOrders();
-    if (open) {
-      setOrders(open);
+    const snapshot = await fetchSnapshot();
+    if (snapshot) {
+      const { open, startedAt } = snapshot;
+      setOrders((current) => mergeSnapshot(current, open, seen.current, startedAt, Date.now()));
       alert.arrived(newPaid(open));
     }
-    return open !== null;
+    return snapshot !== null;
   };
 
   /** The header's refresh button: reloads and shows it is working. */
@@ -102,9 +120,10 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
   useEffect(() => {
     if (!live) return;
     const timer = setInterval(async () => {
-      const open = await fetchOpenOrders();
-      if (open) {
-        setOrders(open);
+      const snapshot = await fetchSnapshot();
+      if (snapshot) {
+        const { open, startedAt } = snapshot;
+        setOrders((current) => mergeSnapshot(current, open, seen.current, startedAt, Date.now()));
         onIncoming(open);
       }
     }, FULL_REFRESH_MS);
@@ -118,9 +137,10 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
     let retry: ReturnType<typeof setTimeout> | undefined;
     let closed = false;
     const refresh = async () => {
-      const open = await fetchOpenOrders();
-      if (open) {
-        setOrders(open);
+      const snapshot = await fetchSnapshot();
+      if (snapshot) {
+        const { open, startedAt } = snapshot;
+        setOrders((current) => mergeSnapshot(current, open, seen.current, startedAt, Date.now()));
         onIncoming(open);
       }
     };
@@ -137,6 +157,7 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
       stream = new EventSource("/api/kitchen/stream");
       const onOrder = (event: MessageEvent<string>) => {
         const order = JSON.parse(event.data) as KitchenOrder;
+        if (!accept(seen.current, order, Date.now())) return; // A late event.
         setOrders((current) => applyOrder(current, order));
         onIncoming([order]);
       };
@@ -164,17 +185,25 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
     };
   }, []);
 
-  /** Moves `order` to `status`; a failure is shown, and the board reloads from Go. */
-  function move(order: KitchenOrder, status: MoveError["status"]) {
+  /**
+   * Moves `order` to `status` if Go still has the version the board shows; a
+   * failure is shown and the board reloads from Go. A forward move to Pronto
+   * or Retirado offers "Desfazer" for 5 s.
+   */
+  function move(order: KitchenOrder, status: MoveError["status"], { back = false } = {}) {
     setBusy(order.id);
     setMoveError(null);
+    setUndo(null);
     startTransition(async () => {
       // A tablet that lost the network rejects instead of answering.
-      const result = await moveOrder(order.id, status).catch(
+      const result = await moveOrder(order.id, status, order.version).catch(
         () => ({ ok: false, code: "NETWORK" }) as const,
       );
       if (result.ok) {
-        setOrders((current) => applyOrder(current, result.data));
+        if (accept(seen.current, result.data, Date.now())) {
+          setOrders((current) => applyOrder(current, result.data));
+        }
+        if (!back && movedLabel(result.data)) setUndo(result.data);
       } else {
         setMoveError({ order, status, code: result.code });
         await refresh();
@@ -186,6 +215,12 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
   function advance(order: KitchenOrder) {
     const status = NEXT_STATUS[order.status as keyof typeof NEXT_STATUS];
     if (status) move(order, status);
+  }
+
+  /** One step back: "Desfazer" after a move, or "Voltar uma etapa" in the detail. */
+  function stepBack(order: KitchenOrder) {
+    const status = PREVIOUS_STATUS[order.status as keyof typeof PREVIOUS_STATUS];
+    if (status) move(order, status, { back: true });
   }
 
   const errorMessage = moveError && moveErrorMessage(moveError);
@@ -337,6 +372,40 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
           busy={pending && busy === opened.id}
           onClose={() => setOpenId(null)}
           onAdvance={() => advance(opened)}
+          secondary={
+            opened.status === "READY" && (
+              <button
+                onClick={() => stepBack(opened)}
+                disabled={pending && busy === opened.id}
+                className="flex h-16 flex-[1_1_0] items-center justify-center gap-2 rounded-2xl bg-ground text-[17px] font-extrabold transition-transform active:scale-[.97] disabled:opacity-60"
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M9 14L4 9l5-5" />
+                  <path d="M4 9h10.5a5.5 5.5 0 010 11H11" />
+                </svg>
+                Voltar uma etapa
+              </button>
+            )
+          }
+        />
+      )}
+      {undo && (
+        <UndoToast
+          key={`${undo.id}:${undo.version}`}
+          label={movedLabel(undo)!}
+          busy={pending}
+          onUndo={() => stepBack(undo)}
+          onExpire={() => setUndo(null)}
         />
       )}
       {alert.dialogOpen && <SoundDialog {...alert.dialogProps} />}

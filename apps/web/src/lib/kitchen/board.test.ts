@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { applyOrder, moveErrorMessage, waitingMinutes, waitLabel, waitState } from "./board";
+import {
+  accept,
+  applyOrder,
+  mergeSnapshot,
+  moveErrorMessage,
+  waitingMinutes,
+  waitLabel,
+  waitState,
+} from "./board";
 
 const order = (id: string, status: string, placedAt: string) =>
   ({
@@ -62,5 +70,34 @@ describe("kitchen board", () => {
   it("says agora under a minute", () => {
     expect(waitLabel(0)).toBe("agora");
     expect(waitLabel(7)).toBe("7 min");
+  });
+});
+
+describe("stale-event guard (G-K3)", () => {
+  const v = (id: string, status: string, version: number) =>
+    ({ ...(order(id, status, "2026-10-30T12:04:00Z") as object), version }) as never;
+
+  it("ignores an event older than what the board saw", () => {
+    const seen = new Map();
+    expect(accept(seen, v("42", "COLLECTED", 4), 10)).toBe(true);
+    expect(accept(seen, v("42", "READY", 3), 11)).toBe(false);
+    expect(accept(seen, v("42", "READY", 5), 12)).toBe(true);
+  });
+
+  it("does not bring back a card collected after the reload started", () => {
+    const seen = new Map([["42", { version: 4, at: 20 }]]);
+    // Reload sent at 10, the tap on "Retirado" answered at 20, the reload answered at 30.
+    const board = mergeSnapshot([], [v("42", "READY", 3)], seen, 10, 30);
+    expect(board).toEqual([]);
+  });
+
+  it("keeps a card that arrived after the reload started and drops one Go closed", () => {
+    const seen = new Map([
+      ["43", { version: 1, at: 20 }],
+      ["44", { version: 2, at: 5 }],
+    ]);
+    const current = [v("43", "PAID", 1), v("44", "READY", 2)];
+    const board = mergeSnapshot(current, [], seen, 10, 30);
+    expect(board.map((o) => o.id)).toEqual(["43"]);
   });
 });
