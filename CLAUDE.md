@@ -177,9 +177,12 @@ Follow these rules exactly. If a request conflicts with them, stop and say which
   edit these files here: change the kit and reinstall with its `install.sh`. Rulesets and the
   `RELEASE_TOKEN` secret are applied only with Kai's yes.
 - Deploy is Cubeship (`deploy/cubeship`), not Jenkins. The apps `comanda/production/web` and
-  `comanda/production/mock` build from a final tag (`ref: v0.1.0` since 31 Oct 2026), never a
-  branch. A prod deploy = `node .github/scripts/release.mjs deploy-check vX.Y.Z --prod`
-  passes, then set `ref` to that tag, with Kai's confirmation. No test stages on Cubeship yet.
+  `comanda/production/mock` build from a tag (`ref: v0.1.0` since 31 Oct 2026), never a branch.
+  On release day prod takes the open line's last rc, with Kai's confirmation: Actions → Release →
+  `deploy`, stage `prod` (needs `DEPLOY_PROD_APPS="comanda/production/mock comanda/production/web"`,
+  `CUBESHIP_URL` and the `CUBESHIP_TOKEN` secret); then the merge into master tags it final.
+  Without those variables, deploy by hand after `release.mjs deploy-check <rc> --prod` passes.
+  No test stages on Cubeship yet.
 - `v0.1.0` is an annotated tag created by hand (Kai, 30 Oct 2026) on `b230cce`, before this flow;
   it has no rc, so the gate refuses it for prod.
 
