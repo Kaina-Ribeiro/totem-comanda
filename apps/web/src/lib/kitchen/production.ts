@@ -6,10 +6,11 @@ type KitchenOrder = components["schemas"]["KitchenOrder"];
 export type ProductionScope = "open" | "new";
 
 export type ProductionItem = {
+  itemId: string;
   name: string;
   quantity: number;
   /** Option combinations with how many of each; lines without options are left out. */
-  variants: { label: string; quantity: number }[];
+  variants: { key: string; label: string; quantity: number }[];
   /** Order numbers that need this item, in board order. */
   orders: string[];
 };
@@ -18,8 +19,9 @@ const collator = new Intl.Collator("pt-BR");
 
 /**
  * Totals to make (plan G-K6, KDS FEAT-039): Novos + Preparando, never
- * Prontos, by item name and option combination. Contract 0.1 has no item id
- * on kitchen lines, so items group by their pt-BR name.
+ * Prontos, by item and option combination. Grouped by ids (contract 0.2.0
+ * `itemId` and `choices`), so two items with the same name stay apart and an
+ * item renamed during the day stays together.
  */
 export function productionTotals(
   orders: KitchenOrder[],
@@ -27,24 +29,24 @@ export function productionTotals(
 ): { items: ProductionItem[]; orders: string[] } {
   const statuses = scope === "new" ? ["PAID"] : ["PAID", "PREPARING"];
   const open = statuses.flatMap((status) => orders.filter((o) => o.status === status));
-  const byName = new Map<string, ProductionItem>();
+  const byId = new Map<string, ProductionItem>();
   for (const order of open) {
     for (const line of order.lines) {
-      let item = byName.get(line.name);
+      let item = byId.get(line.itemId);
       if (!item) {
-        item = { name: line.name, quantity: 0, variants: [], orders: [] };
-        byName.set(line.name, item);
+        item = { itemId: line.itemId, name: line.name, quantity: 0, variants: [], orders: [] };
+        byId.set(line.itemId, item);
       }
       item.quantity += line.quantity;
       if (!item.orders.includes(order.posCheckNumber)) item.orders.push(order.posCheckNumber);
-      if (line.options.length === 0) continue;
-      const label = line.options.join(" · ");
-      const variant = item.variants.find((v) => v.label === label);
+      if (line.choices.length === 0) continue;
+      const key = line.choices.map((c) => `${c.optionId}×${c.quantity}`).join("|");
+      const variant = item.variants.find((v) => v.key === key);
       if (variant) variant.quantity += line.quantity;
-      else item.variants.push({ label, quantity: line.quantity });
+      else item.variants.push({ key, label: line.options.join(" · "), quantity: line.quantity });
     }
   }
-  const items = [...byName.values()].sort((a, b) => collator.compare(a.name, b.name));
+  const items = [...byId.values()].sort((a, b) => collator.compare(a.name, b.name));
   for (const item of items) item.variants.sort((a, b) => b.quantity - a.quantity);
   return { items, orders: open.map((o) => o.posCheckNumber) };
 }

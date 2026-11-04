@@ -53,7 +53,7 @@ export function ProductionView({ orders }: { orders: KitchenOrder[] }) {
       <div className="grid min-h-0 flex-1 auto-rows-min grid-cols-4 content-start gap-3.5 overflow-y-auto px-6 pt-[18px] pb-6">
         {totals.items.map((item) => (
           <article
-            key={item.name}
+            key={item.itemId}
             className="flex min-h-[200px] flex-col gap-2.5 rounded-[14px] bg-surface px-5 py-[18px] shadow-[0_1px_2px_rgba(28,28,26,.08)]"
           >
             <div className="flex items-baseline gap-2.5">
@@ -67,7 +67,7 @@ export function ProductionView({ orders }: { orders: KitchenOrder[] }) {
               <ul className="flex flex-col gap-[5px]">
                 {item.variants.map((variant) => (
                   <li
-                    key={variant.label}
+                    key={variant.key}
                     className="flex gap-2 text-[15px] font-semibold text-muted"
                   >
                     <span className="flex h-[22px] min-w-[22px] shrink-0 items-center justify-center rounded-[11px] bg-wheat text-xs font-extrabold text-ink">

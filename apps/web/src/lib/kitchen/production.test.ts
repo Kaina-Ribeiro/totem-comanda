@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { productionTotals } from "./production";
 
-const order = (number: string, status: string, lines: [number, string, string[]][]) =>
+/** A line: quantity, name, option names; the item id defaults to the name. */
+type Line = [number, string, string[], string?];
+
+const order = (number: string, status: string, lines: Line[]) =>
   ({
     id: `ord-${number}`,
     posCheckNumber: number,
@@ -10,7 +13,13 @@ const order = (number: string, status: string, lines: [number, string, string[]]
     orderType: "DINEIN",
     placedAt: "2026-11-04T12:00:00Z",
     readyAt: null,
-    lines: lines.map(([quantity, name, options]) => ({ quantity, name, options })),
+    lines: lines.map(([quantity, name, options, itemId]) => ({
+      itemId: itemId ?? `item-${name}`,
+      quantity,
+      name,
+      options,
+      choices: options.map((o) => ({ optionId: `opt-${o}`, name: o, quantity: 1 })),
+    })),
   }) as never;
 
 const board = [
@@ -45,5 +54,22 @@ describe("productionTotals", () => {
     const { items, orders } = productionTotals(board, "new");
     expect(orders).toEqual(["44", "45"]);
     expect(items.some((i) => i.name === "Croissant")).toBe(false);
+  });
+
+  it("groups by item id, not by name", () => {
+    const { items } = productionTotals(
+      [
+        order("50", "PAID", [[1, "Café", [], "item-cafe-coado"]]),
+        // Same name, another item (e.g. the morning menu's espresso).
+        order("51", "PAID", [[1, "Café", [], "item-espresso"]]),
+        // The owner renamed the item during the day: still the same thing to make.
+        order("52", "PAID", [[2, "Café coado", [], "item-cafe-coado"]]),
+      ],
+      "open",
+    );
+    expect(items.map((i) => [i.itemId, i.quantity])).toEqual([
+      ["item-cafe-coado", 3],
+      ["item-espresso", 1],
+    ]);
   });
 });
