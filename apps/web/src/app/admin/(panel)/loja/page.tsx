@@ -3,7 +3,7 @@ import { Suspense } from "react";
 
 import { ActionForm, SubmitButton } from "@/components/admin/form";
 import { Card, Checkbox, Field, inputClass, LoadError, PageHeader } from "@/components/admin/ui";
-import { attempt, checked, type FormState, load, text } from "@/lib/admin/form";
+import { attempt, checked, type FormState, load, orderTypesError, text } from "@/lib/admin/form";
 import { uploadImage } from "@/lib/admin/media";
 import { asOwner } from "@/lib/admin/session";
 import { coreApi } from "@/lib/core/client";
@@ -13,6 +13,9 @@ type Language = components["schemas"]["LanguageCode"];
 
 async function saveRestaurant(_: FormState, form: FormData): Promise<FormState> {
   "use server";
+  // Both off leaves the kiosk with nothing to sell (dashboard BR-041). Go should refuse it too.
+  const orderTypes = orderTypesError(checked(form, "dineIn"), checked(form, "takeOut"));
+  if (orderTypes) return { error: orderTypes };
   return attempt(async () => {
     const current = await asOwner((headers) => coreApi().GET("/v1/admin/restaurant", { headers }));
     const logo =
@@ -109,6 +112,7 @@ async function StoreForm() {
           <span className="text-sm font-semibold text-muted">Como o cliente pode pedir</span>
           <Checkbox name="dineIn" label="Comer aqui" defaultChecked={r.isDineInAvailable} />
           <Checkbox name="takeOut" label="Para viagem" defaultChecked={r.isTakeOutAvailable} />
+          <span className="text-xs text-muted">Pelo menos um fica ligado.</span>
         </div>
         <div className="flex flex-col gap-3">
           <span className="text-sm font-semibold text-muted">Idiomas do totem</span>
