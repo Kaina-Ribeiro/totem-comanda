@@ -20,6 +20,8 @@ type KitchenOrder = components["schemas"]["KitchenOrder"];
 const POLL_MS = 2_000;
 /** While polling, try the stream again this often. */
 const RECONNECT_MS = 30_000;
+/** While live, reload the whole list this often, so a lost event cannot leave the board wrong (KDS WF-11). */
+const FULL_REFRESH_MS = 60_000;
 
 /** The open orders as Go has them; null while Go or the network cannot answer. */
 async function fetchOpenOrders(): Promise<KitchenOrder[] | null> {
@@ -52,18 +54,38 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
   const [busy, setBusy] = useState<string | null>(null);
   // The last move Go did not take (KDS BR-012): shown until retried or dismissed.
   const [moveError, setMoveError] = useState<MoveError | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   /** Reloads the open orders from Go; the board then shows where each card really is. */
   const refresh = async () => {
     const open = await fetchOpenOrders();
     if (open) setOrders(open);
+    return open !== null;
   };
+
+  /** The header's refresh button: reloads and shows it is working. */
+  async function refreshNow() {
+    if (refreshing) return;
+    setRefreshing(true);
+    await refresh();
+    setRefreshing(false);
+  }
 
   // Waiting times and the clock tick every 20 s.
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 20_000);
     return () => clearInterval(timer);
   }, []);
+
+  // While live, a full reload every 60 s; while polling, the 2 s poll already does it.
+  useEffect(() => {
+    if (!live) return;
+    const timer = setInterval(async () => {
+      const open = await fetchOpenOrders();
+      if (open) setOrders(open);
+    }, FULL_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [live]);
 
   // Event stream while it works; polling while it does not.
   useEffect(() => {
@@ -153,9 +175,34 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
             {live ? "Ao vivo" : "Reconectando… atualiza a cada 2 s"}
           </span>
         </div>
-        <span className="min-w-16 text-right text-xl font-bold tracking-[-0.02em]">
-          {clock.format(now)}
-        </span>
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={refreshNow}
+            disabled={refreshing}
+            aria-label="Atualizar pedidos"
+            title="Atualizar pedidos"
+            className="flex size-11 items-center justify-center rounded-[14px] bg-surface transition-transform active:scale-[.97] disabled:opacity-60"
+          >
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              className={refreshing ? "animate-spin" : undefined}
+            >
+              <path d="M20 11a8 8 0 10-2.3 5.7" />
+              <path d="M20 4v7h-7" />
+            </svg>
+          </button>
+          <span className="min-w-16 text-right text-xl font-bold tracking-[-0.02em]">
+            {clock.format(now)}
+          </span>
+        </div>
       </header>
 
       {moveError && errorMessage && (
