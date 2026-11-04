@@ -14,6 +14,7 @@ import {
 
 import { NewOrdersBar, SoundButton, SoundDialog, useNewOrderAlert } from "./new-order-alert";
 import { OrderCard } from "./order-card";
+import { OrderDrawer } from "./order-drawer";
 import { ProductionView } from "./production-view";
 
 type KitchenOrder = components["schemas"]["KitchenOrder"];
@@ -58,6 +59,9 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
   const [moveError, setMoveError] = useState<MoveError | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [view, setView] = useState<"orders" | "production">("orders");
+  // The order open in the detail drawer (K2); it follows the board's copy.
+  const [openId, setOpenId] = useState<string | null>(null);
+  const opened = orders.find((o) => o.id === openId) ?? null;
   const alert = useNewOrderAlert();
   // Orders the board has shown; a PAID one not in here is new (G-K1).
   const known = useRef(new Set(initial.map((o) => o.id)));
@@ -187,7 +191,7 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
   const errorMessage = moveError && moveErrorMessage(moveError);
 
   return (
-    <main className="flex h-dvh min-h-0 flex-1 flex-col overflow-hidden bg-ground text-ink tabular-nums">
+    <main className="flex h-dvh min-h-0 w-full flex-col overflow-hidden bg-ground text-ink tabular-nums">
       <header className="flex h-[76px] shrink-0 items-center justify-between gap-4 px-6">
         <div className="flex items-center gap-3.5">
           <h1 className="text-[22px] font-bold tracking-[-0.02em]">Cozinha</h1>
@@ -317,6 +321,7 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
                     now={now}
                     busy={pending && busy === order.id}
                     isNew={alert.unseen.includes(order.id)}
+                    onOpen={() => setOpenId(order.id)}
                     onAdvance={() => advance(order)}
                   />
                 ))}
@@ -324,6 +329,15 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
             );
           })}
         </div>
+      )}
+      {opened && (
+        <OrderDrawer
+          order={opened}
+          now={now}
+          busy={pending && busy === opened.id}
+          onClose={() => setOpenId(null)}
+          onAdvance={() => advance(opened)}
+        />
       )}
       {alert.dialogOpen && <SoundDialog {...alert.dialogProps} />}
     </main>
