@@ -176,6 +176,12 @@ Follow these rules exactly. If a request conflicts with them, stop and say which
   `conventions` (`.github/workflows/pr-checks.yml`), rulesets in `.github/rulesets/*.json`. Never
   edit these files here: change the kit and reinstall with its `install.sh`. Rulesets and the
   `RELEASE_TOKEN` secret are applied only with Kai's yes.
+- Applied rulesets differ from the kit's JSON on purpose (Kai, 4 Nov 2026): **no required
+  approval** (Kai merges alone), and the `v*` tag ruleset lets only admins bypass, because GitHub
+  refuses the Actions app as a bypass actor on a personal-account repo. So `RELEASE_TOKEN` must be
+  an admin's token (Kai's; Pull requests + Contents read/write) or rc/final tags fail to push.
+  Never reapply `.github/rulesets/*.json` here as they are. Kai manages tokens himself: never ask
+  for, read or handle a token value.
 - Deploy is Cubeship (`deploy/cubeship`), not Jenkins. The apps `comanda/production/web` and
   `comanda/production/mock` build from a tag (`ref: v0.1.0` since 31 Oct 2026), never a branch.
   On release day prod takes the open line's last rc, with Kai's confirmation: Actions → Release →
@@ -208,17 +214,22 @@ Follow these rules exactly. If a request conflicts with them, stop and say which
    reapply in the next release by reverting the revert.
 3. **New release:** run Actions → Release → `cut-release`. Never create `release/*` by hand.
    It branches from the newest open release (or master if none).
-4. **Release day:** PR `release/vX.Y → master`, **merge commit** (never squash/rebase).
-   The merge auto-tags the last rc's version (`v0.2.1-rc` → `v0.2.1`) with release notes.
+4. **Release day:** deploy the line's last rc to prod first (see Deploy), then PR
+   `release/vX.Y → master`, **merge commit** (never squash/rebase). The merge auto-tags the last
+   rc's version (`v0.2.1-rc` → `v0.2.1`) with release notes; it refuses while prod runs another tag.
 5. **Hotfix:** Actions → Release → `cut-hotfix` (branches from the final tag in prod).
    Fix PRs into `hotfix/vX.Y` (squash) → test the rc → PR into master (merge commit).
 6. **Sync PRs** (`chore(sync): merge A into B`, opened automatically): review, merge with
    **merge commit**. Resolve conflicts on a branch off the target, never on the source.
 
-### Deploy (Jenkins: `dev_tag` + `environment`)
-- Test stages (`itodev`, `itosit`, `itouat`): any `vX.Y.Z-rc` (or final tag), any time.
-- `prod`: only a final `vX.Y.Z`, only on release day, and only if its code equals its
-  `-rc` (Jenkins' `Check tag` stage enforces this). Never deploy a branch name or an rc to prod.
+### Deploy (Cubeship here; the original flow named Jenkins `dev_tag` + `environment`)
+Every stage runs a tag, never a branch name. `release.mjs deploy-check <tag> [--prod]` is the gate.
+- Test stages: any `vX.Y.Z-rc` (or final tag), any time. None on Cubeship yet.
+- `prod`, on release day: the open line's **last** rc, deployed before the release PR merges
+  (Actions → Release → `deploy`, stage `prod`, run from the release branch); the merge then tags
+  it final. An older rc is refused.
+- `prod`, rollback: a final `vX.Y.Z` whose code equals its `-rc`.
+- Never deploy a branch name, or an rc that is not the line's last, to prod.
 
 ### Before acting
 - Run `git fetch --all --tags` first; reason from remote state, not local.
