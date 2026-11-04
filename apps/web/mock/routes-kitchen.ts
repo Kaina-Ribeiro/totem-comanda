@@ -32,7 +32,28 @@ function optionNames(options: Schemas["OrderLineOption"][]): string[] {
   ]);
 }
 
+/** The chosen options with their ids, flattened (KitchenOrder.lines[].choices). */
+function optionChoices(options: Schemas["OrderLineOption"][]): Schemas["KitchenOrder"]["lines"][number]["choices"] {
+  return options.flatMap((o) => [
+    { optionId: o.optionId, name: o.name, quantity: o.quantity },
+    ...optionChoices(o.options),
+  ]);
+}
+
+// Status history per order (contract 0.2.0); `version` is its length.
+const histories = new Map<string, Schemas["KitchenStatusChange"][]>();
+
+function historyOf(order: StoredOrder): Schemas["KitchenStatusChange"][] {
+  let history = histories.get(order.id);
+  if (!history) {
+    history = [{ status: "PAID", at: order.placedAt ?? order.createdAt, by: "KIOSK" }];
+    histories.set(order.id, history);
+  }
+  return history;
+}
+
 export function kitchenOrder(order: StoredOrder): Schemas["KitchenOrder"] {
+  const history = historyOf(order);
   return {
     id: order.id,
     posCheckNumber: order.posCheckNumber ?? "",
@@ -40,10 +61,15 @@ export function kitchenOrder(order: StoredOrder): Schemas["KitchenOrder"] {
     status: order.status,
     placedAt: order.placedAt ?? order.createdAt,
     readyAt: order.readyAt,
+    updatedAt: history[history.length - 1].at,
+    version: history.length,
+    history,
     lines: order.orderItems.map((line) => ({
+      itemId: line.itemId,
       name: line.name,
       quantity: line.quantity,
       options: optionNames(line.options),
+      choices: optionChoices(line.options),
     })),
   };
 }
@@ -112,6 +138,7 @@ export const kitchenRoutes: Route[] = [
       }
       order.status = status;
       if (status === "READY") order.readyAt = now().toISOString();
+      historyOf(order).push({ status, at: now().toISOString(), by: "KITCHEN" });
       broadcastKitchen("order.status_changed", order);
       return ok(kitchenOrder(order));
     },

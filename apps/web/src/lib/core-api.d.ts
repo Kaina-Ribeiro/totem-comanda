@@ -364,7 +364,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Paid orders not yet collected, oldest first */
+        /**
+         * Open orders oldest first, or today's collected orders newest first
+         * @description `open` (default): PAID, PREPARING and READY orders, oldest `placedAt` first.
+         *     `collected` (plan G-K7, "Retirados hoje"): COLLECTED orders of the current
+         *     business day, newest `updatedAt` first, so the kitchen can find one and move
+         *     it back to READY.
+         */
         get: operations["listKitchenOrders"];
         put?: never;
         post?: never;
@@ -384,9 +390,16 @@ export interface paths {
         /**
          * Server-Sent Events for the kitchen screen
          * @description One event per change. `event: order.paid` and `event: order.status_changed`,
-         *     each with a `KitchenOrder` as JSON in `data`. A `: ping` comment every 15 s
-         *     keeps the connection open. If the stream drops, the kitchen falls back to
-         *     polling `GET /v1/kitchen/orders` every 2 s.
+         *     each with a `KitchenOrder` as JSON in `data`; a cancelled or not-collected
+         *     order is an `order.status_changed` with that status. `event: store.pace_changed`
+         *     carries a `StorePace` whenever the pace changes, including the automatic
+         *     resume after a pause. A `: ping` comment every 15 s keeps the connection open.
+         *     If the stream drops, the kitchen falls back to polling `GET /v1/kitchen/orders`
+         *     every 2 s.
+         *
+         *     Events can arrive late or twice. Clients keep the `KitchenOrder` with the
+         *     highest `version` and drop older ones, so a late event for an undone move
+         *     never puts a card back.
          */
         get: operations["streamKitchenEvents"];
         put?: never;
@@ -406,8 +419,87 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Move an order to PREPARING, READY or COLLECTED */
+        /**
+         * Move an order to PREPARING, READY or COLLECTED, forward or one step back
+         * @description Forward: PAID → PREPARING → READY → COLLECTED (PAID → READY is allowed too).
+         *     Back one step (plan decision 2, for "Desfazer" and "Voltar uma etapa"):
+         *     READY → PREPARING and COLLECTED → READY, only while the order's business day
+         *     is the current one. Anything else is `409 INVALID_STATUS_TRANSITION`.
+         *
+         *     Each change adds a `history` entry, sets `updatedAt` and increments `version`.
+         *     With `expectedVersion`, Go applies the move only if the order is still at that
+         *     version, else `409 STALE_ORDER_VERSION` (another screen moved it first).
+         */
         post: operations["updateKitchenOrderStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kitchen/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * "Acabou": mark an item or one option sold out for today, or back
+         * @description Plan G-K4. The kitchen marks what ran out without leaving its screen. The
+         *     ids come from the order line (`itemId`, `choices[].optionId`). Sold out
+         *     means today's business date, like `markItemSoldOut`; `soldOut: false` clears
+         *     it (the 5 s undo). Orders already placed stay open (KDS BR-027). Go changes
+         *     the menu ETag, so the next kiosk journey loads the new menu.
+         */
+        put: operations["setKitchenAvailability"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kitchen/close-day": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * "Encerrar o dia": every open order of today becomes NOT_COLLECTED
+         * @description Plan G-K9. Moves every PAID, PREPARING and READY order of the current business
+         *     day to NOT_COLLECTED (never COLLECTED: nobody handed them over), with a history
+         *     entry, and sends one `order.status_changed` per order. The owner still sees
+         *     them in the report. Calling it again with nothing open returns `count: 0`.
+         */
+        post: operations["closeKitchenDay"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kitchen/pace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The store's pace (Normal, Movimentado, Pausado) */
+        get: operations["getKitchenPace"];
+        /**
+         * Set the store's pace from the kitchen
+         * @description Plan G-K5 and decision 3: one store-level pace, set from the kitchen or the
+         *     back office (`setStorePace`). See `StorePace` for what each level does.
+         */
+        put: operations["setKitchenPace"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -858,6 +950,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/orders/{orderId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel a paid order that cannot be made
+         * @description Plan G-K11 and decision 12. Confirmed with the owner's login, not a PIN: the
+         *     kitchen screen asks for the owner's email and password, its BFF signs in with
+         *     `POST /v1/admin/auth/login`, calls this with that token and drops the token.
+         *     Allowed from PAID, PREPARING and READY; anything else is
+         *     `409 INVALID_STATUS_TRANSITION`. Sets CANCELLED with a history entry by OWNER
+         *     and sends `order.status_changed`. While the gateway is SIMULATED there is no
+         *     refund; from phase 4 a cancel of a paid order also needs the refund flow.
+         *     Cancelled orders count on their own line in the report, never in revenue.
+         */
+        post: operations["cancelOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/pace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The store's pace, for the back office home */
+        get: operations["getStorePace"];
+        /** Set the store's pace from the back office ("Pausar" on Início) */
+        put: operations["setStorePace"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/pace/wait-minutes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Minutes shown to the guest for each pace level
+         * @description Plan decision 4: `waitTime` is minutes per pace level, set by the owner.
+         *     Defaults: NORMAL 8, BUSY 15.
+         */
+        put: operations["setPaceWaitMinutes"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/reports/daily": {
         parameters: {
             query?: never;
@@ -894,7 +1052,7 @@ export interface components {
             }[];
         };
         /** @enum {string} */
-        ProblemCode: "UNAUTHORIZED" | "INVALID_CREDENTIALS" | "DEVICE_DISABLED" | "NOT_FOUND" | "VALIDATION_FAILED" | "IDEMPOTENCY_KEY_REUSED" | "NO_ACTIVE_MENU" | "ITEM_UNAVAILABLE" | "ORDER_TYPE_UNAVAILABLE" | "BASKET_ITEM_LIMIT_EXCEEDED" | "INVALID_COUPON" | "COUPON_ALREADY_APPLIED" | "ORDER_NOT_AWAITING_PAYMENT" | "PAYMENT_IN_PROGRESS" | "PAYMENT_NOT_CANCELLABLE" | "PAYMENT_NOT_AUTHORISED" | "SIMULATION_DISABLED" | "INVALID_STATUS_TRANSITION" | "SCHEDULE_OVERLAP" | "DISCOUNT_CODE_TAKEN";
+        ProblemCode: "UNAUTHORIZED" | "INVALID_CREDENTIALS" | "DEVICE_DISABLED" | "NOT_FOUND" | "VALIDATION_FAILED" | "IDEMPOTENCY_KEY_REUSED" | "NO_ACTIVE_MENU" | "ITEM_UNAVAILABLE" | "ORDER_TYPE_UNAVAILABLE" | "BASKET_ITEM_LIMIT_EXCEEDED" | "INVALID_COUPON" | "COUPON_ALREADY_APPLIED" | "ORDER_NOT_AWAITING_PAYMENT" | "PAYMENT_IN_PROGRESS" | "PAYMENT_NOT_CANCELLABLE" | "PAYMENT_NOT_AUTHORISED" | "SIMULATION_DISABLED" | "INVALID_STATUS_TRANSITION" | "SCHEDULE_OVERLAP" | "DISCOUNT_CODE_TAKEN" | "STALE_ORDER_VERSION";
         /**
          * Format: int64
          * @description Integer cents in BRL. 2800 = R$ 28,00.
@@ -965,6 +1123,10 @@ export interface components {
          *       "printerEnabled": false,
          *       "maintenanceMode": false,
          *       "atCapacityMode": false,
+         *       "pace": {
+         *         "pace": "NORMAL",
+         *         "pausedUntil": null
+         *       },
          *       "isOpen": true,
          *       "restaurant": {
          *         "locationId": "rst-padaria-01",
@@ -1022,8 +1184,21 @@ export interface components {
             printerEnabled: boolean;
             /** @example false */
             maintenanceMode: boolean;
-            /** @example false */
+            /**
+             * @description True while this device is at capacity in Aparelhos, or while the store's
+             *     pace is PAUSED. The kiosk then shows its at-capacity screen.
+             * @example false
+             */
             atCapacityMode: boolean;
+            /**
+             * @description The store's pace, so the paused screen can say when the kiosk comes back.
+             *     A change of pace changes the config ETag.
+             */
+            pace: {
+                pace: components["schemas"]["Pace"];
+                /** Format: date-time */
+                pausedUntil: string | null;
+            };
             /**
              * @description True when a menu is active now.
              * @example true
@@ -1576,8 +1751,12 @@ export interface components {
             description?: string | null;
             amount: components["schemas"]["Money"];
         };
-        /** @enum {string} */
-        OrderStatus: "AWAITING_PAYMENT" | "PAID" | "PREPARING" | "READY" | "COLLECTED" | "CANCELLED";
+        /**
+         * @description NOT_COLLECTED: still open when the kitchen closed the day (`closeKitchenDay`);
+         *     paid, never handed over. CANCELLED: cancelled by the owner (`cancelOrder`).
+         * @enum {string}
+         */
+        OrderStatus: "AWAITING_PAYMENT" | "PAID" | "PREPARING" | "READY" | "COLLECTED" | "CANCELLED" | "NOT_COLLECTED";
         CreateOrderRequest: {
             /** Format: uuid */
             orderNonce: string;
@@ -1787,7 +1966,9 @@ export interface components {
             /** @example 42 */
             posCheckNumber: string;
             /**
-             * @description Minutes. How it is computed is open question 2.
+             * @description Minutes: the owner's wait minutes for the current pace (NORMAL or BUSY;
+             *     `PaceWaitMinutes`). Plan decision 4 closes open question 2. Null only if
+             *     the owner cleared them.
              * @example 8
              */
             waitTime: number | null;
@@ -1798,31 +1979,58 @@ export interface components {
          *       "id": "ord-7f3a",
          *       "posCheckNumber": "42",
          *       "orderType": "TAKE_OUT",
-         *       "status": "PAID",
+         *       "status": "PREPARING",
          *       "placedAt": "2026-10-30T12:04:10Z",
          *       "readyAt": null,
+         *       "updatedAt": "2026-10-30T12:05:02Z",
+         *       "version": 2,
+         *       "history": [
+         *         {
+         *           "status": "PAID",
+         *           "at": "2026-10-30T12:04:10Z",
+         *           "by": "KIOSK"
+         *         },
+         *         {
+         *           "status": "PREPARING",
+         *           "at": "2026-10-30T12:05:02Z",
+         *           "by": "KITCHEN"
+         *         }
+         *       ],
          *       "lines": [
          *         {
+         *           "itemId": "itm-croque",
          *           "name": "Croque monsieur",
          *           "quantity": 1,
          *           "options": [
          *             "Brioche",
          *             "Ovo pochê"
+         *           ],
+         *           "choices": [
+         *             {
+         *               "optionId": "opt-brioche",
+         *               "name": "Brioche",
+         *               "quantity": 1
+         *             },
+         *             {
+         *               "optionId": "opt-ovo-poche",
+         *               "name": "Ovo pochê",
+         *               "quantity": 1
+         *             }
          *           ]
          *         },
          *         {
+         *           "itemId": "itm-cappuccino",
          *           "name": "Cappuccino",
          *           "quantity": 1,
          *           "options": [
          *             "Leite integral"
-         *           ]
-         *         },
-         *         {
-         *           "name": "Fermentação natural",
-         *           "quantity": 1,
-         *           "options": [
-         *             "Inteiro",
-         *             "fatiado"
+         *           ],
+         *           "choices": [
+         *             {
+         *               "optionId": "opt-leite-integral",
+         *               "name": "Leite integral",
+         *               "quantity": 1
+         *             }
          *           ]
          *         }
          *       ]
@@ -1837,16 +2045,119 @@ export interface components {
             placedAt: string;
             /** Format: date-time */
             readyAt: string | null;
+            /**
+             * Format: date-time
+             * @description Time of the last status change.
+             */
+            updatedAt: string;
+            /**
+             * @description 1 when paid, +1 on every status change. Clients keep the highest version
+             *     they have seen (stale-event guard, plan G-K3).
+             */
+            version: number;
+            /** @description Every status the order had, oldest first (plan G-K2). Starts with PAID. */
+            history: components["schemas"]["KitchenStatusChange"][];
             lines: {
+                /** @description For "Acabou" (`setKitchenAvailability`). */
+                itemId: string;
                 name: string;
                 quantity: number;
-                /** @description Option names, flattened, in pt-BR. */
+                /** @description Option names, flattened, in pt-BR. Same order as `choices`. */
                 options: string[];
+                /** @description The chosen options with their ids, flattened, in pt-BR. */
+                choices: {
+                    optionId: string;
+                    name: string;
+                    quantity: number;
+                }[];
             }[];
+        };
+        KitchenStatusChange: {
+            status: components["schemas"]["OrderStatus"];
+            /** Format: date-time */
+            at: string;
+            /**
+             * @description KIOSK for the payment, SYSTEM for automatic changes.
+             * @enum {string}
+             */
+            by: "KIOSK" | "KITCHEN" | "OWNER" | "SYSTEM";
         };
         KitchenStatusUpdate: {
             /** @enum {string} */
             status: "PREPARING" | "READY" | "COLLECTED";
+            /** @description Optional. The `version` the client saw; a different one is `409 STALE_ORDER_VERSION`. */
+            expectedVersion?: number;
+        };
+        KitchenAvailabilityUpdate: {
+            itemId: string;
+            /** @description Null marks the whole item; an id marks only that option of the item. */
+            optionId: string | null;
+            /** @description True sold out for today; false back in stock. */
+            soldOut: boolean;
+        };
+        KitchenAvailability: {
+            itemId: string;
+            optionId: string | null;
+            /**
+             * Format: date
+             * @description Today's business date while sold out; null when back in stock.
+             */
+            soldOutDate: string | null;
+        };
+        OrderCancelRequest: {
+            /** @enum {string} */
+            reason: "ITEM_SOLD_OUT" | "CANNOT_PREPARE" | "OTHER";
+            note?: string | null;
+        };
+        /**
+         * @description NORMAL: the kiosk sells, `waitTime` is the NORMAL minutes.
+         *     BUSY ("Movimentado"): the kiosk sells, `waitTime` is the BUSY minutes.
+         *     PAUSED: every kiosk shows the at-capacity screen until `pausedUntil`, when Go
+         *     returns to NORMAL by itself (server time, restaurant timezone).
+         * @enum {string}
+         */
+        Pace: "NORMAL" | "BUSY" | "PAUSED";
+        /**
+         * @example {
+         *       "pace": "PAUSED",
+         *       "pausedUntil": "2026-10-30T12:30:00Z",
+         *       "changedAt": "2026-10-30T12:15:00Z",
+         *       "changedBy": "KITCHEN",
+         *       "waitMinutes": {
+         *         "NORMAL": 8,
+         *         "BUSY": 15
+         *       }
+         *     }
+         */
+        StorePace: {
+            pace: components["schemas"]["Pace"];
+            /**
+             * Format: date-time
+             * @description Set only while PAUSED.
+             */
+            pausedUntil: string | null;
+            /** Format: date-time */
+            changedAt: string;
+            /**
+             * @description SYSTEM for the automatic resume.
+             * @enum {string}
+             */
+            changedBy: "KITCHEN" | "OWNER" | "SYSTEM";
+            waitMinutes: components["schemas"]["PaceWaitMinutes"];
+        };
+        StorePaceUpdate: {
+            pace: components["schemas"]["Pace"];
+            /**
+             * @description Required when `pace` is PAUSED, ignored otherwise.
+             * @enum {integer}
+             */
+            pauseMinutes?: 15 | 30;
+        };
+        PaceWaitMinutes: {
+            /** @example 8 */
+            NORMAL: number;
+            /** @example 15 */
+            BUSY: number;
         };
         OwnerLoginRequest: {
             /** Format: email */
@@ -2836,7 +3147,7 @@ export interface operations {
     listKitchenOrders: {
         parameters: {
             query?: {
-                status?: "open";
+                status?: "open" | "collected";
             };
             header?: never;
             path?: never;
@@ -2907,7 +3218,10 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
-            /** @description Not allowed from the current status (`INVALID_STATUS_TRANSITION`). */
+            /**
+             * @description Not allowed from the current status or day (`INVALID_STATUS_TRANSITION`), or
+             *     the order is no longer at `expectedVersion` (`STALE_ORDER_VERSION`).
+             */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -2916,6 +3230,107 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+        };
+    };
+    setKitchenAvailability: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KitchenAvailabilityUpdate"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KitchenAvailability"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    closeKitchenDay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Closed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Orders moved to NOT_COLLECTED.
+                         * @example 2
+                         */
+                        count: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getKitchenPace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current pace. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorePace"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setKitchenPace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorePaceUpdate"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorePace"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["ValidationFailed"];
         };
     };
     ownerLogin: {
@@ -4075,6 +4490,116 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    cancelOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orderId: components["parameters"]["OrderId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrderCancelRequest"];
+            };
+        };
+        responses: {
+            /** @description Cancelled. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KitchenOrder"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            /** @description Already collected, cancelled or not collected (`INVALID_STATUS_TRANSITION`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getStorePace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current pace. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorePace"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setStorePace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorePaceUpdate"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorePace"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    setPaceWaitMinutes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaceWaitMinutes"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorePace"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["ValidationFailed"];
         };
     };
     getDailyReport: {

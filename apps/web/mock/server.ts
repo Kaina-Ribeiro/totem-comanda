@@ -45,6 +45,8 @@ function deviceConfig(device: (typeof state.devices)[number]): Schemas["DeviceCo
     printerEnabled: device.printerEnabled,
     maintenanceMode: device.maintenanceMode,
     atCapacityMode: device.atCapacityMode,
+    // Store pace (contract 0.2.0): always NORMAL until the pace story is built.
+    pace: { pace: "NORMAL", pausedUntil: null },
     isOpen: active !== null && (r.isDineInAvailable || r.isTakeOutAvailable),
     restaurant: {
       locationId: r.id,
