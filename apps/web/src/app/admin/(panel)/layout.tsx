@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
-import { Suspense } from "react";
+import { connection } from "next/server";
+import { cache, Suspense } from "react";
 
 import { AdminNav } from "@/components/admin/nav";
 import { load } from "@/lib/admin/form";
 import { ADMIN_LOGIN, asOwner, signOut } from "@/lib/admin/session";
+import { loadStoreStatus } from "@/lib/admin/store-status";
 import { coreApi } from "@/lib/core/client";
 
 async function logout() {
@@ -27,7 +29,13 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
           <Suspense fallback={<StoreName name="Back office" />}>
             <Store />
           </Suspense>
+          <Suspense>
+            <StatusPill className="inline-flex min-[821px]:hidden" />
+          </Suspense>
         </div>
+        <Suspense>
+          <StatusPill className="mx-1.5 hidden min-[821px]:inline-flex" />
+        </Suspense>
         {/* The active link reads the URL: render it per request. */}
         <Suspense>
           <AdminNav />
@@ -59,8 +67,32 @@ async function Store() {
 
 function StoreName({ name }: { name: string }) {
   return (
-    <span className="truncate text-[12.5px] font-semibold text-muted min-[821px]:max-w-full">
+    <span className="hidden truncate text-[12.5px] font-semibold text-muted min-[821px]:block min-[821px]:max-w-full">
       {name}
+    </span>
+  );
+}
+
+// One status per request for both pills.
+const storeStatus = cache(async () => {
+  await connection();
+  return load(() => loadStoreStatus(new Date()));
+});
+
+/** "Totem aberto" under the brand (A1) or beside it on phones (A10); nothing when Go cannot answer. */
+async function StatusPill({ className }: { className: string }) {
+  const loaded = await storeStatus();
+  if ("error" in loaded) return null;
+  const { open, maintenance } = loaded.data;
+  const label = maintenance ? "Em manutenção" : open ? "Totem aberto" : "Totem fechado";
+  return (
+    <span
+      className={`h-7 items-center gap-1.5 self-start rounded-full px-2.5 text-xs font-bold whitespace-nowrap ${className} ${
+        open && !maintenance ? "bg-sage text-leaf" : "bg-butter text-detail-text"
+      }`}
+    >
+      <span className={`size-2 rounded-full ${open && !maintenance ? "bg-leaf" : "bg-detail"}`} />
+      {label}
     </span>
   );
 }
