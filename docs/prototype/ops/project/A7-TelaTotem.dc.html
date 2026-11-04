@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Back office · Tela do totem</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+:root{--paper:#F3EFE8;--surface:#FFFFFF;--ink:#2B211C;--muted:#625750;--line:#E5DDD2;--espresso:#4E3426;--night:#2A1C16;--crema:#B07A3A;--cremaText:#8A5A2B;--cremaBg:#EFE4C9;--leaf:#4F6B45;--leafBg:#DCDFD2;--danger:#A3472F;--dangerBg:#F4E1DB;--hover:#EFE9E1}
+body{margin:0;background:var(--paper)}
+*{box-sizing:border-box}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--crema);outline-offset:2px}
+.app{min-height:100vh;background:var(--paper);color:var(--ink);font-family:Manrope,system-ui,sans-serif;font-feature-settings:"tnum" 1;display:flex;flex-wrap:wrap;align-items:stretch;-webkit-font-smoothing:antialiased}
+.tap{transition:transform .12s ease,background-color .15s ease,border-color .15s ease,color .15s ease}
+.tap:active{transform:scale(.98)}
+.side{flex:1 1 236px;max-width:236px;background:var(--surface);border-right:1px solid var(--line);padding:20px 12px;display:flex;flex-direction:column;gap:16px}
+.brand{padding:0 10px;display:flex;flex-direction:column;gap:1px}
+.brand b{font-family:Fraunces,Georgia,serif;font-style:italic;font-weight:500;font-size:22px;letter-spacing:-0.01em}
+.brand span{font-size:12.5px;font-weight:600;color:var(--muted)}
+.navgroups{display:flex;flex-direction:column;gap:14px;scrollbar-width:none}.navgroups::-webkit-scrollbar{display:none}
+.navgroup{display:flex;flex-direction:column;gap:1px}
+.navhead{padding:0 10px 4px;font-size:12px;font-weight:600;color:var(--muted)}
+.nav-link{height:36px;padding:0 10px;border-radius: 9px;display:flex;align-items:center;gap:10px;white-space:nowrap;font-size:14px;font-weight:600;color:#4A3F38}
+.nav-link svg{width:18px;height:18px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;opacity:.75}
+.nav-link:hover{background:var(--hover);color:var(--ink)}
+.nav-link[aria-current=page]{background:var(--espresso);color:#FAF6F0;font-weight:700}
+.nav-link[aria-current=page] svg{opacity:1}
+.sair{margin-top:auto;padding:0 10px;font-size:13.5px;font-weight:700;color:var(--muted)}
+.main{flex:999 1 560px;min-width:0;max-width:1160px;padding:28px 36px 48px;display:flex;flex-direction:column;gap:18px}
+.card{border-radius: 14px;background:var(--surface);border:1px solid var(--line);padding:18px 20px;display:flex;flex-direction:column;gap:10px}
+.cardhead{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:28px}
+h1{margin:0;font-weight:700;font-size:28px;letter-spacing:-0.02em;line-height:1.15}
+h2{margin:0;font-weight:700;font-size:16px;letter-spacing:-0.01em}
+.sub{margin:0;font-size:14px;font-weight:500;color:var(--muted)}
+.link{font-size:13.5px;font-weight:700;color:var(--cremaText);white-space:nowrap}
+.link:hover{color:var(--espresso)}
+.btn{height:40px;padding:0 16px;border-radius: 10px;border:1px solid var(--line);background:var(--surface);display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:700;white-space:nowrap}
+.btn:hover{border-color:#D9CFC3;background:var(--hover)}
+.btn.sm{height:34px;padding:0 12px;font-size:13px}
+.list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column}
+.list>li{border-top:1px solid var(--line)}
+.list>li:first-child{border-top:0}
+.chip{height:24px;padding:0 10px;border-radius: 999px;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.row:hover{background:#FBF8F3}
+@media (max-width: 820px){.side{min-width:0;max-width:none;flex-basis:100%;border-right:0;border-bottom:1px solid var(--line);padding:12px 16px;gap:10px;flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:space-between}.side>.chip{order:2}.navgroups{order:3;flex-basis:100%;flex-direction:row;overflow-x:auto;gap:2px;margin:0 -16px;padding:0 16px}.navgroup{flex-direction:row}.navhead{display:none}.sair{display:none}.main{padding:20px 16px 40px}h1{font-size:24px}}
+@media (prefers-reduced-motion: reduce){.tap{transition:none}.tap:active{transform:none}}
+body{margin:0;background:#F3EFE8}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+.tap{transition:transform .12s ease,background-color .15s ease,box-shadow .15s ease}
+.tap:active{transform:scale(.97)}
+</style>
+</helmet>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><b>Comanda</b><span>Padaria Café e Trigo</span></div>
+    <span class="chip" style="margin: 0 6px; align-self: flex-start; height: 28px; background: #DCDFD2; color: #4F6B45"><span class="dot" style="background: #4F6B45"></span>Totem aberto</span>
+    <nav aria-label="Back office" class="navgroups">
+      <sc-for list="{{nav}}" as="g" hint-placeholder-count="4">
+        <div class="navgroup">
+          <sc-if value="{{g.hasTitle}}" hint-placeholder-val="{{true}}"><span class="navhead">{{g.title}}</span></sc-if>
+          <sc-for list="{{g.items}}" as="n" hint-placeholder-count="3"><a href="{{n.href}}" class="nav-link tap" aria-current="{{n.current}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="{{n.icon}}"/></svg>{{n.label}}</a></sc-for>
+        </div>
+      </sc-for>
+    </nav>
+    <a href="#sair" class="sair">Sair</a>
+  </aside>
+
+  <main class="main">
+    <header style="display: flex; flex-direction: column; gap: 4px">
+      <h1 style="margin: 0; font-family: Manrope, system-ui, sans-serif; font-weight: 700; font-size: 28px; letter-spacing: -0.02em">Tela do totem</h1>
+      <p style="margin: 0; font-size: 15px; font-weight: 600; color: #625750">O que o cliente vê quando ninguém está usando, e os avisos quando não dá para pedir.</p>
+    </header>
+
+    <section aria-labelledby="desc-h" style="border-radius: 14px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 22px; display: flex; flex-wrap: wrap; gap: 24px">
+      <div style="flex: 1 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <h2 id="desc-h" style="margin: 0; font-family: Manrope, system-ui, sans-serif; font-weight: 700; font-size: 18px; letter-spacing: -0.02em">Tela de descanso</h2>
+          <p style="margin: 0; font-size: 14px; font-weight: 600; color: #625750">As fotos passam em ordem. Sem nenhuma ligada, o totem usa a foto padrão.</p>
+        </div>
+        <ol style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 132px), 1fr)); gap: 12px">
+          <sc-for list="{{media}}" as="m" hint-placeholder-count="4">
+            <li style="display: flex; flex-direction: column; gap: 8px">
+              <div style="{{m.frameStyle}}">
+                <img src="{{m.img}}" alt="{{m.alt}}" style="width: 100%; height: 100%; object-fit: cover; display: block">
+                <span style="position: absolute; top: 8px; left: 8px; min-width: 26px; height: 26px; border-radius: 13px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800">{{m.n}}</span>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px">
+                <button type="button" role="switch" aria-checked="{{m.checked}}" aria-label="Mostrar foto {{m.n}}" onClick="{{m.toggle}}" class="tap" style="{{m.switchStyle}}"><span style="width: 18px; height: 18px; border-radius: 9px; background: #FFFFFF"></span></button>
+                <span style="display: flex; gap: 2px">
+                  <button type="button" aria-label="Mover foto {{m.n}} para antes" class="tap" style="width: 32px; height: 32px; border-radius: 16px; border: 0; background: #F3EFE8; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+                  <button type="button" aria-label="Mover foto {{m.n}} para depois" class="tap" style="width: 32px; height: 32px; border-radius: 16px; border: 0; background: #F3EFE8; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"></path></svg></button>
+                  <button type="button" aria-label="Remover foto {{m.n}}" class="tap" style="width: 32px; height: 32px; border-radius: 16px; border: 0; background: #F3EFE8; color: #A3472F; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"></path></svg></button>
+                </span>
+              </div>
+            </li>
+          </sc-for>
+          <li>
+            <button type="button" class="tap" style="width: 100%; aspect-ratio: 9 / 16; box-sizing: border-box; border-radius: 16px; border: 2px dashed #D8B98A; background: #FBF8F3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 10px; text-align: center">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#8A5A2B" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+              <span style="font-size: 14px; font-weight: 800; color: #8A5A2B">Adicionar foto</span>
+              <span style="font-size: 11px; font-weight: 700; color: #625750">JPG, PNG ou WebP · ideal 1080 × 1920</span>
+            </button>
+          </li>
+        </ol>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+          <span style="font-size: 15px; font-weight: 800">Cada foto fica</span>
+          <span style="display: flex; align-items: center; gap: 4px; height: 44px; padding: 0 4px; border-radius: 14px; background: #F3EFE8">
+            <button type="button" aria-label="Menos segundos" onClick="{{dec}}" class="tap" style="width: 36px; height: 36px; border-radius: 12px; border: 0; background: #FFFFFF; font-size: 18px; font-weight: 800">−</button>
+            <span aria-live="polite" style="min-width: 54px; text-align: center; font-size: 15px; font-weight: 800">{{secs}} s</span>
+            <button type="button" aria-label="Mais segundos" onClick="{{inc}}" class="tap" style="width: 36px; height: 36px; border-radius: 12px; border: 0; background: #FFFFFF; font-size: 18px; font-weight: 800">+</button>
+          </span>
+          <span style="font-size: 13px; font-weight: 600; color: #625750">Entre 5 e 60 s. Uma volta completa leva {{loop}} s.</span>
+        </div>
+      </div>
+      <figure style="margin: 0; flex: 0 0 236px; display: flex; flex-direction: column; gap: 8px">
+        <figcaption style="font-size: 13px; font-weight: 700; color: #625750">Prévia no totem</figcaption>
+        <div style="width: 236px; height: 420px; box-sizing: border-box; border-radius: 14px; position: relative; overflow: hidden; background: #2A1C16; box-shadow: 0 0 0 6px #E9E2D7">
+          <img src="/_blob/cd7fe9ec0755aec191b23b43b626a4d9" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover">
+          <div style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(42,28,22,0) 40%, rgba(42,28,22,.82) 100%)"></div>
+          <span style="position: absolute; top: 16px; left: 16px; font-family: Fraunces, Georgia, serif; font-style: italic; font-size: 14px; color: #FAF6F0">Café e Trigo</span>
+          <div style="position: absolute; left: 16px; right: 16px; bottom: 18px; display: flex; flex-direction: column; gap: 10px; color: #FAF6F0">
+            <span style="font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 28px; line-height: 0.98">Fornada fresca, sem fila.</span>
+            <span style="display: flex; gap: 5px"><span style="width: 18px; height: 5px; border-radius: 3px; background: #FAF6F0"></span><span style="width: 5px; height: 5px; border-radius: 3px; background: rgba(250,246,240,.5)"></span><span style="width: 5px; height: 5px; border-radius: 3px; background: rgba(250,246,240,.5)"></span></span>
+            <span style="height: 34px; border-radius: 17px; background: #FAF6F0; color: #4E3426; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800">Toque para começar</span>
+          </div>
+        </div>
+      </figure>
+    </section>
+
+    <section aria-labelledby="avisos-h" style="border-radius: 14px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 22px; display: flex; flex-direction: column; gap: 16px">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <h2 id="avisos-h" style="margin: 0; font-family: Manrope, system-ui, sans-serif; font-weight: 700; font-size: 18px; letter-spacing: -0.02em">Avisos</h2>
+        <p style="margin: 0; font-size: 14px; font-weight: 600; color: #625750">Aparecem no lugar do cardápio. Datas especiais podem ter aviso próprio.</p>
+      </div>
+      <div role="tablist" aria-label="Situação" style="display: flex; flex-wrap: wrap; gap: 6px">
+        <sc-for list="{{tabs}}" as="t" hint-placeholder-count="3">
+          <button type="button" role="tab" aria-selected="{{t.selected}}" onClick="{{t.pick}}" class="tap" style="{{t.style}}">{{t.label}}</button>
+        </sc-for>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 14px">
+        <div style="display: flex; flex-direction: column; gap: 12px">
+          <span style="font-size: 13px; font-weight: 600; color: #625750">Português</span>
+          <label style="display: flex; flex-direction: column; gap: 6px"><span style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: #625750"><span>Título</span><span>{{ptTitleCount}} / 50</span></span><input type="text" value="{{msg.ptTitle}}" style="height: 44px; box-sizing: border-box; border-radius: 12px; border: 1px solid #E5DDD2; padding: 0 12px; font-size: 15px; font-weight: 700"></label>
+          <label style="display: flex; flex-direction: column; gap: 6px"><span style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: #625750"><span>Texto</span><span>{{ptBodyCount}} / 140</span></span><textarea rows="2" style="box-sizing: border-box; border-radius: 12px; border: 1px solid #E5DDD2; padding: 10px 12px; font-size: 15px; font-weight: 600; resize: vertical" value="{{msg.ptBody}}"></textarea></label>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 12px">
+          <span style="font-size: 13px; font-weight: 600; color: #625750">Inglês</span>
+          <label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: 700; color: #625750">Título</span><input type="text" value="{{msg.enTitle}}" style="height: 44px; box-sizing: border-box; border-radius: 12px; border: 1px solid #E5DDD2; padding: 0 12px; font-size: 15px; font-weight: 700"></label>
+          <label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: 700; color: #625750">Texto</span><textarea rows="2" style="box-sizing: border-box; border-radius: 12px; border: 1px solid #E5DDD2; padding: 10px 12px; font-size: 15px; font-weight: 600; resize: vertical" value="{{msg.enBody}}"></textarea></label>
+        </div>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+        <button type="button" class="tap" style="height: 44px; padding: 0 4px; border: 0; background: transparent; font-size: 14px; font-weight: 800; color: #8A5A2B">Restaurar texto padrão</button>
+        <span style="flex-grow: 1"></span>
+        <button type="button" class="tap" style="height: 46px; padding: 0 24px; border-radius: 14px; border: 0; background: #4E3426; color: #FAF6F0; font-size: 15px; font-weight: 800">Salvar</button>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1300}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { secs: 15, off: ['4'], tab: 'paused' };
+  }
+  renderVals() {
+    const ACTIVE = 'tela';
+    const NAV = [
+      { title: '', items: [['Início', 'A1-Inicio.dc.html', 'inicio']] },
+      { title: 'Operação', items: [['Pedidos', 'A2-Pedidos.dc.html', 'pedidos'], ['Esgotados', 'A4-Esgotados.dc.html', 'esgotados'], ['Relatório', 'A9-Relatorio.dc.html', 'relatorio']] },
+      { title: 'Cardápio', items: [['Cardápios', '#cardapios', 'cardapios'], ['Categorias', '#categorias', 'categorias'], ['Itens', 'A6-Item.dc.html', 'itens'], ['Selos e sugestões', '#selos', 'selos'], ['Cupons', 'A8-Cupom.dc.html', 'cupons']] },
+      { title: 'Loja', items: [['Horários', 'A5-Datas.dc.html', 'horarios'], ['Tela do totem', 'A7-TelaTotem.dc.html', 'tela'], ['Aparelhos', '#aparelhos', 'aparelhos'], ['Loja e conta', '#loja', 'loja']] }
+    ];
+    const ICON = {
+      inicio: 'M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z',
+      pedidos: 'M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3',
+      esgotados: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM5.6 5.6l12.8 12.8',
+      relatorio: 'M4 20h16M7 16v-5M12 16V7M17 16v-8',
+      cardapios: 'M5 4h12a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2zM9 8h6M9 12h4',
+      categorias: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+      itens: 'M3 12V4h8l10 10-8 8zM7.5 7.5h.01',
+      selos: 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z',
+      cupons: 'M3 7h18v3a2 2 0 0 0 0 4v3H3v-3a2 2 0 0 0 0-4zM14 7v10',
+      horarios: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 7v5l3 2',
+      tela: 'M7 2h10a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zM10 18h4',
+      aparelhos: 'M4 5h16v11H4zM9 20h6M12 16v4',
+      loja: 'M4 9l1.5-5h13L20 9M4 9h16v11H4zM10 20v-6h4v6'
+    };
+    const nav = NAV.map((g) => ({ title: g.title, hasTitle: !!g.title, items: g.items.map(([label, href, id]) => ({ label, href, icon: ICON[id], current: id === ACTIVE ? 'page' : 'false' })) }));
+
+    const M = [
+      ['1', '/_blob/cd7fe9ec0755aec191b23b43b626a4d9', 'Balcão com pães da fornada'],
+      ['2', '/_blob/860fafdf654ea40eaa5928635ff13c15', 'Croissants'],
+      ['3', '/_blob/d943fe23fe05a225fb622148dd744229', 'Cappuccino'],
+      ['4', '/_blob/3bfc57d9ac2170083c0154bcc8c3913d', 'Pães de fermentação natural']
+    ];
+    const off = this.state.off;
+    const media = M.map(([n, img, alt]) => {
+      const on = !off.includes(n);
+      return {
+        n, img, alt, checked: on ? 'true' : 'false',
+        toggle: () => this.setState({ off: on ? off.concat(n) : off.filter((x) => x !== n) }),
+        frameStyle: 'position: relative; aspect-ratio: 9 / 16; border-radius: 16px; overflow: hidden; background: #E9E2D7;' + (on ? '' : ' opacity: 0.4; filter: grayscale(1);'),
+        switchStyle: 'width: 42px; height: 24px; flex-shrink: 0; border-radius: 12px; border: 0; padding: 3px; box-sizing: border-box; display: flex; justify-content: ' + (on ? 'flex-end' : 'flex-start') + '; background: ' + (on ? '#4E3426' : '#C9C1B6') + ';'
+      };
+    });
+    const secs = this.state.secs;
+    const active = M.length - off.length;
+    const MSG = {
+      closed: { label: 'Fechado', ptTitle: 'Fechado agora', ptBody: 'Voltamos amanhã às 06:00. Até logo!', enTitle: 'Closed now', enBody: 'We open tomorrow at 6am. See you soon!' },
+      paused: { label: 'Pausado (muitos pedidos)', ptTitle: 'Estamos com muitos pedidos', ptBody: 'Peça no balcão ou volte em alguns minutos.', enTitle: 'We are very busy right now', enBody: 'Please order at the counter or come back in a few minutes.' },
+      down: { label: 'Indisponível', ptTitle: 'Totem fora do ar', ptBody: 'Faça seu pedido no balcão. Já estamos resolvendo.', enTitle: 'Kiosk unavailable', enBody: 'Please order at the counter. We are on it.' }
+    };
+    const tab = this.state.tab;
+    const tabs = Object.keys(MSG).map((id) => {
+      const on = id === tab;
+      return { label: MSG[id].label, selected: on ? 'true' : 'false', pick: () => this.setState({ tab: id }), style: 'height: 40px; padding: 0 16px; border-radius: 12px; font-size: 14px; font-weight: 800; ' + (on ? 'border: 0; background: #4E3426; color: #FAF6F0;' : 'border: 1px solid #E5DDD2; background: #FFFFFF; color: #2B211C;') };
+    });
+    const msg = MSG[tab];
+    return {
+      nav, media, secs, loop: secs * active,
+      inc: () => this.setState({ secs: Math.min(60, secs + 5) }),
+      dec: () => this.setState({ secs: Math.max(5, secs - 5) }),
+      tabs, msg, ptTitleCount: msg.ptTitle.length, ptBodyCount: msg.ptBody.length
+    };
+  }
+}
+</script>
+</body>
+</html>

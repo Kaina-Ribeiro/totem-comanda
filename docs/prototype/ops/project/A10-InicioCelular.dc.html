@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Back office · Início no celular</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button{font:inherit;color:inherit;cursor:pointer}
+.tap{transition:transform .12s ease,background-color .15s ease}
+.tap:active{transform:scale(.97)}
+nav{scrollbar-width:none}nav::-webkit-scrollbar{display:none}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F3EFE8; color: #2B211C; font-family: Manrope, system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <header style="background: #FFFFFF; border-bottom: 1px solid #E5DDD2; padding: 14px 16px 10px; display: flex; flex-direction: column; gap: 10px">
+    <div style="display: flex; align-items: center; justify-content: space-between">
+      <span style="font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 500; font-size: 22px">Comanda</span>
+      <span style="{{pillStyle}}"><span style="{{dotStyle}}"></span>{{pill}}</span>
+    </div>
+    <nav aria-label="Back office" style="display: flex; gap: 6px; overflow-x: auto; margin: 0 -16px; padding: 0 16px">
+      <a href="A1-Inicio.dc.html" aria-current="page" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; background: #EAD9C6; display: flex; align-items: center; font-size: 14px; font-weight: 800">Início</a>
+      <a href="A2-Pedidos.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Pedidos</a>
+      <a href="A4-Esgotados.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Esgotados</a>
+      <a href="A9-Relatorio.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Relatório</a>
+      <a href="A6-Item.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Cardápio</a>
+    </nav>
+  </header>
+
+  <main style="flex-grow: 1; min-height: 0; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+    <div style="display: flex; align-items: baseline; justify-content: space-between">
+      <h1 style="margin: 0; font-family: Manrope, system-ui, sans-serif; font-weight: 700; font-size: 24px; letter-spacing: -0.02em">Boa tarde</h1>
+      <span style="font-size: 13px; font-weight: 700; color: #625750">Qua, 4 nov · 10:42</span>
+    </div>
+
+    <section aria-label="Totem e ritmo" style="{{cardStyle}}">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <span style="font-size: 17px; font-weight: 800">{{statusTitle}}</span>
+        <span style="font-size: 13px; font-weight: 600; color: #625750">{{statusText}}</span>
+      </div>
+      <div role="radiogroup" aria-label="Ritmo da cozinha" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 12px; background: #F3EFE8">
+        <sc-for list="{{paces}}" as="p" hint-placeholder-count="3">
+          <button type="button" role="radio" aria-checked="{{p.checked}}" onClick="{{p.pick}}" class="tap" style="{{p.style}}">{{p.label}}</button>
+        </sc-for>
+      </div>
+    </section>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+      <a href="A9-Relatorio.dc.html" class="tap" style="border-radius: 12px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px">
+        <span style="font-size: 12px; font-weight: 700; color: #625750">Faturamento hoje</span>
+        <span style="font-family: Manrope, system-ui, sans-serif; font-weight: 700; font-size: 18px; letter-spacing: -0.02em">R$ 1.284,60</span>
+        <span style="font-size: 12px; font-weight: 700; color: #4F6B45">+12% que na quarta passada</span>
+      </a>
+      <a href="A2-Pedidos.dc.html" class="tap" style="border-radius: 12px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px">
+        <span style="font-size: 12px; font-weight: 700; color: #625750">Pedidos</span>
+        <span style="font-family: Manrope, system-ui, sans-serif; font-weight: 700; font-size: 18px; letter-spacing: -0.02em">47</span>
+        <span style="font-size: 12px; font-weight: 700; color: #625750">6 na cozinha agora</span>
+      </a>
+    </div>
+
+    <p role="status" style="margin: 0; padding: 10px 12px; border-radius: 14px; background: #F4E1DB; color: #8C3A24; font-size: 13px; font-weight: 800">Pedido 41 esperando há 12 min na cozinha</p>
+
+    <section aria-labelledby="pv" style="border-radius: 12px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 14px; display: flex; flex-direction: column; gap: 8px">
+      <div style="display: flex; justify-content: space-between; align-items: baseline">
+        <h2 id="pv" style="margin: 0; font-family: Manrope, system-ui, sans-serif; font-weight: 700; font-size: 17px; letter-spacing: -0.02em">Pronto para vender?</h2>
+        <span style="font-size: 12px; font-weight: 800"><span style="color: #A3472F">2 erros</span> · <span style="color: #8A5A2B">3 avisos</span></span>
+      </div>
+      <a href="A6-Item.dc.html" style="display: flex; gap: 10px; align-items: flex-start; padding-top: 8px; border-top: 1px solid #E5DDD2"><span style="flex-shrink: 0; height: 22px; padding: 0 8px; border-radius: 11px; background: #A3472F; color: #FFFFFF; display: flex; align-items: center; font-size: 11px; font-weight: 800">Erro</span><span style="font-size: 13px; font-weight: 600; line-height: 1.4">Croque monsieur: só 1 de 3 pães disponível.</span></a>
+      <a href="A6-Item.dc.html" style="display: flex; gap: 10px; align-items: flex-start; padding-top: 8px; border-top: 1px solid #E5DDD2"><span style="flex-shrink: 0; height: 22px; padding: 0 8px; border-radius: 11px; background: #A3472F; color: #FFFFFF; display: flex; align-items: center; font-size: 11px; font-weight: 800">Erro</span><span style="font-size: 13px; font-weight: 600; line-height: 1.4">Tarte de limão sem preço no Cardápio da tarde.</span></a>
+      <a href="A1-Inicio.dc.html" style="padding-top: 4px; font-size: 13px; font-weight: 800; color: #8A5A2B">Ver os 5 pontos</a>
+    </section>
+
+    <a href="A4-Esgotados.dc.html" class="tap" style="min-height: 56px; border-radius: 12px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 0 14px; display: flex; align-items: center; justify-content: space-between">
+      <span style="display: flex; flex-direction: column"><span style="font-size: 15px; font-weight: 800">Esgotados hoje: 3</span><span style="font-size: 12px; font-weight: 600; color: #625750">Croissant de amêndoas, leite de aveia…</span></span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"></path></svg>
+    </a>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { pace: 'normal' };
+  }
+  renderVals() {
+    const pace = this.state.pace;
+    const paces = [['normal', 'Normal'], ['busy', 'Movimentado'], ['paused', 'Pausar']].map(([id, label]) => {
+      const on = id === pace;
+      return { label, checked: on ? 'true' : 'false', pick: () => this.setState({ pace: id }), style: 'height: 44px; border-radius: 14px; border: 0; font-size: 14px; font-weight: 800; ' + (on ? 'background: #FFFFFF; box-shadow: 0 1px 3px rgba(28,28,26,.14);' : 'background: transparent; color: #625750;') };
+    });
+    const paused = pace === 'paused';
+    const busy = pace === 'busy';
+    return {
+      paces,
+      statusTitle: paused ? 'Totem pausado até 10:57' : busy ? 'Aberto · movimentado' : 'Totem aberto',
+      statusText: paused ? 'O cliente vê “Estamos com muitos pedidos”.' : busy ? 'O totem avisa ~15 min de espera.' : 'Cardápio da tarde até 20:00 · ~8 min de espera',
+      cardStyle: 'border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px; border: 1px solid ' + (paused ? '#E4C9A5' : '#E5DDD2') + '; background: ' + (paused ? '#EFE4C9' : '#FFFFFF') + ';',
+      pill: paused ? 'Pausado' : 'Aberto',
+      pillStyle: 'height: 28px; padding: 0 10px; border-radius: 14px; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; background: ' + (paused ? '#EFE4C9' : '#DCDFD2') + ';',
+      dotStyle: 'width: 7px; height: 7px; border-radius: 4px; background: ' + (paused ? '#B07A3A' : '#4F6B45') + ';'
+    };
+  }
+}
+</script>
+</body>
+</html>

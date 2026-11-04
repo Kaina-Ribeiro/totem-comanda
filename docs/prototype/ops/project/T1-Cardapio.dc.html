@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Totem · Cardápio com item esgotado</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button{font:inherit;color:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 720px; height: 1280px; box-sizing: border-box; background: #F3EFE8; color: #2B211C; font-family: Manrope, system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <header style="display: flex; justify-content: space-between; align-items: center; padding: 28px 32px 20px">
+    <div style="display: flex; align-items: center; gap: 20px">
+      <div style="font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 500; font-size: 26px">Café e Trigo</div>
+      <a href="#tipo" style="display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 18px; border-radius: 24px; background: #FFFFFF; font-size: 17px; font-weight: 700"><span>Para viagem</span><span style="color: #8A5A2B">Trocar</span></a>
+    </div>
+    <a href="#cancelar" aria-label="Cancelar pedido" style="width: 56px; height: 56px; border-radius: 28px; background: #FFFFFF; display: flex; align-items: center; justify-content: center">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+    </a>
+  </header>
+
+  <div style="flex-grow: 1; display: flex; min-height: 0">
+    <nav aria-label="Categorias" style="width: 176px; flex-shrink: 0; display: flex; flex-direction: column; gap: 6px; padding: 8px 12px 0 20px">
+      <sc-for list="{{categories}}" as="cat" hint-placeholder-count="6">
+        <button type="button" aria-pressed="{{cat.pressed}}" style="{{cat.style}}"><span style="{{cat.dotStyle}}"></span><span>{{cat.label}}</span></button>
+      </sc-for>
+    </nav>
+
+    <main style="flex-grow: 1; min-width: 0; background: #FFFFFF; border-radius: 32px 0 0 0; padding: 32px 28px 0 32px; display: flex; flex-direction: column; gap: 24px; overflow: hidden">
+      <div style="display: flex; justify-content: space-between; align-items: baseline">
+        <h1 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 48px; letter-spacing: -0.02em">Doces</h1>
+        <div style="font-size: 17px; font-weight: 600; color: #625750">6 opções</div>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 20px">
+        <sc-for list="{{items}}" as="item" hint-placeholder-count="6">
+          <div style="display: flex; flex-direction: column; gap: 12px" aria-disabled="{{item.disabled}}">
+            <div style="{{item.frameStyle}}">
+              <sc-if value="{{item.hasImg}}" hint-placeholder-val="{{true}}">
+                <img src="{{item.img}}" alt="{{item.name}}" style="{{item.imgStyle}}">
+              </sc-if>
+              <sc-if value="{{item.noImg}}" hint-placeholder-val="{{false}}">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#978B80" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"></rect><circle cx="8.5" cy="8.5" r="1.8"></circle><path d="M21 15l-5-5L5 21"></path></svg>
+              </sc-if>
+              <sc-if value="{{item.popular}}" hint-placeholder-val="{{false}}">
+                <div style="position: absolute; top: 12px; left: 12px; padding: 6px 12px; border-radius: 12px; background: #FFFFFF; font-size: 14px; font-weight: 700">Mais pedido</div>
+              </sc-if>
+              <sc-if value="{{item.out}}" hint-placeholder-val="{{false}}">
+                <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center"><span style="padding: 10px 18px; border-radius: 16px; background: #2B211C; color: #FAF6F0; font-size: 18px; font-weight: 800">Esgotado</span></div>
+              </sc-if>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px">
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <div style="{{item.nameStyle}}">{{item.name}}</div>
+                <div style="{{item.priceStyle}}">{{item.price}}</div>
+              </div>
+              <sc-if value="{{item.canAdd}}" hint-placeholder-val="{{true}}">
+                <a href="T2-Item.dc.html" aria-label="Adicionar {{item.name}}" style="width: 44px; height: 44px; flex-shrink: 0; box-sizing: border-box; border-radius: 22px; border: 2px solid #2B211C; display: flex; align-items: center; justify-content: center">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+                </a>
+              </sc-if>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </main>
+  </div>
+
+  <div style="padding: 20px 32px 32px; background: #FFFFFF">
+    <a href="#carrinho" style="height: 108px; border-radius: 54px; background: #4E3426; color: #FAF6F0; display: flex; align-items: center; justify-content: space-between; padding: 0 44px">
+      <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 16px; font-weight: 600; color: #D9C8B8">3 itens</span><span style="font-size: 26px; font-weight: 700">Ver meu pedido</span></div>
+      <span style="font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 36px; letter-spacing: -0.02em">R$ 82,80</span>
+    </a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":720,"height":1280}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const CATS = [['Pães', '#EFE4C9'], ['Doces', '#EAD9C6'], ['Salgados', '#DCDFD2'], ['Sanduíches', '#E2DED8'], ['Cafés', '#EFE4C9'], ['Bebidas', '#DCDFD2']];
+    const base = 'display: flex; align-items: center; gap: 12px; width: 100%; min-height: 72px; padding: 0 14px; border-radius: 18px; text-align: left; font-size: 20px; border: 0;';
+    const categories = CATS.map(([label, tint]) => {
+      const on = label === 'Doces';
+      return {
+        label, pressed: on ? 'true' : 'false',
+        style: base + (on ? ' background: ' + tint + '; color: #2B211C; font-weight: 800;' : ' background: transparent; color: #625750; font-weight: 600;'),
+        dotStyle: 'width: 10px; height: 10px; border-radius: 5px; flex-shrink: 0; background: ' + tint + '; box-shadow: inset 0 0 0 1px rgba(43,33,28,0.15);'
+      };
+    });
+    const B = (id) => '/_blob/' + id;
+    const I = [
+      { name: 'Cupcake de baunilha', price: 'R$ 14,90', popular: true, img: B('6828920dc996e902596fb8a60faffde4') },
+      { name: 'Donut de morango', price: 'R$ 11,90', img: B('7e1c18f9c991585ad647bc4bae6394be') },
+      { name: 'Cookie de chocolate', price: 'R$ 9,90', img: B('122354594eef3a4751c7ec91ff81b926') },
+      { name: 'Cupcake de chocolate', price: 'R$ 14,90', img: B('b1ca07d7966be9cc00019486bd8b7031') },
+      { name: 'Croissant de amêndoas', price: 'Volta amanhã', img: B('860fafdf654ea40eaa5928635ff13c15'), out: true },
+      { name: 'Tarte de limão', price: 'R$ 21,90' }
+    ];
+    const items = I.map((i) => ({
+      name: i.name, price: i.price,
+      popular: !!i.popular, out: !!i.out, canAdd: !i.out, disabled: i.out ? 'true' : 'false',
+      hasImg: !!i.img, noImg: !i.img, img: i.img || '',
+      frameStyle: 'height: 160px; border-radius: 20px; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; background: #EAD9C6;',
+      imgStyle: 'width: 100%; height: 100%; object-fit: cover; display: block;' + (i.out ? ' filter: grayscale(1); opacity: 0.45;' : ''),
+      nameStyle: 'font-size: 20px; font-weight: 700; line-height: 1.2;' + (i.out ? ' color: #625750;' : ''),
+      priceStyle: 'font-size: 19px; font-weight: 600; color: ' + (i.out ? '#625750' : '#6B4430') + ';'
+    }));
+    return { categories, items };
+  }
+}
+</script>
+</body>
+</html>
