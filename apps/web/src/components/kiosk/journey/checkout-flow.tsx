@@ -13,6 +13,7 @@ import {
 } from "@/app/kiosk/actions";
 import { formatBRL } from "@/lib/format/money";
 import type { Result } from "@/lib/kiosk/core";
+import { clearLostPayment, type UnknownAttempt } from "@/lib/kiosk/payment-recovery";
 import { format, type Strings } from "@/lib/kiosk/strings";
 
 import { ChevronLeft } from "../icons";
@@ -92,6 +93,8 @@ export function CheckoutFlow({
   const [paymentKey, setPaymentKey] = useState(() => crypto.randomUUID());
   // Set while an attempt runs, so a double tap cannot start a second payment.
   const attempting = useRef(false);
+  // Attempts that got no answer: Go may have made their payment (COM-97).
+  const unknownAttempts = useRef<UnknownAttempt[]>([]);
   const checkout = journey.checkout!;
   const total = checkout.order?.orderTotal.total ?? currentQuote(journey)?.total ?? 0;
 
@@ -173,7 +176,29 @@ export function CheckoutFlow({
       order = created.data;
       onOrderCreated(order);
     }
-    const started = await settle(startPayment(order.id, method, key));
+    let started = await start(order.id, method, key);
+    if (!started.ok && started.code === "PAYMENT_IN_PROGRESS") {
+      // An earlier attempt's answer was lost but Go made that payment: clear it first.
+      const recovery = await clearLostPayment(
+        order.id,
+        unknownAttempts.current.filter((a) => a.key !== key),
+        {
+          startPayment: (...args) => settle(startPayment(...args)),
+          pollPayment: (id) => settle(pollPayment(id)),
+          cancelPayment: (id) => settle(cancelPayment(id)),
+        },
+      );
+      unknownAttempts.current = unknownAttempts.current.filter(
+        (a) => !recovery.settled.includes(a.key),
+      );
+      if (recovery.outcome === "paid") return place(method, order);
+      if (recovery.outcome === "free") {
+        // A fresh key: Go may have stored the refusal under the old one.
+        const fresh = crypto.randomUUID();
+        setPaymentKey(fresh);
+        started = await start(order.id, method, fresh);
+      }
+    }
     if (started.ok) {
       setStep({ kind: "authorising", method, payment: started.data, cancelling: false });
     } else if (started.code === "ORDER_NOT_AWAITING_PAYMENT") {
@@ -182,6 +207,15 @@ export function CheckoutFlow({
     } else {
       fail(method, started);
     }
+  }
+
+  /** Starts a payment, remembering it while Go's answer is unknown. */
+  async function start(orderId: string, method: PaymentMethod, key: string) {
+    const attempts = unknownAttempts.current.filter((a) => a.key !== key);
+    unknownAttempts.current = [...attempts, { key, method }];
+    const started = await settle(startPayment(orderId, method, key));
+    if (started.ok || started.code !== "CORE_UNAVAILABLE") unknownAttempts.current = attempts;
+    return started;
   }
 
   const newAttempt = (method: PaymentMethod) => {
