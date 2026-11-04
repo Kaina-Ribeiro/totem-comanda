@@ -77,7 +77,7 @@ pilot · **Phase 4** = with the payment terminal, printers and NFC-e.
 | G-A1 | **Real Início**: today's revenue, orders and average ticket; kiosk and kitchen online; menu live now and next switch; kitchen pace with Pausar; sold out today; catalogue problems. Also fixes COM-67 (fixed "Bom dia!") | Dashboard FEAT-012, ACT-032; BFF health "minutes since last order" | P1 | No (existing endpoints) | A1, A10 |
 | G-A2 | **Pedidos**: orders of a day, filter by status, search by number, detail with lines, coupon, total, payment and timeline; cancelled and "não retirado" orders included | Dashboard FEAT-074, SCR-153/154, BR-049 | P1 | Yes: `GET /v1/admin/orders`, `GET /v1/admin/orders/{id}` | A2 |
 | G-A3 | Refund dialog: full or partial, amount ≤ paid − refunded, reason (item esgotado, cancelamento, reclamação), irreversible confirmation | Dashboard FEAT-074 DLG-009 FORM-085 BR-047; KDS FEAT-025 BR-009/010/011 | Phase 4 | Yes | A3 |
-| G-A4 | **Sold out with a duration, and hidden ≠ sold out**: "só hoje", "até eu liberar", "até uma data"; separate "Mostrar no totem" switch (sold out shows greyed, hidden disappears); options can be sold out too | Dashboard DLG-005, CFG-181/182/183/188, BR-241/242, FEAT-034 | P1 | Yes: `unavailableUntil`, `visible`, option availability | A4 |
+| G-A4 | **Sold out with a duration, and hidden ≠ sold out**: "só hoje", "até eu liberar", "até uma data"; separate "Mostrar no totem" switch (sold out shows greyed, hidden disappears); options can be sold out too. The kitchen reads back what is sold out, so "Esgotado hoje" survives a reload (COM-100) | Dashboard DLG-005, CFG-181/182/183/188, BR-241/242, FEAT-034; KDS FEAT-045, SCR-021 | P1 | Yes: `unavailableUntil`, `visible`, option availability, `GET /v1/kitchen/availability` | A4 |
 | G-A5 | **Special dates**: closed day or special hours, one day or a range, message to the guest in PT and EN, list with Agendada / Hoje / Encerrada | Dashboard FEAT-030, FORM-024, JOURNEY-006, BR-017/018/019 | P1 | Yes: special dates CRUD; Go applies them to `isOpen`, `nextOpeningAt`, `closedMessage` | A5, T4 |
 | G-A6 | **Change password**. Forgot password stays a manual reset for the pilot (no email sender yet) | Dashboard FEAT-010 FORM-005, FEAT-001 DLG-001 | P1 | Yes | — (simple form) |
 | G-A7 | **Allergens on the item**: "não informado" / "sem alergênicos" / list; "pode conter" (traces); vegetariano, vegano; calories optional. The spec uses free tags; the fixed ANVISA list is our decision 7 | Dashboard FEAT-033 CFG-191/213, FEAT-037, FEAT-070, BR-045, DEP-F32 | P2 (recommended before the pilot) | Yes: item fields | A6, T2 |
@@ -172,6 +172,10 @@ card terminal or Pix on screen stays that plan's open question for phase 4.
 1. Kitchen: status history and `updatedAt` (or `version`) on `KitchenOrder`; item and option ids on lines; backward transitions; list collected orders; kitchen-device sold-out; order cancel confirmed by the owner; a "não retirado" outcome for closing.
 2. Store pace: `pace` (NORMAL, BUSY, PAUSED), `pausedUntil`, wait minutes per level; Go sets `atCapacityMode` and `waitTime` from it.
 3. Availability: `unavailableUntil` and `visible` on items; availability on options.
+   `GET /v1/kitchen/availability` for the kitchen device: the items and options unavailable
+   right now, in the same shape the `PUT` returns, read when the board opens and on its 60 s
+   reload (COM-100; modelled on the KDS "Unavailable items" list, FEAT-045). Ask the partner
+   whether the kitchen stream also sends an `availability.changed` event.
 4. Special dates: CRUD, applied by Go to `isOpen`, `nextOpeningAt` and `closedMessage`.
 5. Orders for the owner: list by day with status and number filters, detail with timeline.
 6. Item fields: allergens, traces, vegetarian, vegan, calories; option `supersedes` and `defaultQuantity`.
