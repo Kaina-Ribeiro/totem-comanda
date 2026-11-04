@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, type ReactNode } from "react";
 
 import type { components } from "@/lib/core-api";
 import { waitingMinutes, waitLabel, waitState } from "@/lib/kitchen/board";
@@ -42,7 +42,7 @@ export function OrderDrawer({
   onAdvance,
   secondary,
   lineAction,
-  children,
+  lineExtra,
 }: {
   order: KitchenOrder;
   now: number;
@@ -53,8 +53,8 @@ export function OrderDrawer({
   secondary?: ReactNode;
   /** Button at the end of each item line. */
   lineAction?: (line: KitchenOrder["lines"][number], index: number) => ReactNode;
-  /** Extra panels under the items (the "Acabou" confirmation). */
-  children?: ReactNode;
+  /** A panel under a line (the "Acabou" confirmation). */
+  lineExtra?: (line: KitchenOrder["lines"][number], index: number) => ReactNode;
 }) {
   const close = useRef<HTMLButtonElement>(null);
   const column = order.status as keyof typeof STATUS_CHIP;
@@ -137,24 +137,27 @@ export function OrderDrawer({
           <section className="flex flex-col gap-1">
             <h3 className="mb-1.5 text-lg font-bold tracking-[-0.02em]">Itens</h3>
             {order.lines.map((line, i) => (
-              <div
-                key={i}
-                className="flex min-h-14 items-center justify-between gap-4 border-b border-line py-2 last-of-type:border-b-0"
-              >
-                <span className="flex flex-col gap-0.5">
-                  <span className="text-[19px] font-bold">
-                    {line.quantity}× {line.name}
-                  </span>
-                  {line.options.length > 0 && (
-                    <span className="text-[15px] font-semibold text-muted">
-                      {line.options.join(" · ")}
+              <Fragment key={i}>
+                <div
+                  className={`flex min-h-14 items-center justify-between gap-4 py-2 ${
+                    i < order.lines.length - 1 ? "border-b border-line" : ""
+                  }`}
+                >
+                  <span className="flex flex-col gap-0.5">
+                    <span className="text-[19px] font-bold">
+                      {line.quantity}× {line.name}
                     </span>
-                  )}
-                </span>
-                {lineAction?.(line, i)}
-              </div>
+                    {line.options.length > 0 && (
+                      <span className="text-[15px] font-semibold text-muted">
+                        {line.options.join(" · ")}
+                      </span>
+                    )}
+                  </span>
+                  {lineAction?.(line, i)}
+                </div>
+                {lineExtra?.(line, i)}
+              </Fragment>
             ))}
-            {children}
           </section>
 
           <section className="flex flex-col gap-2.5">
