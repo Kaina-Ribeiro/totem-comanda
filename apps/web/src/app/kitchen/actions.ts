@@ -1,8 +1,15 @@
 "use server";
 
 import { coreApi } from "@/lib/core/client";
-import { deviceCallAs, type Result } from "@/lib/kiosk/core";
-import type { KitchenAvailability, KitchenOrder, KitchenStatus } from "@/lib/kitchen/core";
+import { requireDeviceKind } from "@/lib/device/config";
+import { deviceCallAs, failure, type Result } from "@/lib/kiosk/core";
+import {
+  cancelAsOwner,
+  type CancelReason,
+  type KitchenAvailability,
+  type KitchenOrder,
+  type KitchenStatus,
+} from "@/lib/kitchen/core";
 
 const STATUSES = new Set<KitchenStatus>(["PREPARING", "READY", "COLLECTED"]);
 
@@ -38,4 +45,35 @@ export async function setSoldOut(
   return deviceCallAs("KITCHEN", (headers) =>
     coreApi().PUT("/v1/kitchen/availability", { headers, body: { itemId, optionId, soldOut } }),
   );
+}
+
+const REASONS = new Set<CancelReason>(["ITEM_SOLD_OUT", "CANNOT_PREPARE", "OTHER"]);
+
+/**
+ * "Cancelar" in the order detail: only from the kitchen device, and only with
+ * the owner's email and password (no PIN, decision 12).
+ */
+export async function cancelOrder(
+  orderId: string,
+  email: string,
+  password: string,
+  reason: CancelReason,
+): Promise<Result<KitchenOrder>> {
+  if (
+    typeof email !== "string" ||
+    typeof password !== "string" ||
+    !email.trim() ||
+    !password ||
+    email.length > 254 ||
+    password.length > 200 ||
+    !REASONS.has(reason)
+  ) {
+    return { ok: false, code: "VALIDATION_FAILED" };
+  }
+  try {
+    await requireDeviceKind("KITCHEN");
+  } catch (error) {
+    return failure(error);
+  }
+  return cancelAsOwner(orderId, { email: email.trim(), password }, reason);
 }

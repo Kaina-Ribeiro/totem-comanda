@@ -5,6 +5,7 @@ import type { ServerResponse } from "node:http";
 
 import {
   authDevice,
+  authOwner,
   notFound,
   ok,
   problem,
@@ -186,6 +187,28 @@ export const kitchenRoutes: Route[] = [
         item.soldOutDate = date;
       }
       return ok({ itemId: item.id, optionId, soldOutDate: date });
+    },
+  ],
+  [
+    "POST",
+    /^\/v1\/admin\/orders\/([^/]+)\/cancel$/,
+    (req, [orderId]) => {
+      // The kitchen BFF signs the owner in and calls this with her token (decision 12).
+      const denied = authOwner(req);
+      if (denied) return denied;
+      const order = state.orders.get(orderId);
+      if (!order) return notFound();
+      const reason = (req.body as Partial<Schemas["OrderCancelRequest"]> | null)?.reason;
+      if (reason !== "ITEM_SOLD_OUT" && reason !== "CANNOT_PREPARE" && reason !== "OTHER") {
+        return problem(422, "VALIDATION_FAILED", "Validation failed", "reason");
+      }
+      if (!OPEN.has(order.status)) {
+        return problem(409, "INVALID_STATUS_TRANSITION", "Only open orders can be cancelled");
+      }
+      order.status = "CANCELLED";
+      historyOf(order).push({ status: "CANCELLED", at: now().toISOString(), by: "OWNER" });
+      broadcastKitchen("order.status_changed", order);
+      return ok(kitchenOrder(order));
     },
   ],
 ];
