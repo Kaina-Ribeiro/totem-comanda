@@ -171,12 +171,14 @@ Follow these rules exactly. If a request conflicts with them, stop and say which
 
 **How this repo applies it** (details and setup in `RELEASING.md`):
 - The default/prod branch was renamed `main` → `master` on 31 Oct 2026 (Kai's decision).
-- Automation: `.github/workflows/release.yml` + `.github/scripts/release.mjs`, CI jobs `checks`
-  and `conventions`, rulesets in `.github/rulesets/*.json` (COM-69). Rulesets and the
-  `RELEASE_PR_TOKEN` secret are applied only with Kai's yes.
+- Automation comes from the release kit (`Kaina-Ribeiro/release-kit`, COM-70), the same in every
+  repo: `.github/workflows/release.yml` + `.github/scripts/release.mjs`, CI jobs `checks` and
+  `conventions` (`.github/workflows/pr-checks.yml`), rulesets in `.github/rulesets/*.json`. Never
+  edit these files here: change the kit and reinstall with its `install.sh`. Rulesets and the
+  `RELEASE_TOKEN` secret are applied only with Kai's yes.
 - Deploy is Cubeship (`deploy/cubeship`), not Jenkins. The apps `comanda/production/web` and
   `comanda/production/mock` build from a final tag (`ref: v0.1.0` since 31 Oct 2026), never a
-  branch. A prod deploy = `node .github/scripts/release.mjs check-deploy --tag vX.Y.Z --env prod`
+  branch. A prod deploy = `node .github/scripts/release.mjs deploy-check vX.Y.Z --prod`
   passes, then set `ref` to that tag, with Kai's confirmation. No test stages on Cubeship yet.
 - `v0.1.0` is an annotated tag created by hand (Kai, 30 Oct 2026) on `b230cce`, before this flow;
   it has no rc, so the gate refuses it for prod.
@@ -184,7 +186,8 @@ Follow these rules exactly. If a request conflicts with them, stop and say which
 ### Model
 - Version lines: `release/vX.Y` (next version) and `hotfix/vX.Y` (fix for what's in prod).
 - `master` = what's in prod. Only `release/vX.Y` and `hotfix/vX.Y` merge into it.
-- Tags follow SemVer: `vX.Y.Z-rc.N` = release candidate, `vX.Y.Z` = shipped.
+- Tags follow SemVer: `vX.Y.Z-rc` = release candidate, `vX.Y.Z` = shipped. Every rc takes the
+  next patch (`v0.2.0-rc`, `v0.2.1-rc`, …) and the final is the last rc without `-rc`.
   Tags, GitHub releases, new version-line branches and sync PRs are created by
   automation (`.github/workflows/release.yml` → `.github/scripts/release.mjs`).
   **Never create, move or delete a tag by hand.**
@@ -197,22 +200,22 @@ Follow these rules exactly. If a request conflicts with them, stop and say which
 ### Procedures
 1. **Feature/fix:** find the open release it ships in (`release/vX.Y` not merged into master;
    ask if more than one fits). Branch from it, PR into it, **squash** merge.
-   The merge auto-tags `vX.Y.Z-rc.N`.
+   The merge auto-tags the next `vX.Y.Z-rc`.
 2. **Remove a feature from a release:** revert PR in that release (GitHub "Revert");
    reapply in the next release by reverting the revert.
 3. **New release:** run Actions → Release → `cut-release`. Never create `release/*` by hand.
    It branches from the newest open release (or master if none).
 4. **Release day:** PR `release/vX.Y → master`, **merge commit** (never squash/rebase).
-   The merge auto-tags `vX.Y.0` with release notes.
+   The merge auto-tags the last rc's version (`v0.2.1-rc` → `v0.2.1`) with release notes.
 5. **Hotfix:** Actions → Release → `cut-hotfix` (branches from the final tag in prod).
    Fix PRs into `hotfix/vX.Y` (squash) → test the rc → PR into master (merge commit).
 6. **Sync PRs** (`chore(sync): merge A into B`, opened automatically): review, merge with
    **merge commit**. Resolve conflicts on a branch off the target, never on the source.
 
 ### Deploy (Jenkins: `dev_tag` + `environment`)
-- Test stages (`itodev`, `itosit`, `itouat`): any `vX.Y.Z-rc.N` (or final tag), any time.
+- Test stages (`itodev`, `itosit`, `itouat`): any `vX.Y.Z-rc` (or final tag), any time.
 - `prod`: only a final `vX.Y.Z`, only on release day, and only if its code equals its
-  last `-rc.N` (Jenkins' `Check tag` stage enforces this). Never deploy a branch name or an rc to prod.
+  `-rc` (Jenkins' `Check tag` stage enforces this). Never deploy a branch name or an rc to prod.
 
 ### Before acting
 - Run `git fetch --all --tags` first; reason from remote state, not local.
@@ -225,8 +228,8 @@ Follow these rules exactly. If a request conflicts with them, stop and say which
 ### If this repo doesn't have the automation yet
 Set it up, adapted to the repo (same behavior, no repo-specific values in the script):
 - `.github/scripts/release.mjs` with commands `rc`, `final`, `sync`, `cut-release`,
-  `cut-hotfix`, and `--dry-run`. Version from the branch name: patch is `.0` until the
-  line ships, then last shipped + 1.
+  `cut-hotfix`, and `--dry-run`. Every rc takes the next patch (`vX.Y.0-rc`,
+  `vX.Y.1-rc`, …); the final is the last rc without `-rc`.
 - `.github/workflows/release.yml`: on push to `release/v*`/`hotfix/v*` → `rc` + `sync`;
   on PR merged into master from those branches → `final`; `workflow_dispatch` → cut.
 - CI job `checks` (install, lint, type-check) and job `conventions` (branch name, PR title,
@@ -235,6 +238,6 @@ Set it up, adapted to the repo (same behavior, no repo-specific values in the sc
   push/delete); release/hotfix (same, squash + merge allowed); `v*` tags (only GitHub
   Actions, app id 15368, and admins can create/update/delete).
 - Deploy gate: test stages take release tags only; prod takes only `vX.Y.Z` whose
-  tree equals its latest `vX.Y.Z-rc.N`.
+  tree equals its `vX.Y.Z-rc`.
 - A `RELEASING.md` with these rules. Test the script with `--dry-run` on real tags before
   opening the PR, and don't apply settings without Kai's approval.
