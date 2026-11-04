@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { cents } from "./form";
+import { cents, orderTypesError } from "./form";
 
 describe("cents", () => {
   it("reads Brazilian and plain prices as integer cents", () => {
@@ -10,5 +10,17 @@ describe("cents", () => {
     expect(cents("7")).toBe(700);
     expect(cents("")).toBeNull();
     expect(cents("-3")).toBeNull();
+  });
+});
+
+describe("orderTypesError", () => {
+  it("refuses dine-in and take-out both off", () => {
+    expect(orderTypesError(false, false)).toMatch(/pelo menos um/);
+  });
+
+  it("accepts either one on", () => {
+    expect(orderTypesError(true, false)).toBeNull();
+    expect(orderTypesError(false, true)).toBeNull();
+    expect(orderTypesError(true, true)).toBeNull();
   });
 });

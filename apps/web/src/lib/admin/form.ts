@@ -46,6 +46,15 @@ export const text = (form: FormData, name: string) => String(form.get(name) ?? "
 export const optionalText = (form: FormData, name: string) => text(form, name) || undefined;
 export const checked = (form: FormData, name: string) => form.get(name) === "on";
 
+/**
+ * Why the store's order types cannot be saved, or null when they can. A kiosk
+ * with "Comer aqui" and "Para viagem" both off has nothing to sell (BR-041).
+ */
+export function orderTypesError(dineIn: boolean, takeOut: boolean): string | null {
+  if (dineIn || takeOut) return null;
+  return "Deixe pelo menos um ligado: Comer aqui ou Para viagem. Sem os dois, o totem não tem o que vender.";
+}
+
 /** "28,00" or "28.00" or "28" → 2800 cents; null for empty or invalid. */
 export function cents(value: string): number | null {
   const clean = value
