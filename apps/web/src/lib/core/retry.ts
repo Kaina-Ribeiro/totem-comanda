@@ -15,13 +15,20 @@ type Outcome = { ok: true } | { ok: false; code: string };
 export const isUnknownOutcome = (result: Outcome) =>
   !result.ok && result.code === "CORE_UNAVAILABLE";
 
+const UNKNOWN = { ok: false, code: "CORE_UNAVAILABLE" } as const;
+
 /**
  * Runs `call` again while its outcome is unknown, as long as one more attempt
  * still fits in `budgetMs`. Returns the first known outcome, or the last
  * unknown one when the budget runs out (the caller then must not say "failed").
+ *
+ * `budgetMs` is a hard deadline (COM-99): one attempt can outlast `attemptMs`
+ * (a token exchange, then a 401, a new token and the call again), so when the
+ * budget is spent the attempt is cut, `signal` aborts its request and the
+ * outcome is unknown. Callers pass `signal` to the Core API call.
  */
 export async function retryUnknown<R extends Outcome>(
-  call: () => Promise<R>,
+  call: (signal: AbortSignal) => Promise<R>,
   {
     budgetMs = ORDER_BUDGET_MS,
     attemptMs = CALL_TIMEOUT_MS,
@@ -31,10 +38,21 @@ export async function retryUnknown<R extends Outcome>(
   } = {},
 ): Promise<R> {
   const start = now();
-  for (;;) {
-    const result = await call();
-    if (!isUnknownOutcome(result)) return result;
-    if (now() - start + backoffMs + attemptMs > budgetMs) return result;
-    await sleep(backoffMs);
+  const deadline = new AbortController();
+  let expire = () => {};
+  const expired = new Promise<R>((resolve) => (expire = () => resolve(UNKNOWN as R)));
+  const timer = setTimeout(() => {
+    deadline.abort(new DOMException("Order budget spent", "TimeoutError"));
+    expire();
+  }, budgetMs);
+  try {
+    for (;;) {
+      const result = await Promise.race([call(deadline.signal), expired]);
+      if (!isUnknownOutcome(result) || deadline.signal.aborted) return result;
+      if (now() - start + backoffMs + attemptMs > budgetMs) return result;
+      await sleep(backoffMs);
+    }
+  } finally {
+    clearTimeout(timer);
   }
 }

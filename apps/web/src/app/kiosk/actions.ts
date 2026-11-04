@@ -162,16 +162,18 @@ export async function createOrder(
   idempotencyKey: string,
   order: Schemas["CreateOrderRequest"],
 ): Promise<Result<Order>> {
-  return retryUnknown(() => postOrder(idempotencyKey, order));
+  return retryUnknown((signal) => postOrder(idempotencyKey, order, signal));
 }
 
 function postOrder(
   idempotencyKey: string,
   order: Schemas["CreateOrderRequest"],
+  signal: AbortSignal,
 ): Promise<Result<Order>> {
   return deviceCallAs("KIOSK", (headers) =>
     coreApi().POST("/v1/orders", {
       headers,
+      signal,
       params: { header: { "Idempotency-Key": idempotencyKey } },
       body: {
         orderNonce: order.orderNonce,
@@ -242,10 +244,11 @@ export async function placeOrder(
   orderId: string,
   idempotencyKey: string,
 ): Promise<Result<PlacedOrder>> {
-  return retryUnknown(() =>
+  return retryUnknown((signal) =>
     deviceCall((headers) =>
       coreApi().POST("/v1/orders/{orderId}/place", {
         headers,
+        signal,
         params: { path: { orderId }, header: { "Idempotency-Key": idempotencyKey } },
       }),
     ),
