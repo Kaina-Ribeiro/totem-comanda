@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useEffectEvent, useRef, useState, useTransition } from "react";
 
 import { moveOrder } from "@/app/kitchen/actions";
 import type { components } from "@/lib/core-api";
@@ -12,6 +12,7 @@ import {
   NEXT_STATUS,
 } from "@/lib/kitchen/board";
 
+import { NewOrdersBar, SoundButton, SoundDialog, useNewOrderAlert } from "./new-order-alert";
 import { OrderCard } from "./order-card";
 
 type KitchenOrder = components["schemas"]["KitchenOrder"];
@@ -55,11 +56,25 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
   // The last move Go did not take (KDS BR-012): shown until retried or dismissed.
   const [moveError, setMoveError] = useState<MoveError | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const alert = useNewOrderAlert();
+  // Orders the board has shown; a PAID one not in here is new (G-K1).
+  const known = useRef(new Set(initial.map((o) => o.id)));
+
+  /** Paid orders the board has not shown yet; remembers every order it sees. */
+  const newPaid = (list: KitchenOrder[]) => {
+    const ids = list.filter((o) => o.status === "PAID" && !known.current.has(o.id)).map((o) => o.id);
+    for (const o of list) known.current.add(o.id);
+    return ids;
+  };
+  const onIncoming = useEffectEvent((list: KitchenOrder[]) => alert.arrived(newPaid(list)));
 
   /** Reloads the open orders from Go; the board then shows where each card really is. */
   const refresh = async () => {
     const open = await fetchOpenOrders();
-    if (open) setOrders(open);
+    if (open) {
+      setOrders(open);
+      alert.arrived(newPaid(open));
+    }
     return open !== null;
   };
 
@@ -82,7 +97,10 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
     if (!live) return;
     const timer = setInterval(async () => {
       const open = await fetchOpenOrders();
-      if (open) setOrders(open);
+      if (open) {
+        setOrders(open);
+        onIncoming(open);
+      }
     }, FULL_REFRESH_MS);
     return () => clearInterval(timer);
   }, [live]);
@@ -95,7 +113,10 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
     let closed = false;
     const refresh = async () => {
       const open = await fetchOpenOrders();
-      if (open) setOrders(open);
+      if (open) {
+        setOrders(open);
+        onIncoming(open);
+      }
     };
 
     const startPolling = () => {
@@ -108,8 +129,11 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
       if (closed) return;
       stream?.close();
       stream = new EventSource("/api/kitchen/stream");
-      const onOrder = (event: MessageEvent<string>) =>
-        setOrders((current) => applyOrder(current, JSON.parse(event.data) as KitchenOrder));
+      const onOrder = (event: MessageEvent<string>) => {
+        const order = JSON.parse(event.data) as KitchenOrder;
+        setOrders((current) => applyOrder(current, order));
+        onIncoming([order]);
+      };
       stream.addEventListener("order.paid", onOrder);
       stream.addEventListener("order.status_changed", onOrder);
       stream.onopen = () => {
@@ -176,6 +200,7 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
           </span>
         </div>
         <div className="flex items-center gap-2.5">
+          <SoundButton on={alert.soundOn} onPress={alert.openDialog} />
           <button
             onClick={refreshNow}
             disabled={refreshing}
@@ -205,6 +230,13 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
         </div>
       </header>
 
+      {alert.unseen.length > 0 && (
+        <NewOrdersBar
+          numbers={orders.filter((o) => alert.unseen.includes(o.id)).map((o) => o.posCheckNumber)}
+          repeating={alert.soundOn && alert.settings.repeat}
+          onSeen={alert.acknowledge}
+        />
+      )}
       {moveError && errorMessage && (
         <div
           role="alert"
@@ -253,6 +285,7 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
                   order={order}
                   now={now}
                   busy={pending && busy === order.id}
+                  isNew={alert.unseen.includes(order.id)}
                   onAdvance={() => advance(order)}
                 />
               ))}
@@ -260,6 +293,7 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
           );
         })}
       </div>
+      {alert.dialogOpen && <SoundDialog {...alert.dialogProps} />}
     </main>
   );
 }
