@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { applyOrder, moveErrorMessage, waitingMinutes } from "./board";
+import { applyOrder, moveErrorMessage, waitingMinutes, waitLabel, waitState } from "./board";
 
 const order = (id: string, status: string, placedAt: string) =>
   ({
@@ -53,5 +53,14 @@ describe("kitchen board", () => {
       code: "INVALID_STATUS_TRANSITION",
     });
     expect(message.retry).toBe(false);
+  });
+
+  it("ages waiting time in 3 steps", () => {
+    expect([0, 4, 5, 9, 10, 25].map(waitState)).toEqual(["ok", "ok", "warn", "warn", "late", "late"]);
+  });
+
+  it("says agora under a minute", () => {
+    expect(waitLabel(0)).toBe("agora");
+    expect(waitLabel(7)).toBe("7 min");
   });
 });

@@ -27,6 +27,19 @@ export function waitingMinutes(placedAt: string, now: number): number {
   return Math.max(0, Math.floor((now - Date.parse(placedAt)) / 60_000));
 }
 
+/** Waiting in 3 steps (plan G-K8): on time, attention from 5 min, late from 10 min. */
+export const ATTENTION_MINUTES = 5;
+export const LATE_MINUTES = 10;
+
+export function waitState(minutes: number): "ok" | "warn" | "late" {
+  if (minutes >= LATE_MINUTES) return "late";
+  if (minutes >= ATTENTION_MINUTES) return "warn";
+  return "ok";
+}
+
+/** "agora" under a minute, else "7 min". */
+export const waitLabel = (minutes: number) => (minutes < 1 ? "agora" : `${minutes} min`);
+
 /** A status change Go did not take. */
 export type MoveError = {
   order: KitchenOrder;
