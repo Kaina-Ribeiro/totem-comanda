@@ -14,6 +14,7 @@ import {
 
 import { NewOrdersBar, SoundButton, SoundDialog, useNewOrderAlert } from "./new-order-alert";
 import { OrderCard } from "./order-card";
+import { ProductionView } from "./production-view";
 
 type KitchenOrder = components["schemas"]["KitchenOrder"];
 
@@ -56,6 +57,7 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
   // The last move Go did not take (KDS BR-012): shown until retried or dismissed.
   const [moveError, setMoveError] = useState<MoveError | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [view, setView] = useState<"orders" | "production">("orders");
   const alert = useNewOrderAlert();
   // Orders the board has shown; a PAID one not in here is new (G-K1).
   const known = useRef(new Set(initial.map((o) => o.id)));
@@ -199,6 +201,32 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
             {live ? "Ao vivo" : "Reconectando… atualiza a cada 2 s"}
           </span>
         </div>
+        <nav aria-label="Telas da cozinha" className="flex gap-1 rounded-2xl bg-tabs p-1">
+          {(["orders", "production"] as const).map((tab) => {
+            const on = view === tab;
+            return (
+              <button
+                key={tab}
+                onClick={() => setView(tab)}
+                aria-current={on ? "page" : undefined}
+                className={`flex h-11 items-center gap-2 rounded-[14px] text-[15px] font-extrabold transition-transform active:scale-[.97] ${
+                  tab === "orders" ? "pr-2.5 pl-[18px]" : "px-[18px]"
+                } ${on ? "bg-accent text-on-accent" : "text-muted"}`}
+              >
+                {tab === "orders" ? "Pedidos" : "Produção"}
+                {tab === "orders" && (
+                  <span
+                    className={`flex h-[26px] min-w-[26px] items-center justify-center rounded-[13px] px-[7px] text-[13px] ${
+                      on ? "bg-detail-light text-ink" : "bg-ground text-ink"
+                    }`}
+                  >
+                    {orders.length}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
         <div className="flex items-center gap-2.5">
           <SoundButton on={alert.soundOn} onPress={alert.openDialog} />
           <button
@@ -264,35 +292,39 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
         </div>
       )}
 
-      <div className="grid min-h-0 flex-1 grid-cols-3 gap-4 px-6 pt-4 pb-6">
-        {COLUMNS.map((column) => {
-          const list = orders.filter((o) => o.status === column);
-          return (
-            <section
-              key={column}
-              aria-label={COLUMN_LABEL[column]}
-              className="flex min-h-0 flex-col gap-3 overflow-y-auto rounded-2xl bg-tray p-3"
-            >
-              <h2 className="flex items-center justify-between px-1.5 pt-0.5 text-[17px] font-extrabold">
-                {COLUMN_LABEL[column]}
-                <span className="flex h-7 min-w-7 items-center justify-center rounded-[14px] bg-surface px-2 text-sm text-muted">
-                  {list.length}
-                </span>
-              </h2>
-              {list.map((order) => (
-                <OrderCard
-                  key={order.id}
-                  order={order}
-                  now={now}
-                  busy={pending && busy === order.id}
-                  isNew={alert.unseen.includes(order.id)}
-                  onAdvance={() => advance(order)}
-                />
-              ))}
-            </section>
-          );
-        })}
-      </div>
+      {view === "production" ? (
+        <ProductionView orders={orders} />
+      ) : (
+        <div className="grid min-h-0 flex-1 grid-cols-3 gap-4 px-6 pt-4 pb-6">
+          {COLUMNS.map((column) => {
+            const list = orders.filter((o) => o.status === column);
+            return (
+              <section
+                key={column}
+                aria-label={COLUMN_LABEL[column]}
+                className="flex min-h-0 flex-col gap-3 overflow-y-auto rounded-2xl bg-tray p-3"
+              >
+                <h2 className="flex items-center justify-between px-1.5 pt-0.5 text-[17px] font-extrabold">
+                  {COLUMN_LABEL[column]}
+                  <span className="flex h-7 min-w-7 items-center justify-center rounded-[14px] bg-surface px-2 text-sm text-muted">
+                    {list.length}
+                  </span>
+                </h2>
+                {list.map((order) => (
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    now={now}
+                    busy={pending && busy === order.id}
+                    isNew={alert.unseen.includes(order.id)}
+                    onAdvance={() => advance(order)}
+                  />
+                ))}
+              </section>
+            );
+          })}
+        </div>
+      )}
       {alert.dialogOpen && <SoundDialog {...alert.dialogProps} />}
     </main>
   );
