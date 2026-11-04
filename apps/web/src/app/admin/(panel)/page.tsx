@@ -4,10 +4,12 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 
 import { ActionForm, SubmitButton } from "@/components/admin/form";
+import { PaceSwitch } from "@/components/admin/pace-switch";
 import { LoadError } from "@/components/admin/ui";
 import { attempt, type FormState, load, text } from "@/lib/admin/form";
 import {
   greeting,
+  kioskState,
   localNow,
   signalLabel,
   versusLastWeek,
@@ -34,6 +36,25 @@ async function releaseItem(_: FormState, form: FormData): Promise<FormState> {
     );
     revalidatePath("/admin");
     return "Voltou para o totem.";
+  });
+}
+
+/** "Ritmo da cozinha" on the band: the store pace (decision 3); Pausar is 15 min. */
+async function setPace(_: FormState, form: FormData): Promise<FormState> {
+  "use server";
+  const pace = text(form, "pace");
+  if (pace !== "NORMAL" && pace !== "BUSY" && pace !== "PAUSED") {
+    return { error: "Escolha um ritmo." };
+  }
+  return attempt(async () => {
+    await asOwner((headers) =>
+      coreApi().PUT("/v1/admin/pace", {
+        headers,
+        body: pace === "PAUSED" ? { pace, pauseMinutes: 15 } : { pace },
+      }),
+    );
+    revalidatePath("/admin");
+    return pace === "PAUSED" ? "Totem pausado por 15 min." : "Ritmo salvo.";
   });
 }
 
@@ -197,40 +218,64 @@ const LINK =
 const BUTTON =
   "inline-flex h-10 items-center gap-2 rounded-[10px] border border-line bg-surface px-4 text-sm font-bold whitespace-nowrap transition-[transform,background-color] hover:bg-hover active:scale-[.98]";
 
-/** The dark band (A1): is the kiosk selling, which menu, until when. */
+/** The dark band (A1): is the kiosk selling, which menu, until when, and the kitchen's pace. */
 function StatusBand({ status }: { status: StoreStatus }) {
-  const { open, maintenance, live, next, day } = status;
-  const kicker = maintenance ? "Totem em manutenção" : open ? "Totem aberto" : "Totem fechado";
+  const { open, live, next, day, pace, timeZone } = status;
+  const state = kioskState(status);
+  const resumeAt =
+    pace.pausedUntil &&
+    new Intl.DateTimeFormat("pt-BR", { timeZone, hour: "2-digit", minute: "2-digit" }).format(
+      new Date(pace.pausedUntil),
+    );
+  const kicker = {
+    maintenance: "Totem em manutenção",
+    closed: "Totem fechado",
+    paused: "Totem pausado",
+    busy: "Totem aberto, cozinha movimentada",
+    open: "Totem aberto",
+  }[state];
   const title =
-    open && live
-      ? live.forcedUntil
-        ? `${live.name}, forçado no ar`
-        : live.until
-          ? `${live.name} no ar até ${live.until}`
-          : `${live.name} no ar`
-      : "Fechado agora";
-  const text = next
-    ? open
-      ? `Depois: ${next.menu}, ${whenLabel(next, day)}.`
-      : `Abre ${whenLabel(next, day)} com ${next.menu}.`
-    : open
-      ? "Nenhum outro cardápio programado nesta semana."
-      : "Nenhum cardápio programado. Configure os horários em Cardápios.";
+    state === "paused"
+      ? `Pausado até ${resumeAt}`
+      : open && live
+        ? live.forcedUntil
+          ? `${live.name}, forçado no ar`
+          : live.until
+            ? `${live.name} no ar até ${live.until}`
+            : `${live.name} no ar`
+        : "Fechado agora";
+  const text =
+    state === "paused"
+      ? "O totem mostra “Estamos com muitos pedidos” e indica o balcão. Volta sozinho no horário."
+      : next
+        ? open
+          ? `Depois: ${next.menu}, ${whenLabel(next, day)}.`
+          : `Abre ${whenLabel(next, day)} com ${next.menu}.`
+        : open
+          ? "Nenhum outro cardápio programado nesta semana."
+          : "Nenhum cardápio programado. Configure os horários em Cardápios.";
+  const dot =
+    state === "open" || state === "busy"
+      ? "bg-[#8fbf8a]"
+      : state === "closed"
+        ? "bg-[#cdbfb2]"
+        : "bg-detail-light";
   return (
     <section
-      aria-label="Totem"
-      className="flex flex-col gap-1.5 rounded-2xl bg-night px-[22px] py-5 text-on-accent"
+      aria-label="Totem e ritmo da cozinha"
+      className="flex flex-wrap items-center gap-x-8 gap-y-4 rounded-2xl bg-night px-[22px] py-5 text-on-accent"
     >
-      <span className="flex items-center gap-2 text-[13px] font-semibold text-[#cdbfb2]">
-        <span
-          className={`size-2 rounded-full ${
-            maintenance ? "bg-detail-light" : open ? "bg-[#8fbf8a]" : "bg-[#cdbfb2]"
-          }`}
-        />
-        {kicker}
-      </span>
-      <span className="text-[26px] leading-[1.15] font-bold tracking-[-0.02em]">{title}</span>
-      <span className="text-sm leading-[1.45] font-medium text-[#cdbfb2]">{text}</span>
+      <div className="flex min-w-0 flex-[1_1_300px] flex-col gap-1.5">
+        <span className="flex items-center gap-2 text-[13px] font-semibold text-[#cdbfb2]">
+          <span className={`size-2 rounded-full ${dot}`} />
+          {kicker}
+        </span>
+        <span className="text-[26px] leading-[1.15] font-bold tracking-[-0.02em]">{title}</span>
+        <span className="text-sm leading-[1.45] font-medium text-[#cdbfb2]">{text}</span>
+      </div>
+      <div className="min-w-0 flex-[1_1_360px]">
+        <PaceSwitch pace={pace.pace} waitMinutes={pace.waitMinutes} action={setPace} />
+      </div>
     </section>
   );
 }

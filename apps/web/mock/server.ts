@@ -11,6 +11,7 @@
 //                           (timeouts, 5xx, a lost answer); DELETE clears them
 //   POST /__mock/kitchen/backdate {"posCheckNumber": "42", "minutes": 12}
 //                           moves an order's placedAt, readyAt and status history back, to see waiting colours
+//   POST /__mock/clock     {"minutes": 16} moves the mock's clock forward (a pause's automatic resume)
 
 import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
@@ -22,6 +23,7 @@ import { SEED_MEDIA } from "./catalogue.ts";
 import { authDevice, problem, type Reply, type Request, type Route, type Schemas } from "./http.ts";
 import { adminRoutes } from "./routes-admin.ts";
 import { catalogueRoutes } from "./routes-catalogue.ts";
+import { currentPace, paceRoutes } from "./pace.ts";
 import { historyOf, serveKitchenStream, kitchenRoutes } from "./routes-kitchen.ts";
 import { optionRoutes } from "./routes-options.ts";
 import { kioskRoutes } from "./routes-kiosk.ts";
@@ -38,15 +40,16 @@ function deviceConfig(device: (typeof state.devices)[number]): Schemas["DeviceCo
   const r = state.restaurant;
   const at = now();
   const active = activeMenu(state.menus, at, r.timezone);
+  const storePace = currentPace();
   return {
     kioskID: device.id,
     kind: device.kind,
     idleTimerIntervalMilliseconds: device.idleTimerIntervalMilliseconds,
     printerEnabled: device.printerEnabled,
     maintenanceMode: device.maintenanceMode,
-    atCapacityMode: device.atCapacityMode,
-    // Store pace (contract 0.2.0): always NORMAL until the pace story is built.
-    pace: { pace: "NORMAL", pausedUntil: null },
+    // At capacity in Aparelhos, or the whole store paused (contract 0.2.0).
+    atCapacityMode: device.atCapacityMode || storePace.pace === "PAUSED",
+    pace: { pace: storePace.pace, pausedUntil: storePace.pausedUntil },
     isOpen: active !== null && (r.isDineInAvailable || r.isTakeOutAvailable),
     restaurant: {
       locationId: r.id,
@@ -85,6 +88,7 @@ const routes: Route[] = [
   ...catalogueRoutes,
   ...optionRoutes,
   ...kitchenRoutes,
+  ...paceRoutes,
   [
     "POST",
     /^\/v1\/devices\/auth$/,
@@ -194,6 +198,16 @@ const routes: Route[] = [
       order.readyAt = back(order.readyAt) ?? null;
       for (const change of historyOf(order)) change.at = back(change.at) ?? change.at;
       return { status: 200, body: { id: order.id, placedAt: order.placedAt } };
+    },
+  ],
+  [
+    "POST",
+    /^\/__mock\/clock$/,
+    (req) => {
+      const minutes = (req.body as { minutes?: unknown } | null)?.minutes;
+      if (typeof minutes !== "number") return { status: 400, body: { error: "minutes" } };
+      state.clockOffsetMs += minutes * 60_000;
+      return { status: 200, body: { now: now().toISOString() } };
     },
   ],
   [

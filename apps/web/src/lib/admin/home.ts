@@ -136,3 +136,17 @@ export function signalLabel(
   if (seconds < 3600) return `online, sinal há ${Math.floor(seconds / 60)} min`;
   return `online, sinal há ${Math.floor(seconds / 3600)} h`;
 }
+
+export type KioskState = "maintenance" | "closed" | "paused" | "busy" | "open";
+
+/**
+ * What the kiosk shows, in the screen precedence of decision 14 (offline is
+ * the kiosk's own): maintenance, then closed, then paused, then live (busy or
+ * normal).
+ */
+export function kioskState(status: { open: boolean; maintenance: boolean; pace: { pace: "NORMAL" | "BUSY" | "PAUSED" } }): KioskState {
+  if (status.maintenance) return "maintenance";
+  if (!status.open) return "closed";
+  if (status.pace.pace === "PAUSED") return "paused";
+  return status.pace.pace === "BUSY" ? "busy" : "open";
+}

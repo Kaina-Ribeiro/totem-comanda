@@ -26,6 +26,13 @@ export function kitchenStreamUrl(): string {
   return `${base}/v1/kitchen/stream`;
 }
 
+export type StorePace = components["schemas"]["StorePace"];
+
+/** The store's pace (Normal, Movimentado, Pausado), as the kitchen sees it. */
+export function getKitchenPace(): Promise<Result<StorePace>> {
+  return deviceCallAs("KITCHEN", (headers) => coreApi().GET("/v1/kitchen/pace", { headers }));
+}
+
 export type CancelReason = components["schemas"]["OrderCancelRequest"]["reason"];
 
 /**

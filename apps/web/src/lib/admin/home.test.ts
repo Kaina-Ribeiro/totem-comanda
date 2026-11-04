@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   greeting,
+  kioskState,
   localNow,
   nextOpening,
   signalLabel,
@@ -70,5 +71,18 @@ describe("back office home", () => {
     expect(signalLabel(true, "2026-11-04T13:39:00Z", now, TZ)).toBe("online, sinal há 3 min");
     expect(signalLabel(false, "2026-11-04T13:30:00Z", now, TZ)).toBe("sem sinal desde 10:30");
     expect(signalLabel(false, null, now, TZ)).toBe("nunca conectou");
+  });
+});
+
+describe("kioskState (decision 14)", () => {
+  const live = { open: true, maintenance: false, pace: { pace: "NORMAL" as const } };
+  it.each([
+    [{ ...live, maintenance: true, open: false, pace: { pace: "PAUSED" as const } }, "maintenance"],
+    [{ ...live, open: false, pace: { pace: "PAUSED" as const } }, "closed"],
+    [{ ...live, pace: { pace: "PAUSED" as const } }, "paused"],
+    [{ ...live, pace: { pace: "BUSY" as const } }, "busy"],
+    [live, "open"],
+  ])("%o is %s", (status, expected) => {
+    expect(kioskState(status)).toBe(expected);
   });
 });

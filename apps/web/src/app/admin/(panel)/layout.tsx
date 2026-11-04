@@ -5,6 +5,7 @@ import { cache, Suspense } from "react";
 import { AdminNav } from "@/components/admin/nav";
 import { load } from "@/lib/admin/form";
 import { ADMIN_LOGIN, asOwner, signOut } from "@/lib/admin/session";
+import { kioskState } from "@/lib/admin/home";
 import { loadStoreStatus } from "@/lib/admin/store-status";
 import { coreApi } from "@/lib/core/client";
 
@@ -80,19 +81,28 @@ const storeStatus = cache(async () => {
 });
 
 /** "Totem aberto" under the brand (A1) or beside it on phones (A10); nothing when Go cannot answer. */
+/** Sidebar pill per kiosk state (A1). */
+const PILL_LABEL = {
+  maintenance: "Em manutenção",
+  closed: "Totem fechado",
+  paused: "Totem pausado",
+  busy: "Aberto, movimentado",
+  open: "Totem aberto",
+} as const;
+
 async function StatusPill({ className }: { className: string }) {
   const loaded = await storeStatus();
   if ("error" in loaded) return null;
-  const { open, maintenance } = loaded.data;
-  const label = maintenance ? "Em manutenção" : open ? "Totem aberto" : "Totem fechado";
+  const state = kioskState(loaded.data);
+  const selling = state === "open" || state === "busy";
   return (
     <span
       className={`h-7 items-center gap-1.5 self-start rounded-full px-2.5 text-xs font-bold whitespace-nowrap ${className} ${
-        open && !maintenance ? "bg-sage text-leaf" : "bg-butter text-detail-text"
+        selling ? "bg-sage text-leaf" : "bg-butter text-detail-text"
       }`}
     >
-      <span className={`size-2 rounded-full ${open && !maintenance ? "bg-leaf" : "bg-detail"}`} />
-      {label}
+      <span className={`size-2 rounded-full ${selling ? "bg-leaf" : "bg-detail"}`} />
+      {PILL_LABEL[state]}
     </span>
   );
 }
