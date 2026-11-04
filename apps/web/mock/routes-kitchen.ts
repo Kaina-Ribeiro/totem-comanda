@@ -22,6 +22,13 @@ const NEXT: Partial<Record<Schemas["OrderStatus"], Schemas["OrderStatus"][]>> = 
   PREPARING: ["READY"],
   READY: ["COLLECTED"],
 };
+// One step back, the same business day only (contract 0.2.0, plan decision 2).
+const BACK: Partial<Record<Schemas["OrderStatus"], Schemas["OrderStatus"]>> = {
+  READY: "PREPARING",
+  COLLECTED: "READY",
+};
+const businessDay = (at: Date | string) =>
+  new Date(at).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 const PING_MS = 15_000;
 
 /** Option names of a line, flattened, in pt-BR (KitchenOrder.lines[].options). */
@@ -129,15 +136,24 @@ export const kitchenRoutes: Route[] = [
       if (error) return error;
       const order = state.orders.get(orderId);
       if (!order) return notFound();
-      const status = (req.body as Partial<Schemas["KitchenStatusUpdate"]> | null)?.status;
+      const body = req.body as Partial<Schemas["KitchenStatusUpdate"]> | null;
+      const status = body?.status;
       if (status !== "PREPARING" && status !== "READY" && status !== "COLLECTED") {
         return problem(422, "VALIDATION_FAILED", "Validation failed", "status");
       }
-      if (!NEXT[order.status]?.includes(status)) {
+      const version = historyOf(order).length;
+      if (body?.expectedVersion !== undefined && body.expectedVersion !== version) {
+        return problem(409, "STALE_ORDER_VERSION", "The order changed since this version");
+      }
+      const back = BACK[order.status] === status;
+      const sameDay = businessDay(order.placedAt ?? order.createdAt) === businessDay(now());
+      if (!NEXT[order.status]?.includes(status) && !(back && sameDay)) {
         return problem(409, "INVALID_STATUS_TRANSITION", "Not allowed from the current status");
       }
+      const wasCollected = order.status === "COLLECTED";
       order.status = status;
-      if (status === "READY") order.readyAt = now().toISOString();
+      if (status === "READY" && !wasCollected) order.readyAt = now().toISOString();
+      if (status === "PREPARING") order.readyAt = null;
       historyOf(order).push({ status, at: now().toISOString(), by: "KITCHEN" });
       broadcastKitchen("order.status_changed", order);
       return ok(kitchenOrder(order));
