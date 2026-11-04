@@ -10,7 +10,7 @@
 //                           makes the next matching Core API calls slow or fail
 //                           (timeouts, 5xx, a lost answer); DELETE clears them
 //   POST /__mock/kitchen/backdate {"posCheckNumber": "42", "minutes": 12}
-//                           moves an order's placedAt (and readyAt) back, to see waiting colours
+//                           moves an order's placedAt, readyAt and status history back, to see waiting colours
 
 import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
@@ -22,7 +22,7 @@ import { SEED_MEDIA } from "./catalogue.ts";
 import { authDevice, problem, type Reply, type Request, type Route, type Schemas } from "./http.ts";
 import { adminRoutes } from "./routes-admin.ts";
 import { catalogueRoutes } from "./routes-catalogue.ts";
-import { serveKitchenStream, kitchenRoutes } from "./routes-kitchen.ts";
+import { historyOf, serveKitchenStream, kitchenRoutes } from "./routes-kitchen.ts";
 import { optionRoutes } from "./routes-options.ts";
 import { kioskRoutes } from "./routes-kiosk.ts";
 import { orderRoutes } from "./routes-orders.ts";
@@ -192,6 +192,7 @@ const routes: Route[] = [
         at ? new Date(Date.parse(at) - (body.minutes as number) * 60_000).toISOString() : at;
       order.placedAt = back(order.placedAt) ?? order.placedAt;
       order.readyAt = back(order.readyAt) ?? null;
+      for (const change of historyOf(order)) change.at = back(change.at) ?? change.at;
       return { status: 200, body: { id: order.id, placedAt: order.placedAt } };
     },
   ],

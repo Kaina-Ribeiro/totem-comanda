@@ -43,7 +43,7 @@ function optionChoices(options: Schemas["OrderLineOption"][]): Schemas["KitchenO
 // Status history per order (contract 0.2.0); `version` is its length.
 const histories = new Map<string, Schemas["KitchenStatusChange"][]>();
 
-function historyOf(order: StoredOrder): Schemas["KitchenStatusChange"][] {
+export function historyOf(order: StoredOrder): Schemas["KitchenStatusChange"][] {
   let history = histories.get(order.id);
   if (!history) {
     history = [{ status: "PAID", at: order.placedAt ?? order.createdAt, by: "KIOSK" }];

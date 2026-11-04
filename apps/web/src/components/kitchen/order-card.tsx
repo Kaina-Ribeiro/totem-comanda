@@ -27,6 +27,7 @@ export function OrderCard({
   now,
   busy,
   isNew = false,
+  onOpen,
   onAdvance,
 }: {
   order: KitchenOrder;
@@ -34,6 +35,8 @@ export function OrderCard({
   busy: boolean;
   /** Arrived after the board loaded and nobody touched the screen since (G-K1). */
   isNew?: boolean;
+  /** Opens the order detail (prototype K2). */
+  onOpen: () => void;
   onAdvance: () => void;
 }) {
   const column = order.status as keyof typeof BUTTON_LABEL;
@@ -47,38 +50,44 @@ export function OrderCard({
         isNew ? "shadow-[0_0_0_3px_var(--color-detail-light)]" : CARD_RING[state]
       }`}
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2.5">
-          <span className="text-[38px] leading-none font-extrabold tracking-[-0.02em]">
-            {order.posCheckNumber}
-          </span>
-          {isNew && (
-            <span className="flex h-6 items-center gap-[5px] rounded-xl bg-wheat px-[9px] text-xs font-semibold">
-              <span className="size-1.5 rounded-full bg-detail" />
-              Novo
+      <button
+        onClick={onOpen}
+        aria-label={`Abrir pedido ${order.posCheckNumber}`}
+        className="-mx-2 -mt-1.5 flex flex-col gap-3 rounded-lg px-2 pt-1.5 text-left transition-colors active:bg-hover"
+      >
+        <span className="flex w-full items-center justify-between gap-2">
+          <span className="flex items-center gap-2.5">
+            <span className="text-[38px] leading-none font-extrabold tracking-[-0.02em]">
+              {order.posCheckNumber}
             </span>
-          )}
-          <span className={`${chip} ${order.orderType === "TAKE_OUT" ? "bg-butter" : "bg-oat"}`}>
-            {order.orderType === "TAKE_OUT" ? "Para viagem" : "Comer aqui"}
-          </span>
-        </div>
-        <span className={`${chip} ${WAIT_CHIP[state]}`}>
-          {ready ? `pronto há ${minutes} min` : waitLabel(minutes)}
-          {!ready && <span className="sr-only">, {WAIT_NAME[state]}</span>}
-        </span>
-      </div>
-      <ul className="flex flex-col gap-[7px]">
-        {order.lines.map((line, i) => (
-          <li key={i} className="flex flex-col gap-px">
-            <span className="text-[17px] font-bold">
-              {line.quantity}× {line.name}
-            </span>
-            {line.options.length > 0 && (
-              <span className="text-sm font-semibold text-muted">{line.options.join(" · ")}</span>
+            {isNew && (
+              <span className="flex h-6 items-center gap-[5px] rounded-xl bg-wheat px-[9px] text-xs font-semibold">
+                <span className="size-1.5 rounded-full bg-detail" />
+                Novo
+              </span>
             )}
-          </li>
-        ))}
-      </ul>
+            <span className={`${chip} ${order.orderType === "TAKE_OUT" ? "bg-butter" : "bg-oat"}`}>
+              {order.orderType === "TAKE_OUT" ? "Para viagem" : "Comer aqui"}
+            </span>
+          </span>
+          <span className={`${chip} ${WAIT_CHIP[state]}`}>
+            {ready ? `pronto há ${minutes} min` : waitLabel(minutes)}
+            {!ready && <span className="sr-only">, {WAIT_NAME[state]}</span>}
+          </span>
+        </span>
+        <span className="flex flex-col gap-[7px]">
+          {order.lines.map((line, i) => (
+            <span key={i} className="flex flex-col gap-px">
+              <span className="text-[17px] font-bold">
+                {line.quantity}× {line.name}
+              </span>
+              {line.options.length > 0 && (
+                <span className="text-sm font-semibold text-muted">{line.options.join(" · ")}</span>
+              )}
+            </span>
+          ))}
+        </span>
+      </button>
       <button
         onClick={onAdvance}
         disabled={busy}
