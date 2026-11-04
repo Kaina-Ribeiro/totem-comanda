@@ -3,6 +3,7 @@
 import { after } from "next/server";
 
 import { coreApi } from "@/lib/core/client";
+import { retryUnknown } from "@/lib/core/retry";
 import type { components } from "@/lib/core-api";
 import {
   deviceCall,
@@ -154,9 +155,17 @@ export type PlacedOrder = Schemas["PlacedOrder"];
 
 /**
  * Stores the order as AWAITING_PAYMENT (first half of OP-PAY-01). The Core
- * API reprices every line; `idempotencyKey` makes a retry return the same order.
+ * API reprices every line; `idempotencyKey` makes a retry return the same order,
+ * so an unknown answer is retried with it for up to 15 s.
  */
 export async function createOrder(
+  idempotencyKey: string,
+  order: Schemas["CreateOrderRequest"],
+): Promise<Result<Order>> {
+  return retryUnknown(() => postOrder(idempotencyKey, order));
+}
+
+function postOrder(
   idempotencyKey: string,
   order: Schemas["CreateOrderRequest"],
 ): Promise<Result<Order>> {
@@ -224,15 +233,21 @@ export async function cancelPayment(paymentId: string): Promise<Result<Payment>>
   );
 }
 
-/** Places a paid order (OP-PAY-03): the Core API assigns the order number. */
+/**
+ * Places a paid order (OP-PAY-03): the Core API assigns the order number. An
+ * unknown answer is retried with the same key for up to 15 s; after that it is
+ * still CORE_UNAVAILABLE, which the kiosk shows as "verificando", never "falhou".
+ */
 export async function placeOrder(
   orderId: string,
   idempotencyKey: string,
 ): Promise<Result<PlacedOrder>> {
-  return deviceCall((headers) =>
-    coreApi().POST("/v1/orders/{orderId}/place", {
-      headers,
-      params: { path: { orderId }, header: { "Idempotency-Key": idempotencyKey } },
-    }),
+  return retryUnknown(() =>
+    deviceCall((headers) =>
+      coreApi().POST("/v1/orders/{orderId}/place", {
+        headers,
+        params: { path: { orderId }, header: { "Idempotency-Key": idempotencyKey } },
+      }),
+    ),
   );
 }
