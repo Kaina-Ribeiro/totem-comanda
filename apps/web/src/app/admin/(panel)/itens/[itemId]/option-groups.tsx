@@ -146,7 +146,7 @@ export async function OptionGroups({ itemId }: { itemId: string }) {
   const groups = loaded.data.filter((g) => !g.parentOptionId);
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="font-display text-2xl font-semibold">Opções e adicionais</h2>
+      <h2 className="text-xl font-bold tracking-[-0.02em]">Opções e adicionais</h2>
       {groups.map((group) => (
         <GroupForm key={group.id} itemId={itemId} group={group} />
       ))}
@@ -186,7 +186,7 @@ function GroupForm({
       }));
   return (
     <Card className="flex flex-col gap-4">
-      {!group && <h3 className="font-display text-lg font-semibold">Novo grupo</h3>}
+      {!group && <h3 className="text-base font-bold">Novo grupo</h3>}
       <ActionForm action={saveGroup} resetOnSave={!group} className="flex flex-col gap-4">
         <input type="hidden" name="groupId" value={group?.id ?? ""} />
         <input type="hidden" name="itemId" value={itemId} />

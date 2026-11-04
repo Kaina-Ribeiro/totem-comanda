@@ -153,7 +153,7 @@ async function Categories({
           <Link
             key={m.id}
             href={`${PATH}?menu=${m.id}`}
-            className={`rounded-full px-4 py-2 text-sm font-bold ${
+            className={`rounded-[10px] px-4 py-2 text-sm font-bold ${
               m.id === menu.id ? "bg-accent text-on-accent" : "bg-surface text-ink"
             }`}
           >
@@ -170,7 +170,7 @@ async function Categories({
         />
       ))}
       <Card>
-        <h2 className="mb-4 font-display text-xl font-semibold">
+        <h2 className="mb-4 text-lg font-bold tracking-[-0.01em]">
           Nova categoria em {menu.name["pt-BR"]}
         </h2>
         <ActionForm action={createCategory} resetOnSave className="grid gap-4 sm:grid-cols-4">

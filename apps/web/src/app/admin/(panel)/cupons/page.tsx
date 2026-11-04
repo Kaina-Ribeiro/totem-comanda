@@ -141,13 +141,13 @@ function DiscountForm({ discount }: { discount: Discount | null }) {
     <Card className="flex flex-col gap-4">
       {discount ? (
         <div className="flex flex-wrap items-center gap-2">
-          <code className="font-display text-xl font-semibold">{discount.code}</code>
+          <code className="text-lg font-bold tracking-[-0.01em]">{discount.code}</code>
           <span className="text-sm text-muted">{summary(discount)}</span>
           {!discount.active && <Badge tone="danger">Inativo</Badge>}
           {expired && <Badge tone="warn">Vencido</Badge>}
         </div>
       ) : (
-        <h2 className="font-display text-xl font-semibold">Novo cupom</h2>
+        <h2 className="text-lg font-bold tracking-[-0.01em]">Novo cupom</h2>
       )}
       <ActionForm action={saveDiscount} resetOnSave={!discount} className="flex flex-col gap-4">
         <input type="hidden" name="discountId" value={discount?.id ?? ""} />

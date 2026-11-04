@@ -130,7 +130,7 @@ export default function MenusPage() {
         <MenuList />
       </Suspense>
       <Card>
-        <h2 className="mb-4 font-display text-xl font-semibold">Novo cardápio</h2>
+        <h2 className="mb-4 text-lg font-bold tracking-[-0.01em]">Novo cardápio</h2>
         <ActionForm action={createMenu} resetOnSave className="grid gap-4 sm:grid-cols-3">
           <Field label="Nome (PT)">
             <input name="name.pt" required placeholder="Noite" className={inputClass} />
@@ -184,7 +184,7 @@ function MenuCard({ menu, windows }: { menu: Menu; windows: Window[] }) {
   return (
     <Card className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="font-display text-2xl font-semibold">{menu.name["pt-BR"]}</h2>
+        <h2 className="text-xl font-bold tracking-[-0.02em]">{menu.name["pt-BR"]}</h2>
         {menu.isActive && <Badge tone="ok">No totem agora</Badge>}
         {menu.forcedUntil && (
           <Badge tone="warn">Forçado até {untilFormat.format(new Date(menu.forcedUntil))}</Badge>
@@ -207,28 +207,33 @@ function MenuCard({ menu, windows }: { menu: Menu; windows: Window[] }) {
             <input name="name.en" defaultValue={menu.name.en} className={inputClass} />
           </Field>
         </div>
-        <fieldset className="flex flex-col gap-2">
+        <fieldset className="flex min-w-0 flex-col gap-2">
           <legend className="mb-2 text-sm font-semibold text-muted">
             Horários (fim antes do início passa da meia-noite)
           </legend>
           {DAYS.map(([day, label]) => {
             const w = byDay.get(day);
             return (
-              <div key={day} className="grid grid-cols-[7rem_1fr_1fr] items-center gap-3">
-                <Checkbox name={`${day}.open`} label={label} defaultChecked={!!w} />
+              <div
+                key={day}
+                className="grid grid-cols-2 items-center gap-2 sm:grid-cols-[7rem_minmax(0,1fr)_minmax(0,1fr)] sm:gap-3"
+              >
+                <div className="col-span-2 sm:col-span-1">
+                  <Checkbox name={`${day}.open`} label={label} defaultChecked={!!w} />
+                </div>
                 <input
                   name={`${day}.start`}
                   type="time"
                   defaultValue={w?.timeStart ?? "06:00"}
                   aria-label={`${label}, abre`}
-                  className={inputClass}
+                  className={`${inputClass} min-w-0`}
                 />
                 <input
                   name={`${day}.end`}
                   type="time"
                   defaultValue={w?.timeEnd ?? "11:00"}
                   aria-label={`${label}, fecha`}
-                  className={inputClass}
+                  className={`${inputClass} min-w-0`}
                 />
               </div>
             );
