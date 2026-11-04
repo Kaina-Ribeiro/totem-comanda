@@ -6,6 +6,7 @@ import { formatNextOpening } from "@/lib/format/next-opening";
 import { AttractScreen } from "./attract-screen";
 import { availableOrderTypes } from "./journey/journey-state";
 import { KioskJourney } from "./journey/kiosk-journey";
+import { PausedScreen } from "./paused-screen";
 import { UnavailableScreen } from "./unavailable-screen";
 
 /** FR-137: gate screens re-read the config every 45 s, so the kiosk opens and closes by itself. */
@@ -40,8 +41,16 @@ function GateScreen({ config }: { config: DeviceConfig }) {
           body="Faça seu pedido no balcão. Já já voltamos."
         />
       );
-    // The store pace's own screen (T3) comes with COM-83; until then the same copy.
     case "paused":
+      return (
+        <PausedScreen
+          brand={brand}
+          pausedUntil={config.pace.pausedUntil}
+          timeZone={restaurant.timezone}
+          languages={restaurant.supportedLanguages.map((l) => l.code)}
+          defaultLanguage={restaurant.defaultLanguage}
+        />
+      );
     case "at-capacity":
       return (
         <UnavailableScreen
