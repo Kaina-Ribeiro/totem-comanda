@@ -180,7 +180,8 @@ Follow these rules exactly. If a request conflicts with them, stop and say which
   approval** (Kai merges alone), and the `v*` tag ruleset lets only admins bypass, because GitHub
   refuses the Actions app as a bypass actor on a personal-account repo. So `RELEASE_TOKEN` must be
   an admin's token (Kai's; Pull requests + Contents read/write) or rc/final tags fail to push.
-  Never reapply `.github/rulesets/*.json` here as they are. Kai manages tokens himself: never ask
+  The version-lines ruleset also has the admin role as bypass (`always`, 4 Nov 2026), so the
+  workflow can delete a shipped `release/*` or `hotfix/*` branch. Never reapply `.github/rulesets/*.json` here as they are. Kai manages tokens himself: never ask
   for, read or handle a token value.
 - Deploy is Cubeship (`deploy/cubeship`), not Jenkins. The apps `comanda/production/web` and
   `comanda/production/mock` build from a tag (`ref: v0.1.0` since 31 Oct 2026), never a branch.
