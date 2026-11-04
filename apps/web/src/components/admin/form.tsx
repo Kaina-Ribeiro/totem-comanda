@@ -35,7 +35,7 @@ export function ActionForm({
         </p>
       )}
       {state.reveal && (
-        <div className="flex flex-col gap-1 rounded-xl border border-detail bg-butter p-3">
+        <div className="flex flex-col gap-1 rounded-[10px] border border-detail bg-butter p-3">
           <span className="text-xs font-bold text-detail-text">{state.reveal.label}</span>
           <code className="text-base font-bold break-all select-all">{state.reveal.value}</code>
         </div>
@@ -65,8 +65,8 @@ export function SubmitButton({
   const { pending } = useFormStatus();
   const styles = {
     primary: "bg-accent text-on-accent",
-    secondary: "bg-surface text-ink border border-line",
-    danger: "bg-surface text-danger border border-line",
+    secondary: "bg-surface text-ink border border-line hover:bg-hover",
+    danger: "bg-surface text-danger border border-line hover:bg-danger-bg",
   }[variant];
   return (
     <button
@@ -74,7 +74,7 @@ export function SubmitButton({
       name={name}
       value={value}
       disabled={pending}
-      className={`h-11 rounded-full px-5 text-sm font-bold transition-opacity disabled:opacity-60 ${styles}`}
+      className={`h-10 rounded-[10px] px-4 text-sm font-bold whitespace-nowrap transition-[transform,background-color,opacity] active:scale-[.98] disabled:opacity-60 ${styles}`}
     >
       {pending ? pendingLabel : children}
     </button>

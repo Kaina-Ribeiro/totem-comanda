@@ -29,7 +29,7 @@ export default function AdminLoginPage({ searchParams }: PageProps<"/admin/login
       <div className="flex w-full max-w-sm flex-col gap-8">
         <div className="flex flex-col gap-2">
           <span className="font-display text-xl italic">Comanda</span>
-          <h1 className="font-display text-4xl font-semibold tracking-[-0.02em]">Back office</h1>
+          <h1 className="text-[28px] leading-[1.15] font-bold tracking-[-0.02em]">Back office</h1>
           <Suspense>
             <ExpiredNote searchParams={searchParams} />
           </Suspense>

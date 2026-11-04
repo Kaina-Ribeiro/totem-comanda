@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 // uses normal type sizes with the same "Café e trigo" tokens.
 
 export const inputClass =
-  "h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-ink outline-none focus:border-detail";
+  "h-11 w-full rounded-[10px] border border-line bg-surface px-3 text-base text-ink outline-none focus:border-detail";
 
 export function PageHeader({
   title,
@@ -18,10 +18,10 @@ export function PageHeader({
   return (
     <header className="flex flex-wrap items-end justify-between gap-4">
       <div className="flex flex-col gap-1">
-        <h1 className="font-display text-3xl font-semibold tracking-[-0.02em] sm:text-4xl">
+        <h1 className="text-2xl leading-[1.15] font-bold tracking-[-0.02em] min-[821px]:text-[28px]">
           {title}
         </h1>
-        {description && <p className="text-sm text-muted">{description}</p>}
+        {description && <p className="text-sm font-medium text-muted">{description}</p>}
       </div>
       {actions}
     </header>
@@ -30,7 +30,7 @@ export function PageHeader({
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <section className={`rounded-2xl border border-line bg-surface p-5 ${className}`}>
+    <section className={`rounded-[14px] border border-line bg-surface px-5 py-[18px] ${className}`}>
       {children}
     </section>
   );
@@ -89,7 +89,7 @@ export function Badge({
     muted: "bg-ground text-muted",
     ok: "bg-sage text-ink",
     warn: "bg-butter text-detail-text",
-    danger: "bg-danger/10 text-danger",
+    danger: "bg-danger-bg text-danger",
   };
   return (
     <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${tones[tone]}`}>
@@ -101,7 +101,7 @@ export function Badge({
 /** Error box for a page whose data could not load. */
 export function LoadError({ message }: { message: string }) {
   return (
-    <p role="alert" className="rounded-2xl bg-danger/10 p-5 text-sm font-semibold text-danger">
+    <p role="alert" className="rounded-[14px] bg-danger-bg p-5 text-sm font-semibold text-danger">
       {message}
     </p>
   );

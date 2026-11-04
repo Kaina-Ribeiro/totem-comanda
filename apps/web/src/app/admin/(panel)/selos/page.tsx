@@ -134,12 +134,12 @@ async function Lists() {
   );
   return (
     <>
-      <h2 className="font-display text-2xl font-semibold">Selos</h2>
+      <h2 className="text-xl font-bold tracking-[-0.02em]">Selos</h2>
       {tags.map((tag) => (
         <TagForm key={tag.id} tag={tag} items={items} />
       ))}
       <TagForm tag={null} items={items} />
-      <h2 className="mt-4 font-display text-2xl font-semibold">Sugestões ao adicionar</h2>
+      <h2 className="mt-4 text-xl font-bold tracking-[-0.02em]">Sugestões ao adicionar</h2>
       {crossSells.map((group) => (
         <CrossSellForm key={group.id} group={group} items={items} />
       ))}
@@ -152,7 +152,7 @@ function ItemPicker({ items, chosen }: { items: Item[]; chosen: Set<string> }) {
   return (
     <fieldset className="flex flex-col gap-2">
       <legend className="mb-2 text-sm font-semibold text-muted">Itens</legend>
-      <div className="grid max-h-56 gap-1.5 overflow-y-auto rounded-xl border border-line p-3 sm:grid-cols-2">
+      <div className="grid max-h-56 gap-1.5 overflow-y-auto rounded-[10px] border border-line p-3 sm:grid-cols-2">
         {items.map((item) => (
           <label key={item.id} className="flex items-center gap-2 text-sm">
             <input
@@ -199,7 +199,7 @@ function TagForm({ tag, items }: { tag: Tag | null; items: Item[] }) {
               name="textColour"
               type="color"
               defaultValue={tag?.textColour ?? "#2B211C"}
-              className="h-11 w-16 rounded-xl border border-line"
+              className="h-11 w-16 rounded-[10px] border border-line"
             />
           </Field>
           <Field label="Fundo">
@@ -207,7 +207,7 @@ function TagForm({ tag, items }: { tag: Tag | null; items: Item[] }) {
               name="backgroundColour"
               type="color"
               defaultValue={tag?.backgroundColour ?? "#FFFFFF"}
-              className="h-11 w-16 rounded-xl border border-line"
+              className="h-11 w-16 rounded-[10px] border border-line"
             />
           </Field>
           {tag && (

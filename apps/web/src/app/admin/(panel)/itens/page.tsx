@@ -17,7 +17,7 @@ export default function ItemsPage() {
         actions={
           <Link
             href="/admin/itens/novo"
-            className="rounded-full bg-accent px-5 py-2.5 text-sm font-bold text-on-accent"
+            className="rounded-[10px] bg-accent px-4 py-2.5 text-sm font-bold text-on-accent transition-transform active:scale-[.98]"
           >
             Novo item
           </Link>

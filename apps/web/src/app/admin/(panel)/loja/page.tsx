@@ -144,7 +144,7 @@ async function StoreForm() {
       </Card>
 
       <Card className="grid gap-5 sm:grid-cols-2">
-        <h2 className="font-display text-xl font-semibold sm:col-span-2">Mensagem de fechado</h2>
+        <h2 className="text-lg font-bold tracking-[-0.01em] sm:col-span-2">Mensagem de fechado</h2>
         <Field label="Título (PT)">
           <input
             name="closedTitle.pt"
@@ -180,7 +180,7 @@ async function StoreForm() {
       </Card>
 
       <Card className="grid gap-5 sm:grid-cols-2">
-        <h2 className="font-display text-xl font-semibold sm:col-span-2">Rodapé do comprovante</h2>
+        <h2 className="text-lg font-bold tracking-[-0.01em] sm:col-span-2">Rodapé do comprovante</h2>
         <Field label="Rodapé (PT)" hint="Sai impresso a partir da fase 4.">
           <input
             name="footer.pt"

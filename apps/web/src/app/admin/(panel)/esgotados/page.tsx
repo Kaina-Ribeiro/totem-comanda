@@ -77,7 +77,7 @@ async function SoldOutList() {
         return (
           <li
             key={item.id}
-            className={`flex items-center gap-3 rounded-2xl border p-3 ${
+            className={`flex items-center gap-3 rounded-[14px] border p-3 ${
               out ? "border-danger/30 bg-danger/5" : "border-line bg-surface"
             }`}
           >
