@@ -1,3 +1,4 @@
+import { CALL_TIMEOUT_MS } from "@/lib/core/client";
 import { requireDeviceKind } from "@/lib/device/config";
 import { asDevice } from "@/lib/device/session";
 import { kitchenStreamUrl } from "@/lib/kitchen/core";
@@ -11,13 +12,22 @@ export async function GET(request: Request) {
   let upstream: Response;
   try {
     await requireDeviceKind("KITCHEN");
-    ({ response: upstream } = await asDevice(async (headers) => ({
-      response: await fetch(kitchenStreamUrl(), {
-        headers: { ...headers, Accept: "text/event-stream" },
-        signal: request.signal,
-        cache: "no-store",
-      }),
-    })));
+    ({ response: upstream } = await asDevice(async (headers) => {
+      // The stream never ends, so the timeout covers only the wait for its headers.
+      const connecting = new AbortController();
+      const timer = setTimeout(() => connecting.abort(), CALL_TIMEOUT_MS);
+      try {
+        return {
+          response: await fetch(kitchenStreamUrl(), {
+            headers: { ...headers, Accept: "text/event-stream" },
+            signal: AbortSignal.any([request.signal, connecting.signal]),
+            cache: "no-store",
+          }),
+        };
+      } finally {
+        clearTimeout(timer);
+      }
+    }));
   } catch {
     return new Response(null, { status: 502 });
   }
