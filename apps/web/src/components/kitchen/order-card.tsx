@@ -26,11 +26,14 @@ export function OrderCard({
   order,
   now,
   busy,
+  isNew = false,
   onAdvance,
 }: {
   order: KitchenOrder;
   now: number;
   busy: boolean;
+  /** Arrived after the board loaded and nobody touched the screen since (G-K1). */
+  isNew?: boolean;
   onAdvance: () => void;
 }) {
   const column = order.status as keyof typeof BUTTON_LABEL;
@@ -40,13 +43,21 @@ export function OrderCard({
   const state = ready ? "ok" : waitState(minutes);
   return (
     <article
-      className={`flex shrink-0 flex-col gap-3 rounded-xl bg-surface px-4 pt-3.5 pb-4 ${CARD_RING[state]}`}
+      className={`flex shrink-0 flex-col gap-3 rounded-xl bg-surface px-4 pt-3.5 pb-4 ${
+        isNew ? "shadow-[0_0_0_3px_var(--color-detail-light)]" : CARD_RING[state]
+      }`}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
           <span className="text-[38px] leading-none font-extrabold tracking-[-0.02em]">
             {order.posCheckNumber}
           </span>
+          {isNew && (
+            <span className="flex h-6 items-center gap-[5px] rounded-xl bg-wheat px-[9px] text-xs font-semibold">
+              <span className="size-1.5 rounded-full bg-detail" />
+              Novo
+            </span>
+          )}
           <span className={`${chip} ${order.orderType === "TAKE_OUT" ? "bg-butter" : "bg-oat"}`}>
             {order.orderType === "TAKE_OUT" ? "Para viagem" : "Comer aqui"}
           </span>
