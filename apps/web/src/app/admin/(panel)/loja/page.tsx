@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import Image from "next/image";
 import { Suspense } from "react";
 
@@ -45,7 +46,27 @@ async function saveRestaurant(_: FormState, form: FormData): Promise<FormState> 
         },
       }),
     );
+    // React resets the form after the action: re-render it with what was saved.
+    revalidatePath("/admin", "layout");
     return "Configurações salvas. O totem atualiza em até 45 s.";
+  });
+}
+
+/** Minutes per pace level (decision 4): what the success screen says about the wait. */
+async function saveWaitMinutes(_: FormState, form: FormData): Promise<FormState> {
+  "use server";
+  const minutes = (name: string) => Number(text(form, name));
+  const NORMAL = minutes("waitNormal");
+  const BUSY = minutes("waitBusy");
+  const valid = (n: number) => Number.isInteger(n) && n >= 1 && n <= 120;
+  if (!valid(NORMAL) || !valid(BUSY)) return { error: "Use minutos inteiros de 1 a 120." };
+  return attempt(async () => {
+    await asOwner((headers) =>
+      coreApi().PUT("/v1/admin/pace/wait-minutes", { headers, body: { NORMAL, BUSY } }),
+    );
+    // The form resets after the action: re-render it (and Início's hints) with the saved minutes.
+    revalidatePath("/admin", "layout");
+    return "Tempo de espera salvo.";
   });
 }
 
@@ -59,7 +80,55 @@ export default function StorePage() {
       <Suspense>
         <StoreForm />
       </Suspense>
+      <Suspense>
+        <WaitTimesForm />
+      </Suspense>
     </>
+  );
+}
+
+/** "Tempo de espera" per pace level; the kitchen and Início pick the level. */
+async function WaitTimesForm() {
+  const loaded = await load(() => asOwner((headers) => coreApi().GET("/v1/admin/pace", { headers })));
+  if ("error" in loaded) return <LoadError message={loaded.error} />;
+  const { waitMinutes } = loaded.data;
+  return (
+    <ActionForm action={saveWaitMinutes} className="flex flex-col gap-4">
+      <Card className="grid gap-5 sm:grid-cols-2">
+        <div className="flex flex-col gap-1 sm:col-span-2">
+          <h2 className="text-lg font-bold tracking-[-0.01em]">Tempo de espera</h2>
+          <p className="text-sm text-muted">
+            O que a tela de sucesso do totem diz ao cliente. A cozinha escolhe o ritmo; no
+            Pausado, o totem não vende.
+          </p>
+        </div>
+        <Field label="Normal (minutos)">
+          <input
+            name="waitNormal"
+            type="number"
+            min={1}
+            max={120}
+            required
+            defaultValue={waitMinutes.NORMAL}
+            className={inputClass}
+          />
+        </Field>
+        <Field label="Movimentado (minutos)">
+          <input
+            name="waitBusy"
+            type="number"
+            min={1}
+            max={120}
+            required
+            defaultValue={waitMinutes.BUSY}
+            className={inputClass}
+          />
+        </Field>
+      </Card>
+      <div>
+        <SubmitButton>Salvar tempo de espera</SubmitButton>
+      </div>
+    </ActionForm>
   );
 }
 

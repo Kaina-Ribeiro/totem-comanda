@@ -2,7 +2,13 @@
 
 import { useEffect, useEffectEvent, useRef, useState, useTransition } from "react";
 
-import { cancelOrder, moveOrder, setSoldOut } from "@/app/kitchen/actions";
+import {
+  cancelOrder,
+  moveOrder,
+  readKitchenPace,
+  setKitchenPace,
+  setSoldOut,
+} from "@/app/kitchen/actions";
 import type { components } from "@/lib/core-api";
 import {
   accept,
@@ -21,11 +27,13 @@ import { CancelDialog, cancelErrorText } from "./cancel-dialog";
 import { NewOrdersBar, SoundButton, SoundDialog, useNewOrderAlert } from "./new-order-alert";
 import { OrderCard } from "./order-card";
 import { OrderDrawer } from "./order-drawer";
+import { PaceButton, PaceDialog } from "./pace-dialog";
 import { ProductionView } from "./production-view";
 import { lineTargets, SoldOutButton, SoldOutPanel, soldOutKey, type SoldOutTarget } from "./sold-out";
 import { UndoToast } from "./undo-toast";
 
 type KitchenOrder = components["schemas"]["KitchenOrder"];
+type StorePace = components["schemas"]["StorePace"];
 
 /** The contract's fallback when the event stream drops: poll every 2 s. */
 const POLL_MS = 2_000;
@@ -64,7 +72,14 @@ const clock = new Intl.DateTimeFormat("pt-BR", {
  * Preparing → Ready → Collected with one tap. Live through the BFF's event
  * stream; falls back to polling the open orders every 2 s while it is down.
  */
-export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
+export function KitchenBoard({
+  initial,
+  initialPace,
+}: {
+  initial: KitchenOrder[];
+  /** Null when Go did not answer; the header then shows a plain "Ritmo". */
+  initialPace: StorePace | null;
+}) {
   const [orders, setOrders] = useState(initial);
   const [live, setLive] = useState(true);
   const [now, setNow] = useState(() => Date.now());
@@ -82,6 +97,10 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
   // "Cancelar pedido" (G-K11): the order asked about and the last error.
   const [cancelling, setCancelling] = useState<KitchenOrder | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  // The store's pace (G-K5, K4), also set from Início: re-read with every full reload.
+  const [pace, setPace] = useState(initialPace);
+  const [paceOpen, setPaceOpen] = useState(false);
+  const [paceError, setPaceError] = useState<string | null>(null);
   // "Acabou" (G-K4): the line being asked about, and what this tablet marked today.
   const [soldOutAsk, setSoldOutAsk] = useState<{ line: number; target: SoldOutTarget } | null>(
     null,
@@ -101,6 +120,7 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
     return ids;
   };
   const onIncoming = useEffectEvent((list: KitchenOrder[]) => alert.arrived(newPaid(list)));
+  const onPaceTick = useEffectEvent(() => void reloadPace());
 
   /** Reloads the open orders from Go; the board then shows where each card really is. */
   const refresh = async () => {
@@ -113,12 +133,34 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
     return snapshot !== null;
   };
 
-  /** The header's refresh button: reloads and shows it is working. */
+  /** The header's refresh button: reloads orders and the pace and shows it is working. */
   async function refreshNow() {
     if (refreshing) return;
     setRefreshing(true);
-    await refresh();
+    await Promise.all([refresh(), reloadPace()]);
     setRefreshing(false);
+  }
+
+  /** Reads the pace again; keeps the last one if Go does not answer. */
+  async function reloadPace() {
+    const result = await readKitchenPace().catch(() => null);
+    if (result?.ok) setPace(result.data);
+  }
+
+  /** Saves the pace from the K4 dialog. */
+  function choosePace(next: StorePace["pace"], pauseMinutes?: 15 | 30) {
+    setPaceError(null);
+    startTransition(async () => {
+      const result = await setKitchenPace(next, pauseMinutes).catch(
+        () => ({ ok: false, code: "NETWORK" }) as const,
+      );
+      if (!result.ok) {
+        setPaceError("Não deu para mudar o ritmo. Verifique a conexão e tente de novo.");
+        return;
+      }
+      setPace(result.data);
+      setPaceOpen(false);
+    });
   }
 
   // Waiting times and the clock tick every 20 s.
@@ -137,6 +179,7 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
         setOrders((current) => mergeSnapshot(current, open, seen.current, startedAt, Date.now()));
         onIncoming(open);
       }
+      onPaceTick();
     }, FULL_REFRESH_MS);
     return () => clearInterval(timer);
   }, [live]);
@@ -356,6 +399,14 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
           })}
         </nav>
         <div className="flex items-center gap-2.5">
+          <PaceButton
+            pace={pace}
+            onPress={() => {
+              setPaceError(null);
+              setPaceOpen(true);
+              void reloadPace();
+            }}
+          />
           <SoundButton on={alert.soundOn} onPress={alert.openDialog} />
           <button
             onClick={refreshNow}
@@ -521,6 +572,15 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
               </button>
             )
           }
+        />
+      )}
+      {paceOpen && pace && (
+        <PaceDialog
+          pace={pace}
+          busy={pending}
+          error={paceError}
+          onCancel={() => setPaceOpen(false)}
+          onConfirm={choosePace}
         />
       )}
       {cancelling && (

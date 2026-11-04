@@ -17,6 +17,8 @@ export type StoreStatus = {
   next: NextOpening | null;
   timeZone: string;
   day: number;
+  /** The store's pace (decision 3), the same one the kitchen sets. */
+  pace: Schemas["StorePace"];
 };
 
 /**
@@ -28,11 +30,12 @@ export async function loadStoreStatus(
   now: Date,
   loaded: { restaurant?: Schemas["Restaurant"]; devices?: Schemas["AdminDevice"][] } = {},
 ): Promise<StoreStatus> {
-  const [restaurant, menus, devices] = await Promise.all([
+  const [restaurant, menus, devices, pace] = await Promise.all([
     loaded.restaurant ??
       asOwner((headers) => coreApi().GET("/v1/admin/restaurant", { headers })),
     asOwner((headers) => coreApi().GET("/v1/admin/menus", { headers })),
     loaded.devices ?? asOwner((headers) => coreApi().GET("/v1/admin/devices", { headers })),
+    asOwner((headers) => coreApi().GET("/v1/admin/pace", { headers })),
   ]);
   const schedules = await Promise.all(
     menus.map((menu) =>
@@ -67,5 +70,6 @@ export async function loadStoreStatus(
     ),
     timeZone: restaurant.timezone,
     day: clock.day,
+    pace,
   };
 }

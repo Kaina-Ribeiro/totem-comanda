@@ -5,10 +5,12 @@ import { requireDeviceKind } from "@/lib/device/config";
 import { deviceCallAs, failure, type Result } from "@/lib/kiosk/core";
 import {
   cancelAsOwner,
+  getKitchenPace,
   type CancelReason,
   type KitchenAvailability,
   type KitchenOrder,
   type KitchenStatus,
+  type StorePace,
 } from "@/lib/kitchen/core";
 
 const STATUSES = new Set<KitchenStatus>(["PREPARING", "READY", "COLLECTED"]);
@@ -76,4 +78,28 @@ export async function cancelOrder(
     return failure(error);
   }
   return cancelAsOwner(orderId, { email: email.trim(), password }, reason);
+}
+
+/** "Ritmo da cozinha" (K4): Normal, Movimentado, or paused for 15 or 30 min. */
+export async function setKitchenPace(
+  pace: StorePace["pace"],
+  pauseMinutes?: 15 | 30,
+): Promise<Result<StorePace>> {
+  if (pace !== "NORMAL" && pace !== "BUSY" && pace !== "PAUSED") {
+    return { ok: false, code: "VALIDATION_FAILED" };
+  }
+  if (pace === "PAUSED" && pauseMinutes !== 15 && pauseMinutes !== 30) {
+    return { ok: false, code: "VALIDATION_FAILED" };
+  }
+  return deviceCallAs("KITCHEN", (headers) =>
+    coreApi().PUT("/v1/kitchen/pace", {
+      headers,
+      body: pace === "PAUSED" ? { pace, pauseMinutes } : { pace },
+    }),
+  );
+}
+
+/** Reads the pace again (the owner may have changed it on Início). */
+export async function readKitchenPace(): Promise<Result<StorePace>> {
+  return getKitchenPace();
 }
