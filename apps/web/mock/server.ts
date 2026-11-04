@@ -9,6 +9,8 @@
 //   POST /__mock/fault      {"path": "<regex>", "method"?, "status"?, "delayMs"?, "times"?}
 //                           makes the next matching Core API calls slow or fail
 //                           (timeouts, 5xx, a lost answer); DELETE clears them
+//   POST /__mock/kitchen/backdate {"posCheckNumber": "42", "minutes": 12}
+//                           moves an order's placedAt (and readyAt) back, to see waiting colours
 
 import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
@@ -171,6 +173,24 @@ const routes: Route[] = [
       faults.push(fault);
       console.log(`[mock] fault: ${fault.method ?? "*"} ${body.path} ×${fault.times}`);
       return { status: 200, body: { faults: faults.length } };
+    },
+  ],
+  [
+    "POST",
+    /^\/__mock\/kitchen\/backdate$/,
+    (req) => {
+      const body = (req.body ?? {}) as { posCheckNumber?: unknown; minutes?: unknown };
+      const order = [...state.orders.values()].find(
+        (o) => o.posCheckNumber === String(body.posCheckNumber),
+      );
+      if (!order || typeof body.minutes !== "number") {
+        return { status: 400, body: { error: "posCheckNumber of a placed order and minutes" } };
+      }
+      const back = (at: string | null | undefined) =>
+        at ? new Date(Date.parse(at) - (body.minutes as number) * 60_000).toISOString() : at;
+      order.placedAt = back(order.placedAt) ?? order.placedAt;
+      order.readyAt = back(order.readyAt) ?? null;
+      return { status: 200, body: { id: order.id, placedAt: order.placedAt } };
     },
   ],
   [

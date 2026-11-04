@@ -23,6 +23,14 @@
   --color-sage: #dcdfd2;
   --color-oat: #e2ded8;
   --color-image-bg: #e9e2d7;
+  /* Work screens (second canvas, docs/prototype/README.md "Second canvas"). */
+  --color-leaf: #4f6b45;
+  --color-night: #2a1c16;
+  --color-danger-bg: #f4e1db;
+  --color-hover: #efe9e1;
+  /* Kitchen: column trays and the tab bar (K1). */
+  --color-tray: #eae3d8;
+  --color-tabs: #e6ded2;
 
   --font-display: var(--font-fraunces), Georgia, serif;
   --font-sans: var(--font-manrope), system-ui, sans-serif;

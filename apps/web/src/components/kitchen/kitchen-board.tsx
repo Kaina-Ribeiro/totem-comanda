@@ -10,8 +10,9 @@ import {
   moveErrorMessage,
   type MoveError,
   NEXT_STATUS,
-  waitingMinutes,
 } from "@/lib/kitchen/board";
+
+import { OrderCard } from "./order-card";
 
 type KitchenOrder = components["schemas"]["KitchenOrder"];
 
@@ -19,8 +20,6 @@ type KitchenOrder = components["schemas"]["KitchenOrder"];
 const POLL_MS = 2_000;
 /** While polling, try the stream again this often. */
 const RECONNECT_MS = 30_000;
-/** Waiting time turns to a warning after this many minutes. */
-const LATE_MINUTES = 10;
 
 /** The open orders as Go has them; null while Go or the network cannot answer. */
 async function fetchOpenOrders(): Promise<KitchenOrder[] | null> {
@@ -33,12 +32,17 @@ async function fetchOpenOrders(): Promise<KitchenOrder[] | null> {
 }
 
 const COLUMN_LABEL = { PAID: "Novos", PREPARING: "Preparando", READY: "Prontos" } as const;
-const BUTTON_LABEL = { PAID: "Começar", PREPARING: "Pronto", READY: "Retirado" } as const;
+
+const clock = new Intl.DateTimeFormat("pt-BR", {
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "America/Sao_Paulo",
+});
 
 /**
- * The kitchen screen: paid orders, oldest first, moved New → Preparing →
- * Ready → Collected with one tap. Live through the BFF's event stream;
- * falls back to polling the open orders every 2 s while the stream is down.
+ * The kitchen screen (prototype K1): paid orders, oldest first, moved New →
+ * Preparing → Ready → Collected with one tap. Live through the BFF's event
+ * stream; falls back to polling the open orders every 2 s while it is down.
  */
 export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
   const [orders, setOrders] = useState(initial);
@@ -55,7 +59,7 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
     if (open) setOrders(open);
   };
 
-  // Waiting times tick every 20 s.
+  // Waiting times and the clock tick every 20 s.
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 20_000);
     return () => clearInterval(timer);
@@ -135,24 +139,31 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
   const errorMessage = moveError && moveErrorMessage(moveError);
 
   return (
-    <main className="flex min-h-dvh flex-1 flex-col gap-4 bg-ground p-4 text-ink">
-      <header className="flex items-center justify-between">
-        <h1 className="font-display text-3xl font-semibold">Cozinha</h1>
-        <span
-          className={`rounded-full px-3 py-1 text-sm font-bold ${
-            live ? "bg-sage text-ink" : "bg-butter text-detail-text"
-          }`}
-          role="status"
-        >
-          {live ? "Ao vivo" : "Reconectando… (atualiza a cada 2 s)"}
+    <main className="flex h-dvh min-h-0 flex-1 flex-col overflow-hidden bg-ground text-ink tabular-nums">
+      <header className="flex h-[76px] shrink-0 items-center justify-between gap-4 px-6">
+        <div className="flex items-center gap-3.5">
+          <h1 className="text-[22px] font-bold tracking-[-0.02em]">Cozinha</h1>
+          <span
+            role="status"
+            className={`flex h-7 items-center gap-[7px] rounded-[14px] px-3 text-[13px] font-extrabold ${
+              live ? "bg-sage" : "bg-butter text-detail-text"
+            }`}
+          >
+            <span className={`size-2 rounded-full ${live ? "bg-leaf" : "bg-detail"}`} />
+            {live ? "Ao vivo" : "Reconectando… atualiza a cada 2 s"}
+          </span>
+        </div>
+        <span className="min-w-16 text-right text-xl font-bold tracking-[-0.02em]">
+          {clock.format(now)}
         </span>
       </header>
+
       {moveError && errorMessage && (
         <div
           role="alert"
-          className="flex min-h-14 items-center justify-between gap-4 rounded-xl bg-danger py-2 pr-2 pl-5 text-on-accent"
+          className="mx-6 flex min-h-14 shrink-0 items-center justify-between gap-4 rounded-xl bg-danger py-2 pr-2 pl-5 text-on-accent"
         >
-          <span className="text-base font-bold">{errorMessage.text}</span>
+          <span className="text-[17px] font-extrabold">{errorMessage.text}</span>
           <span className="flex shrink-0 gap-2">
             {errorMessage.retry && (
               <button
@@ -173,65 +184,31 @@ export function KitchenBoard({ initial }: { initial: KitchenOrder[] }) {
           </span>
         </div>
       )}
-      <div className="grid flex-1 grid-cols-3 gap-4">
+
+      <div className="grid min-h-0 flex-1 grid-cols-3 gap-4 px-6 pt-4 pb-6">
         {COLUMNS.map((column) => {
           const list = orders.filter((o) => o.status === column);
           return (
-            <section key={column} className="flex flex-col gap-3 rounded-2xl bg-surface/60 p-3">
-              <h2 className="flex items-center justify-between px-1 text-lg font-bold">
+            <section
+              key={column}
+              aria-label={COLUMN_LABEL[column]}
+              className="flex min-h-0 flex-col gap-3 overflow-y-auto rounded-2xl bg-tray p-3"
+            >
+              <h2 className="flex items-center justify-between px-1.5 pt-0.5 text-[17px] font-extrabold">
                 {COLUMN_LABEL[column]}
-                <span className="rounded-full bg-surface px-2.5 text-sm text-muted">
+                <span className="flex h-7 min-w-7 items-center justify-center rounded-[14px] bg-surface px-2 text-sm text-muted">
                   {list.length}
                 </span>
               </h2>
-              {list.map((order) => {
-                const minutes = waitingMinutes(order.placedAt, now);
-                return (
-                  <article
-                    key={order.id}
-                    className="flex flex-col gap-3 rounded-2xl bg-surface p-4 shadow-sm"
-                  >
-                    <div className="flex items-baseline justify-between">
-                      <span className="font-display text-4xl font-semibold">
-                        {order.posCheckNumber}
-                      </span>
-                      <span
-                        className={`text-sm font-bold ${minutes >= LATE_MINUTES ? "text-danger" : "text-muted"}`}
-                      >
-                        {minutes} min
-                      </span>
-                    </div>
-                    <span
-                      className={`self-start rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                        order.orderType === "TAKE_OUT" ? "bg-butter" : "bg-oat"
-                      }`}
-                    >
-                      {order.orderType === "TAKE_OUT" ? "Para viagem" : "Comer aqui"}
-                    </span>
-                    <ul className="flex flex-col gap-1.5">
-                      {order.lines.map((line, i) => (
-                        <li key={i} className="flex flex-col">
-                          <span className="font-semibold">
-                            {line.quantity}× {line.name}
-                          </span>
-                          {line.options.length > 0 && (
-                            <span className="text-sm text-muted">{line.options.join(", ")}</span>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                    <button
-                      onClick={() => advance(order)}
-                      disabled={pending && busy === order.id}
-                      className={`h-12 rounded-full text-base font-bold disabled:opacity-60 ${
-                        column === "READY" ? "bg-ground text-ink" : "bg-accent text-on-accent"
-                      }`}
-                    >
-                      {BUTTON_LABEL[column]}
-                    </button>
-                  </article>
-                );
-              })}
+              {list.map((order) => (
+                <OrderCard
+                  key={order.id}
+                  order={order}
+                  now={now}
+                  busy={pending && busy === order.id}
+                  onAdvance={() => advance(order)}
+                />
+              ))}
             </section>
           );
         })}
