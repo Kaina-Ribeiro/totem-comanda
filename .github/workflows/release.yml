@@ -38,6 +38,9 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          # Tags are pushed with this token. When the v* tag ruleset cannot list GitHub Actions as a
+          # bypass actor (repos owned by a personal account), RELEASE_PR_TOKEN must be an admin's.
+          token: ${{ secrets.RELEASE_PR_TOKEN || github.token }}
       - name: Git identity
         run: |
           git config user.name "github-actions[bot]"
@@ -63,6 +66,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          token: ${{ secrets.RELEASE_PR_TOKEN || github.token }}
       - name: Git identity
         run: |
           git config user.name "github-actions[bot]"

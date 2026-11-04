@@ -69,10 +69,15 @@ Cubeship has only a production environment for now, so there are no test stages 
 1. **CI.** `checks.yml` (job `checks`: install, lint, type-check) and `conventions.yml`
    (job `conventions`: branch name, PR title, only version lines into the default branch) run on
    every PR.
-2. **Token for sync PRs.** PRs opened with the workflow's own `GITHUB_TOKEN` do not start CI, so
-   the required checks never report. Add a repository secret `RELEASE_PR_TOKEN` (a fine-grained
-   token or GitHub App token with Pull requests: write and Contents: read). Without it, close and
-   reopen each sync PR to start CI.
+2. **Release token.** Add a repository secret `RELEASE_PR_TOKEN`: a fine-grained token of a repo
+   admin, only this repository, with **Pull requests: Read and write** and **Contents: Read and
+   write**. The workflow uses it for two things:
+   - Sync PRs. PRs opened with the workflow's own `GITHUB_TOKEN` do not start CI, so the required
+     checks would never report.
+   - Pushing `vX.Y.Z-rc.N` and `vX.Y.Z` tags. On a repo owned by a personal account, GitHub refuses
+     GitHub Actions as a bypass actor on the tag ruleset, so only admins may create tags.
+
+   Renew it before it expires: without it, rc and final tags fail to push.
 3. **Rulesets.** The JSON in `.github/rulesets/` is the source of truth. Apply each one with:
 
    ```bash
@@ -83,9 +88,12 @@ Cubeship has only a production environment for now, so there are no test stages 
 
    | Ruleset | Targets | Rules |
    |:--|:--|:--|
-   | `default branch` | `~DEFAULT_BRANCH` | PR, 1 approval, `checks` + `conventions`, merge commit only, no force push or delete |
-   | `version lines` | `release/v*`, `hotfix/v*` | Same, squash and merge commit allowed |
-   | `release tags` | `v*` tags | Only GitHub Actions (app 15368) and admins create, update or delete |
+   | `default branch` | `~DEFAULT_BRANCH` | PR, no required approval, `checks` + `conventions`, merge commit only, no force push or delete |
+   | `version lines` | `release/v*`, `hotfix/v*` | Same, squash and merge commit allowed; checks not required to create a line (cuts start from commits that never ran CI) |
+   | `release tags` | `v*` tags | Only admins create, update or delete (the workflow pushes as an admin, step 2) |
+
+   No required approval: Kai merges alone (decided 4 Nov 2026). In an organization, add GitHub
+   Actions (app 15368) as a bypass actor on `release tags` and the workflow can tag with its own token.
 
 ## Script reference
 

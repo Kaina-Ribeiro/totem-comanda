@@ -172,8 +172,12 @@ Follow these rules exactly. If a request conflicts with them, stop and say which
 **How this repo applies it** (details and setup in `RELEASING.md`):
 - The default/prod branch was renamed `main` → `master` on 31 Oct 2026 (Kai's decision).
 - Automation: `.github/workflows/release.yml` + `.github/scripts/release.mjs`, CI jobs `checks`
-  and `conventions`, rulesets in `.github/rulesets/*.json` (COM-69). Rulesets and the
-  `RELEASE_PR_TOKEN` secret are applied only with Kai's yes.
+  and `conventions`, rulesets in `.github/rulesets/*.json` (COM-69), all applied on GitHub.
+- Kai's deviations (4 Nov 2026): **no required approval** on the branch rulesets (he merges
+  alone), and the `v*` tag ruleset lets only admins bypass, because GitHub refuses the Actions app
+  as a bypass actor on a personal-account repo. So the workflow pushes tags with the
+  `RELEASE_PR_TOKEN` secret (Kai's token, Pull requests + Contents read/write), which Kai manages
+  himself: never ask for, read or handle its value.
 - Deploy is Cubeship (`deploy/cubeship`), not Jenkins. The apps `comanda/production/web` and
   `comanda/production/mock` build from a final tag (`ref: v0.1.0` since 31 Oct 2026), never a
   branch. A prod deploy = `node .github/scripts/release.mjs check-deploy --tag vX.Y.Z --env prod`
