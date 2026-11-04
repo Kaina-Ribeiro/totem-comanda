@@ -6,6 +6,9 @@
 // Mock-only control endpoints (not in the contract, called on 4020 directly):
 //   GET  /__mock            current scenario, scenarios, device health, reports
 //   POST /__mock/scenario   {"name": "<scenario>"} resets the state to it
+//   POST /__mock/fault      {"path": "<regex>", "method"?, "status"?, "delayMs"?, "times"?}
+//                           makes the next matching Core API calls slow or fail
+//                           (timeouts, 5xx, a lost answer); DELETE clears them
 
 import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
@@ -154,6 +157,32 @@ const routes: Route[] = [
   ],
   [
     "POST",
+    /^\/__mock\/fault$/,
+    (req) => {
+      const body = (req.body ?? {}) as Partial<Fault> & { path?: unknown };
+      if (typeof body.path !== "string") return { status: 400, body: { error: "path is required" } };
+      const fault: Fault = {
+        path: new RegExp(body.path),
+        method: typeof body.method === "string" ? body.method.toUpperCase() : undefined,
+        status: typeof body.status === "number" ? body.status : undefined,
+        delayMs: typeof body.delayMs === "number" ? body.delayMs : 0,
+        times: typeof body.times === "number" ? body.times : 1,
+      };
+      faults.push(fault);
+      console.log(`[mock] fault: ${fault.method ?? "*"} ${body.path} ×${fault.times}`);
+      return { status: 200, body: { faults: faults.length } };
+    },
+  ],
+  [
+    "DELETE",
+    /^\/__mock\/fault$/,
+    () => {
+      faults.length = 0;
+      return { status: 204 };
+    },
+  ],
+  [
+    "POST",
     /^\/__mock\/scenario$/,
     (req) => {
       const name = (req.body as { name?: unknown } | null)?.name;
@@ -164,6 +193,37 @@ const routes: Route[] = [
     },
   ],
 ];
+
+/** A Core API call made slow or failing on purpose, for the next `times` matches. */
+type Fault = {
+  path: RegExp;
+  method?: string;
+  /** Answer with this status instead of the route's answer. */
+  status?: number;
+  /** Wait this long first; with no status the route then answers normally. */
+  delayMs: number;
+  times: number;
+};
+const faults: Fault[] = [];
+
+/** Applies the first matching fault; true when it already answered. */
+async function applyFault(req: Request, res: ServerResponse): Promise<boolean> {
+  if (req.path.startsWith("/__mock")) return false;
+  const fault = faults.find(
+    (f) => f.times > 0 && f.path.test(req.path) && (!f.method || f.method === req.method),
+  );
+  if (!fault) return false;
+  fault.times -= 1;
+  if (fault.times === 0) faults.splice(faults.indexOf(fault), 1);
+  if (fault.delayMs > 0) await new Promise((resolve) => setTimeout(resolve, fault.delayMs));
+  if (fault.status === undefined) return false;
+  send(res, {
+    status: fault.status,
+    headers: { "Content-Type": "application/problem+json" },
+    body: { type: "about:blank", title: "Injected fault", status: fault.status },
+  });
+  return true;
+}
 
 async function readRaw(req: IncomingMessage): Promise<Buffer> {
   const chunks: Buffer[] = [];
@@ -223,6 +283,7 @@ const server = createServer({ insecureHTTPParser: true }, async (incoming, res) 
     body: parseJson(raw),
     ip: incoming.socket.remoteAddress ?? "",
   };
+  if (await applyFault(req, res)) return;
   if (serveKitchenStream(req, res)) return;
   for (const [method, pattern, handler] of routes) {
     const match = pattern.exec(req.path);

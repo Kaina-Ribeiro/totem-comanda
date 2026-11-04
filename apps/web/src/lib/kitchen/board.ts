@@ -26,3 +26,31 @@ export const NEXT_STATUS = {
 export function waitingMinutes(placedAt: string, now: number): number {
   return Math.max(0, Math.floor((now - Date.parse(placedAt)) / 60_000));
 }
+
+/** A status change Go did not take. */
+export type MoveError = {
+  order: KitchenOrder;
+  status: (typeof NEXT_STATUS)[keyof typeof NEXT_STATUS];
+  code: string;
+};
+
+const STEP_LABEL = { PREPARING: "Preparando", READY: "Pronto", COLLECTED: "Retirado" } as const;
+
+/**
+ * What the kitchen reads when a move fails (KDS BR-012). A transition Go
+ * refuses means another screen moved the order first: the board reloads and
+ * there is nothing to retry. Anything else is worth one more tap.
+ */
+export function moveErrorMessage(error: MoveError): { text: string; retry: boolean } {
+  const number = error.order.posCheckNumber;
+  if (error.code === "INVALID_STATUS_TRANSITION" || error.code === "NOT_FOUND") {
+    return {
+      text: `O pedido ${number} já mudou em outro aparelho. O quadro foi atualizado.`,
+      retry: false,
+    };
+  }
+  return {
+    text: `Não deu para marcar o pedido ${number} como ${STEP_LABEL[error.status]}. Verifique a conexão.`,
+    retry: true,
+  };
+}
