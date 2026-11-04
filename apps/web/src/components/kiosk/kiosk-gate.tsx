@@ -12,8 +12,8 @@ import { UnavailableScreen } from "./unavailable-screen";
 const GATE_RECHECK_MS = 45_000;
 
 /**
- * The kiosk's gate (BR-KIOSK-09): maintenance, then at capacity, then closed,
- * else the guest journey. All of these come from the Core API's config. Gate
+ * The kiosk's gate (decision 14): maintenance, then closed, then paused or at
+ * capacity, else the guest journey. All of these come from the Core API's config. Gate
  * screens re-check the config; the journey re-checks only while on attract,
  * so a guest mid-order is never cut off.
  */
@@ -40,6 +40,8 @@ function GateScreen({ config }: { config: DeviceConfig }) {
           body="Faça seu pedido no balcão. Já já voltamos."
         />
       );
+    // The store pace's own screen (T3) comes with COM-83; until then the same copy.
+    case "paused":
     case "at-capacity":
       return (
         <UnavailableScreen
