@@ -133,6 +133,18 @@ export function closeDay(at: Date = now()): number {
   return count;
 }
 
+/**
+ * "Retirados hoje" (contract listKitchenOrders, status=collected): COLLECTED
+ * orders of the business day of `at`, newest hand-over (`updatedAt`) first.
+ */
+export function collectedToday(at: Date = now()): StoredOrder[] {
+  const day = businessDay(at);
+  const handedAt = (o: StoredOrder) => Date.parse(historyOf(o).at(-1)!.at);
+  return [...state.orders.values()]
+    .filter((o) => o.status === "COLLECTED" && businessDay(o.placedAt ?? o.createdAt) === day)
+    .sort((a, b) => handedAt(b) - handedAt(a));
+}
+
 export const kitchenRoutes: Route[] = [
   [
     "POST",
@@ -149,6 +161,9 @@ export const kitchenRoutes: Route[] = [
     (req) => {
       const { error } = authDevice(req);
       if (error) return error;
+      const filter = req.query.get("status") ?? "open";
+      if (filter === "collected") return ok(collectedToday().map(kitchenOrder));
+      if (filter !== "open") return problem(422, "VALIDATION_FAILED", "Validation failed", "status");
       const open = [...state.orders.values()]
         .filter((o) => OPEN.has(o.status))
         .sort(

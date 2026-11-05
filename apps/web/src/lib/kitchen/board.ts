@@ -38,6 +38,8 @@ export function accept(seen: Seen, order: KitchenOrder, at: number): boolean {
  * is Go's open orders at some moment after that, so a card in it older than
  * what the board saw since keeps the board's copy, and a card missing from
  * it stays only if the board learned about it after the reload started.
+ * `apply` puts one order in the list: the board's columns by default, or
+ * the Retirados list (`applyCollected`).
  */
 export function mergeSnapshot(
   current: KitchenOrder[],
@@ -45,17 +47,18 @@ export function mergeSnapshot(
   seen: Seen,
   startedAt: number,
   at: number,
+  apply: (list: KitchenOrder[], order: KitchenOrder) => KitchenOrder[] = applyOrder,
 ): KitchenOrder[] {
   const byId = new Map(current.map((o) => [o.id, o]));
   const listed = new Set(snapshot.map((o) => o.id));
   let board: KitchenOrder[] = [];
   for (const order of snapshot) {
-    if (accept(seen, order, at)) board = applyOrder(board, order);
-    else if (byId.has(order.id)) board = applyOrder(board, byId.get(order.id)!);
+    if (accept(seen, order, at)) board = apply(board, order);
+    else if (byId.has(order.id)) board = apply(board, byId.get(order.id)!);
   }
   for (const order of current) {
     if (!listed.has(order.id) && (seen.get(order.id)?.at ?? 0) > startedAt) {
-      board = applyOrder(board, order);
+      board = apply(board, order);
     }
   }
   return board;

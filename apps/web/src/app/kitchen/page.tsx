@@ -15,9 +15,19 @@ export default function KitchenPage() {
 
 /** First paint with the open orders; the board keeps itself current from there. */
 async function Board() {
-  const [orders, pace] = await Promise.all([listKitchenOrders(), getKitchenPace()]);
+  const [orders, collected, pace] = await Promise.all([
+    listKitchenOrders(),
+    listKitchenOrders("collected"),
+    getKitchenPace(),
+  ]);
   if (!orders.ok) {
     return <UnavailableScreen title="Cozinha sem conexão" body="Tentando de novo em instantes." />;
   }
-  return <KitchenBoard initial={orders.data} initialPace={pace.ok ? pace.data : null} />;
+  return (
+    <KitchenBoard
+      initial={orders.data}
+      initialCollected={collected.ok ? collected.data : []}
+      initialPace={pace.ok ? pace.data : null}
+    />
+  );
 }

@@ -24,9 +24,11 @@ import {
   type Seen,
 } from "@/lib/kitchen/board";
 import { closeDayError, closedDayLabel } from "@/lib/kitchen/close-day";
+import { applyCollected } from "@/lib/kitchen/collected";
 
 import { CancelDialog, cancelErrorText } from "./cancel-dialog";
 import { CloseDayButton, CloseDayDialog } from "./close-day-dialog";
+import { CollectedView } from "./collected-view";
 import { NewOrdersBar, SoundButton, SoundDialog, useNewOrderAlert } from "./new-order-alert";
 import { OrderCard } from "./order-card";
 import { OrderDrawer } from "./order-drawer";
@@ -45,24 +47,28 @@ const RECONNECT_MS = 30_000;
 /** While live, reload the whole list this often, so a lost event cannot leave the board wrong (KDS WF-11). */
 const FULL_REFRESH_MS = 60_000;
 
-/** The open orders as Go has them; null while Go or the network cannot answer. */
-async function fetchOpenOrders(): Promise<KitchenOrder[] | null> {
+/** Open orders, or today's collected ones, as Go has them; null while Go or the network cannot answer. */
+async function fetchOrders(status: "open" | "collected"): Promise<KitchenOrder[] | null> {
   try {
-    const response = await fetch("/api/kitchen/orders", { cache: "no-store" });
+    const query = status === "collected" ? "?status=collected" : "";
+    const response = await fetch(`/api/kitchen/orders${query}`, { cache: "no-store" });
     return response.ok ? ((await response.json()) as KitchenOrder[]) : null;
   } catch {
     return null; // Offline: the next tick tries again.
   }
 }
 
-/** The open orders with the time the request left, for `mergeSnapshot`. */
-async function fetchSnapshot(): Promise<{ open: KitchenOrder[]; startedAt: number } | null> {
+/** Both lists with the time the requests left, for `mergeSnapshot`; null without the open ones. */
+type Snapshot = { open: KitchenOrder[]; collected: KitchenOrder[] | null; startedAt: number };
+
+async function fetchSnapshot(): Promise<Snapshot | null> {
   const startedAt = Date.now();
-  const open = await fetchOpenOrders();
-  return open && { open, startedAt };
+  const [open, collected] = await Promise.all([fetchOrders("open"), fetchOrders("collected")]);
+  return open && { open, collected, startedAt };
 }
 
 const COLUMN_LABEL = { PAID: "Novos", PREPARING: "Preparando", READY: "Prontos" } as const;
+const TAB_LABEL = { orders: "Pedidos", production: "Produção", collected: "Retirados" } as const;
 
 const clock = new Intl.DateTimeFormat("pt-BR", {
   hour: "2-digit",
@@ -77,13 +83,17 @@ const clock = new Intl.DateTimeFormat("pt-BR", {
  */
 export function KitchenBoard({
   initial,
+  initialCollected,
   initialPace,
 }: {
   initial: KitchenOrder[];
+  /** Today's collected orders, newest first ("Retirados", G-K7). */
+  initialCollected: KitchenOrder[];
   /** Null when Go did not answer; the header then shows a plain "Ritmo". */
   initialPace: StorePace | null;
 }) {
   const [orders, setOrders] = useState(initial);
+  const [collected, setCollected] = useState(initialCollected);
   const [live, setLive] = useState(true);
   const [now, setNow] = useState(() => Date.now());
   const [pending, startTransition] = useTransition();
@@ -91,7 +101,7 @@ export function KitchenBoard({
   // The last move Go did not take (KDS BR-012): shown until retried or dismissed.
   const [moveError, setMoveError] = useState<MoveError | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [view, setView] = useState<"orders" | "production">("orders");
+  const [view, setView] = useState<"orders" | "production" | "collected">("orders");
   // The order open in the detail drawer (K2); it follows the board's copy.
   const [openId, setOpenId] = useState<string | null>(null);
   const opened = orders.find((o) => o.id === openId) ?? null;
@@ -114,7 +124,9 @@ export function KitchenBoard({
   const [soldOutError, setSoldOutError] = useState<string | null>(null);
   const [marked, setMarked] = useState<ReadonlySet<string>>(() => new Set());
   // Highest version seen per order, so late events and reloads cannot move a card back (G-K3).
-  const seen = useRef<Seen>(new Map(initial.map((o) => [o.id, { version: o.version, at: 0 }])));
+  const seen = useRef<Seen>(
+    new Map([...initial, ...initialCollected].map((o) => [o.id, { version: o.version, at: 0 }])),
+  );
   const alert = useNewOrderAlert();
   // Orders the board has shown; a PAID one not in here is new (G-K1).
   const known = useRef(new Set(initial.map((o) => o.id)));
@@ -128,13 +140,34 @@ export function KitchenBoard({
   const onIncoming = useEffectEvent((list: KitchenOrder[]) => alert.arrived(newPaid(list)));
   const onPaceTick = useEffectEvent(() => void reloadPace());
 
+  /** Puts a full reload on the board and in Retirados (the latter only if it loaded). */
+  const takeSnapshot = ({ open, collected: done, startedAt }: Snapshot) => {
+    const at = Date.now();
+    setOrders((current) => mergeSnapshot(current, open, seen.current, startedAt, at));
+    if (done) {
+      setCollected((current) =>
+        mergeSnapshot(current, done, seen.current, startedAt, at, applyCollected),
+      );
+    }
+  };
+  const onSnapshot = useEffectEvent((snapshot: Snapshot) => {
+    takeSnapshot(snapshot);
+    alert.arrived(newPaid(snapshot.open));
+  });
+
+  /** One order Go answered or announced, on the board and in Retirados. */
+  const putOrder = (order: KitchenOrder) => {
+    setOrders((current) => applyOrder(current, order));
+    setCollected((current) => applyCollected(current, order));
+  };
+  const onPut = useEffectEvent((order: KitchenOrder) => putOrder(order));
+
   /** Reloads the open orders from Go; the board then shows where each card really is. */
   const refresh = async () => {
     const snapshot = await fetchSnapshot();
     if (snapshot) {
-      const { open, startedAt } = snapshot;
-      setOrders((current) => mergeSnapshot(current, open, seen.current, startedAt, Date.now()));
-      alert.arrived(newPaid(open));
+      takeSnapshot(snapshot);
+      alert.arrived(newPaid(snapshot.open));
     }
     return snapshot !== null;
   };
@@ -202,11 +235,7 @@ export function KitchenBoard({
     if (!live) return;
     const timer = setInterval(async () => {
       const snapshot = await fetchSnapshot();
-      if (snapshot) {
-        const { open, startedAt } = snapshot;
-        setOrders((current) => mergeSnapshot(current, open, seen.current, startedAt, Date.now()));
-        onIncoming(open);
-      }
+      if (snapshot) onSnapshot(snapshot);
       onPaceTick();
     }, FULL_REFRESH_MS);
     return () => clearInterval(timer);
@@ -220,11 +249,7 @@ export function KitchenBoard({
     let closed = false;
     const refresh = async () => {
       const snapshot = await fetchSnapshot();
-      if (snapshot) {
-        const { open, startedAt } = snapshot;
-        setOrders((current) => mergeSnapshot(current, open, seen.current, startedAt, Date.now()));
-        onIncoming(open);
-      }
+      if (snapshot) onSnapshot(snapshot);
     };
 
     const startPolling = () => {
@@ -240,7 +265,7 @@ export function KitchenBoard({
       const onOrder = (event: MessageEvent<string>) => {
         const order = JSON.parse(event.data) as KitchenOrder;
         if (!accept(seen.current, order, Date.now())) return; // A late event.
-        setOrders((current) => applyOrder(current, order));
+        onPut(order);
         onIncoming([order]);
       };
       stream.addEventListener("order.paid", onOrder);
@@ -282,13 +307,16 @@ export function KitchenBoard({
         () => ({ ok: false, code: "NETWORK" }) as const,
       );
       if (result.ok) {
-        if (accept(seen.current, result.data, Date.now())) {
-          setOrders((current) => applyOrder(current, result.data));
-        }
+        if (accept(seen.current, result.data, Date.now())) putOrder(result.data);
         const label = !back && movedLabel(result.data);
         const moved = result.data;
         if (label) {
           setUndo({ key: `${moved.id}:${moved.version}`, label, run: () => stepBack(moved) });
+        } else if (back && order.status === "COLLECTED") {
+          setUndo({
+            key: `${moved.id}:${moved.version}`,
+            label: `Pedido ${moved.posCheckNumber} voltou para Prontos`,
+          });
         }
       } else {
         setMoveError({ order, status, code: result.code });
@@ -401,25 +429,27 @@ export function KitchenBoard({
           </span>
         </div>
         <nav aria-label="Telas da cozinha" className="flex gap-1 rounded-2xl bg-tabs p-1">
-          {(["orders", "production"] as const).map((tab) => {
+          {(["orders", "production", "collected"] as const).map((tab) => {
             const on = view === tab;
+            const count =
+              tab === "orders" ? orders.length : tab === "collected" ? collected.length : null;
             return (
               <button
                 key={tab}
                 onClick={() => setView(tab)}
                 aria-current={on ? "page" : undefined}
                 className={`flex h-11 items-center gap-2 rounded-[14px] text-[15px] font-extrabold transition-transform active:scale-[.97] ${
-                  tab === "orders" ? "pr-2.5 pl-[18px]" : "px-[18px]"
+                  count === null ? "px-[18px]" : "pr-2.5 pl-[18px]"
                 } ${on ? "bg-accent text-on-accent" : "text-muted"}`}
               >
-                {tab === "orders" ? "Pedidos" : "Produção"}
-                {tab === "orders" && (
+                {TAB_LABEL[tab]}
+                {count !== null && (
                   <span
                     className={`flex h-[26px] min-w-[26px] items-center justify-center rounded-[13px] px-[7px] text-[13px] ${
                       on ? "bg-detail-light text-ink" : "bg-ground text-ink"
                     }`}
                   >
-                    {orders.length}
+                    {count}
                   </span>
                 )}
               </button>
@@ -508,6 +538,12 @@ export function KitchenBoard({
 
       {view === "production" ? (
         <ProductionView orders={orders} />
+      ) : view === "collected" ? (
+        <CollectedView
+          orders={collected}
+          busyId={pending ? busy : null}
+          onBack={(order) => move(order, "READY", { back: true })}
+        />
       ) : (
         <div className="grid min-h-0 flex-1 grid-cols-3 gap-4 px-6 pt-4 pb-6">
           {COLUMNS.map((column) => {
