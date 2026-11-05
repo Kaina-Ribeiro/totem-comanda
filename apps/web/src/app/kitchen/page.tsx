@@ -1,8 +1,8 @@
 import { Suspense } from "react";
 
 import { DeviceGate } from "@/components/device-gate";
-import { UnavailableScreen } from "@/components/kiosk/unavailable-screen";
 import { KitchenBoard } from "@/components/kitchen/kitchen-board";
+import { KitchenOffline } from "@/components/kitchen/kitchen-offline";
 import { getKitchenPace, listKitchenOrders } from "@/lib/kitchen/core";
 
 export default function KitchenPage() {
@@ -20,9 +20,7 @@ async function Board() {
     listKitchenOrders("collected"),
     getKitchenPace(),
   ]);
-  if (!orders.ok) {
-    return <UnavailableScreen title="Cozinha sem conexão" body="Tentando de novo em instantes." />;
-  }
+  if (!orders.ok) return <KitchenOffline />;
   return (
     <KitchenBoard
       initial={orders.data}
