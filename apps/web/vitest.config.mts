@@ -11,6 +11,9 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["src/**/*.test.ts", "mock/**/*.test.ts"],
+    // Component tests are *.test.tsx and declare `// @vitest-environment jsdom`;
+    // everything else runs in Node.
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx", "mock/**/*.test.ts"],
+    setupFiles: ["./test/setup.ts"],
   },
 });
