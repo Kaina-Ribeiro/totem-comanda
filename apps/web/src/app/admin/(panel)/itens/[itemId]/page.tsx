@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
-import { Card, LoadError, PageHeader } from "@/components/admin/ui";
+import { Card, LoadError, PageHeader, PageLoading } from "@/components/admin/ui";
 import { load } from "@/lib/admin/form";
 import { AdminApiError, asOwner } from "@/lib/admin/session";
 import { coreApi } from "@/lib/core/client";
@@ -12,7 +12,7 @@ import { OptionGroups } from "./option-groups";
 
 export default function EditItemPage({ params, searchParams }: PageProps<"/admin/itens/[itemId]">) {
   return (
-    <Suspense>
+    <Suspense fallback={<PageLoading />}>
       <EditItem params={params} searchParams={searchParams} />
     </Suspense>
   );
@@ -57,7 +57,7 @@ async function EditItem({ params, searchParams }: PageProps<"/admin/itens/[itemI
         </Card>
       )}
       <ItemForm item={item} crossSells={crossSells} />
-      <Suspense>
+      <Suspense fallback={<PageLoading />}>
         <OptionGroups itemId={item.id} />
       </Suspense>
     </>

@@ -10,6 +10,7 @@ import {
   inputClass,
   LoadError,
   PageHeader,
+  PageLoading,
 } from "@/components/admin/ui";
 import { attempt, cents, checked, type FormState, load, text } from "@/lib/admin/form";
 import { AdminApiError, asOwner } from "@/lib/admin/session";
@@ -102,7 +103,7 @@ export default function DiscountsPage() {
         title="Cupons e descontos"
         description="Códigos que o cliente digita no totem. Vale um por pedido; o desconto é calculado pelo sistema."
       />
-      <Suspense>
+      <Suspense fallback={<PageLoading />}>
         <DiscountList />
       </Suspense>
     </>

@@ -3,11 +3,14 @@ import { connection } from "next/server";
 import { cache, Suspense } from "react";
 
 import { AdminNav } from "@/components/admin/nav";
+import { NavProgress } from "@/components/admin/nav-progress";
 import { load } from "@/lib/admin/form";
 import { ADMIN_LOGIN, asOwner, signOut } from "@/lib/admin/session";
 import { kioskState } from "@/lib/admin/home";
 import { loadStoreStatus } from "@/lib/admin/store-status";
 import { coreApi } from "@/lib/core/client";
+
+import "./admin.css";
 
 async function logout() {
   "use server";
@@ -22,6 +25,7 @@ async function logout() {
 export default function AdminLayout({ children }: LayoutProps<"/admin">) {
   return (
     <div className="flex min-h-dvh flex-1 flex-col bg-ground text-ink tabular-nums min-[821px]:flex-row">
+      <NavProgress />
       <aside className="flex shrink-0 flex-col gap-2.5 border-b border-line bg-surface px-4 pt-3.5 pb-2.5 min-[821px]:sticky min-[821px]:top-0 min-[821px]:h-dvh min-[821px]:w-[236px] min-[821px]:gap-4 min-[821px]:overflow-y-auto min-[821px]:border-r min-[821px]:border-b-0 min-[821px]:px-3 min-[821px]:py-5">
         <div className="flex items-center justify-between gap-3 min-[821px]:flex-col min-[821px]:items-start min-[821px]:gap-px min-[821px]:px-2.5">
           <span className="font-display text-[22px] font-medium tracking-[-0.01em] italic">

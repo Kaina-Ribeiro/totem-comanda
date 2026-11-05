@@ -10,6 +10,7 @@ import {
   inputClass,
   LoadError,
   PageHeader,
+  PageLoading,
 } from "@/components/admin/ui";
 import {
   attempt,
@@ -172,7 +173,7 @@ export default function MenusPage() {
         title="Cardápios"
         description="Cada cardápio tem seus horários; o totem mostra sozinho o que vale agora. Fora de todos, mostra Fechado."
       />
-      <Suspense>
+      <Suspense fallback={<PageLoading />}>
         <MenuList />
       </Suspense>
       <Card>

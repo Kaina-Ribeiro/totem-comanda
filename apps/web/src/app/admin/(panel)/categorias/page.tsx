@@ -10,6 +10,7 @@ import {
   inputClass,
   LoadError,
   PageHeader,
+  PageLoading,
 } from "@/components/admin/ui";
 import {
   attempt,
@@ -179,7 +180,7 @@ export default function CategoriesPage({
         title="Categorias"
         description="As categorias de cada cardápio e os itens de cada uma, com o preço nesse cardápio."
       />
-      <Suspense>
+      <Suspense fallback={<PageLoading />}>
         <Categories searchParams={searchParams} />
       </Suspense>
     </>

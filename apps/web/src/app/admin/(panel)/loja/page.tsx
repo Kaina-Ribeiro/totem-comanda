@@ -3,7 +3,15 @@ import Image from "next/image";
 import { Suspense } from "react";
 
 import { ActionForm, SubmitButton } from "@/components/admin/form";
-import { Card, Checkbox, Field, inputClass, LoadError, PageHeader } from "@/components/admin/ui";
+import {
+  Card,
+  Checkbox,
+  Field,
+  inputClass,
+  LoadError,
+  PageHeader,
+  PageLoading,
+} from "@/components/admin/ui";
 import { attempt, checked, type FormState, load, orderTypesError, text } from "@/lib/admin/form";
 import { uploadImage } from "@/lib/admin/media";
 import { asOwner } from "@/lib/admin/session";
@@ -77,7 +85,7 @@ export default function StorePage() {
         title="Loja"
         description="Nome, logo, idiomas e o que o totem mostra quando está fechado."
       />
-      <Suspense>
+      <Suspense fallback={<PageLoading />}>
         <StoreForm />
       </Suspense>
       <Suspense>

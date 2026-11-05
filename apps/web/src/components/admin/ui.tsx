@@ -98,6 +98,18 @@ export function Badge({
   );
 }
 
+/**
+ * Suspense fallback while a page's data streams in. It fades in only after 300 ms
+ * (`.page-loading` in app/admin/(panel)/admin.css), so a quick load never flashes it.
+ */
+export function PageLoading({ label = "Carregando…" }: { label?: string }) {
+  return (
+    <p role="status" className="page-loading text-sm text-muted">
+      {label}
+    </p>
+  );
+}
+
 /** Error box for a page whose data could not load. */
 export function LoadError({ message }: { message: string }) {
   return (
