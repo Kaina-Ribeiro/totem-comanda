@@ -85,7 +85,8 @@ async function Report({
               <div className="flex justify-between text-sm">
                 <span className="font-semibold">{label}</span>
                 <span className="text-muted">
-                  {totals.orders} pedidos · {formatBRL(totals.revenue)}
+                  {totals.orders === 1 ? "1 pedido" : `${totals.orders} pedidos`} ·{" "}
+                  {formatBRL(totals.revenue)}
                 </span>
               </div>
               <div className="h-2.5 overflow-hidden rounded-full bg-ground">
