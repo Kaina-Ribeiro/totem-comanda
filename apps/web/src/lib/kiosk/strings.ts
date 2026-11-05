@@ -56,6 +56,8 @@ const ptBR = {
   "basket.retry": "Tentar de novo",
   "basket.unavailable": "{name} acabou de esgotar. Remova para continuar.",
   "basket.unavailableGeneric": "Um item do pedido não está mais disponível. Remova para continuar.",
+  "basket.goneLine": "Item indisponível",
+  "basket.goneLineBody": "Saiu do cardápio. Remova para continuar.",
   "basket.limit": "Seu pedido passou do limite de itens. Diminua as quantidades.",
   "cancel.title": "Cancelar o pedido?",
   "cancel.body": "Os {n} itens serão removidos e o totem volta para a tela inicial.",
@@ -205,6 +207,8 @@ const en: Strings = {
   "basket.unavailable": "{name} just sold out. Remove it to continue.",
   "basket.unavailableGeneric":
     "An item in your order is no longer available. Remove it to continue.",
+  "basket.goneLine": "Item unavailable",
+  "basket.goneLineBody": "No longer on the menu. Remove it to continue.",
   "basket.limit": "Your order is over the item limit. Lower the quantities.",
   "cancel.title": "Cancel your order?",
   "cancel.body": "The {n} items will be removed and the kiosk goes back to the start.",
