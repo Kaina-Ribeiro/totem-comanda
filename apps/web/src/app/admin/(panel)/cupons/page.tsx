@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
-import { Suspense } from "react";
 
 import { ActionForm, SubmitButton } from "@/components/admin/form";
+import { FormSkeleton, Streamed } from "@/components/admin/skeleton";
 import {
   Badge,
   Card,
@@ -10,7 +10,6 @@ import {
   inputClass,
   LoadError,
   PageHeader,
-  PageLoading,
 } from "@/components/admin/ui";
 import { attempt, cents, checked, type FormState, load, text } from "@/lib/admin/form";
 import { AdminApiError, asOwner } from "@/lib/admin/session";
@@ -103,9 +102,9 @@ export default function DiscountsPage() {
         title="Cupons e descontos"
         description="Códigos que o cliente digita no totem. Vale um por pedido; o desconto é calculado pelo sistema."
       />
-      <Suspense fallback={<PageLoading />}>
+      <Streamed fallback={<FormSkeleton fields={9} />}>
         <DiscountList />
-      </Suspense>
+      </Streamed>
     </>
   );
 }

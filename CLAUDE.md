@@ -141,8 +141,10 @@ npx @redocly/cli lint contract/openapi.yaml
   which refuse what is not a price and never guess. A form saved through two Core calls uses
   `saveBoth()`: the part that can be read back and undone goes first, and it is put back if the
   second call fails. The contract has no atomic save.
-- Back office loading (COM-140): every page `<Suspense>` gets `fallback={<PageLoading />}`
-  (`components/admin/ui.tsx`); no skeletons. `NavProgress` and the page entrance live in
+- Back office loading (COM-140, COM-141): a page part that loads data goes in
+  `<Streamed fallback={<…Skeleton />}>` (`components/admin/skeleton.tsx`), never a bare
+  `<Suspense>`. The skeleton has the page's shape with its fixed labels as real text; the
+  content then fades in at the same spot, without sliding. `NavProgress` and the page entrance live in
   `app/admin/(panel)/admin.css` + `template.tsx`, admin only. With `cacheComponents`, visited
   pages stay in `<main>` hidden (`display: none`): never rely on `:nth-child` across pages or on
   the URL changing as "the new page is on screen".

@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
-import { Suspense } from "react";
 
 import { ActionForm, SubmitButton } from "@/components/admin/form";
+import { FormSkeleton, Streamed } from "@/components/admin/skeleton";
 import {
   Badge,
   Card,
@@ -10,7 +10,6 @@ import {
   inputClass,
   LoadError,
   PageHeader,
-  PageLoading,
 } from "@/components/admin/ui";
 import { attempt, checked, type FormState, load, text } from "@/lib/admin/form";
 import { asOwner } from "@/lib/admin/session";
@@ -95,9 +94,9 @@ export default function DevicesPage() {
         title="Aparelhos"
         description="Totens e telas da cozinha: quem está online, manutenção, lotado e acesso."
       />
-      <Suspense fallback={<PageLoading />}>
+      <Streamed fallback={<FormSkeleton cards={1} fields={3} />}>
         <DeviceList />
-      </Suspense>
+      </Streamed>
       <Card>
         <h2 className="mb-4 text-lg font-bold tracking-[-0.01em]">Cadastrar aparelho</h2>
         <ActionForm action={createDevice} resetOnSave className="grid gap-4 sm:grid-cols-3">
