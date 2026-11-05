@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 
-import { Card, inputClass, LoadError, PageHeader } from "@/components/admin/ui";
+import { Card, inputClass, LoadError, PageHeader, PageLoading } from "@/components/admin/ui";
 import { load } from "@/lib/admin/form";
 import { asOwner } from "@/lib/admin/session";
 import { coreApi } from "@/lib/core/client";
@@ -15,7 +15,7 @@ export default function ReportPage({ searchParams }: PageProps<"/admin/relatorio
         title="Relatório do dia"
         description="Pedidos pagos no totem, por dia de funcionamento."
       />
-      <Suspense>
+      <Suspense fallback={<PageLoading />}>
         <Report searchParams={searchParams} />
       </Suspense>
     </>

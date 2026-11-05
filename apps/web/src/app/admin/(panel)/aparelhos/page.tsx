@@ -10,6 +10,7 @@ import {
   inputClass,
   LoadError,
   PageHeader,
+  PageLoading,
 } from "@/components/admin/ui";
 import { attempt, checked, type FormState, load, text } from "@/lib/admin/form";
 import { asOwner } from "@/lib/admin/session";
@@ -94,7 +95,7 @@ export default function DevicesPage() {
         title="Aparelhos"
         description="Totens e telas da cozinha: quem está online, manutenção, lotado e acesso."
       />
-      <Suspense>
+      <Suspense fallback={<PageLoading />}>
         <DeviceList />
       </Suspense>
       <Card>

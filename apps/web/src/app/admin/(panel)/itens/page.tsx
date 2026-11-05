@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Suspense } from "react";
 
-import { Badge, Card, LoadError, PageHeader } from "@/components/admin/ui";
+import { Badge, Card, LoadError, PageHeader, PageLoading } from "@/components/admin/ui";
 import { load } from "@/lib/admin/form";
 import { asOwner } from "@/lib/admin/session";
 import { coreApi } from "@/lib/core/client";
@@ -23,7 +23,7 @@ export default function ItemsPage() {
           </Link>
         }
       />
-      <Suspense>
+      <Suspense fallback={<PageLoading />}>
         <ItemList />
       </Suspense>
     </>

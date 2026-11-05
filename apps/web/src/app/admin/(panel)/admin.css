@@ -1,0 +1,93 @@
+/*
+ * Back office motion only (COM-140), kept out of globals.css so the kiosk never loads it.
+ * Only opacity, transform and width; no blur or animated shadows. With reduced motion
+ * nothing here moves.
+ */
+
+/* Thin bar at the top while a page loads (components/admin/nav-progress.tsx): creeps to 85%
+   while loading, completes and fades when the page arrives. */
+.nav-progress {
+  width: 0;
+  opacity: 0;
+  border-radius: 0 2px 2px 0;
+  background: linear-gradient(90deg, var(--color-detail), var(--color-detail-light));
+}
+.nav-progress[data-state="loading"] {
+  width: 85%;
+  opacity: 1;
+}
+.nav-progress[data-state="done"] {
+  width: 100%;
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .nav-progress[data-state="loading"] {
+    transition:
+      width 6s cubic-bezier(0.1, 0.6, 0.2, 1),
+      opacity 0.15s;
+  }
+  .nav-progress[data-state="done"] {
+    transition:
+      width 0.2s ease-out,
+      opacity 0.3s ease 0.15s;
+  }
+
+  /* Page entrance: each block of the page (a child of its wrapper in template.tsx) fades in
+     and rises 10px, one after the other, also when a visited page is shown again. Blocks
+     streamed in later by Suspense enter the same way when they arrive. `backwards`: no fill
+     after the end, so hover and press transforms still work. */
+  .page-reveal > * {
+    animation: page-reveal 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    animation-delay: calc(var(--n, 0) * 60ms);
+  }
+  .page-reveal > :nth-child(2) {
+    --n: 1;
+  }
+  .page-reveal > :nth-child(3) {
+    --n: 2;
+  }
+  .page-reveal > :nth-child(4) {
+    --n: 3;
+  }
+  .page-reveal > :nth-child(5) {
+    --n: 4;
+  }
+  .page-reveal > :nth-child(n + 6) {
+    --n: 5;
+  }
+}
+
+/* "Carregando…" while a page's data streams in (PageLoading in components/admin/ui.tsx):
+   hidden for the first 300 ms, then a slow breathing fade. Outside the reduced-motion query
+   on purpose: without motion it simply shows after the same wait. */
+.page-loading {
+  animation: page-loading-wait 0s linear 0.3s backwards;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .page-loading {
+    animation:
+      page-loading-wait 0s linear 0.3s backwards,
+      page-loading-breathe 1.4s ease-in-out 0.3s infinite alternate;
+  }
+}
+@keyframes page-loading-wait {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes page-loading-breathe {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.45;
+  }
+}
+
+@keyframes page-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}

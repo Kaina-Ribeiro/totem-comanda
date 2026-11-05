@@ -141,6 +141,11 @@ npx @redocly/cli lint contract/openapi.yaml
   which refuse what is not a price and never guess. A form saved through two Core calls uses
   `saveBoth()`: the part that can be read back and undone goes first, and it is put back if the
   second call fails. The contract has no atomic save.
+- Back office loading (COM-140): every page `<Suspense>` gets `fallback={<PageLoading />}`
+  (`components/admin/ui.tsx`); no skeletons. `NavProgress` and the page entrance live in
+  `app/admin/(panel)/admin.css` + `template.tsx`, admin only. With `cacheComponents`, visited
+  pages stay in `<main>` hidden (`display: none`): never rely on `:nth-child` across pages or on
+  the URL changing as "the new page is on screen".
 - Open questions in `docs/data-model-and-api.md` (price changed mid-order, `waitTime`, order
   number reset, offline, fiscal fields, device pairing and secret storage) are not decided.
   Do not guess an answer into the code; ask Kai, or isolate it behind one clearly named function.
