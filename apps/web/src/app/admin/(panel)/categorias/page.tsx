@@ -1,16 +1,33 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
-import { Suspense } from "react";
 
 import { ActionForm, SubmitButton } from "@/components/admin/form";
-import { Card, Checkbox, Field, inputClass, LoadError, PageHeader } from "@/components/admin/ui";
-import { attempt, cents, checked, type FormState, load, text } from "@/lib/admin/form";
+import { FormSkeleton, Streamed } from "@/components/admin/skeleton";
+import {
+  Card,
+  Checkbox,
+  Field,
+  inputClass,
+  LoadError,
+  PageHeader,
+} from "@/components/admin/ui";
+import {
+  attempt,
+  checked,
+  type FormState,
+  load,
+  optionalPrice,
+  sameText,
+  saveBoth,
+  text,
+} from "@/lib/admin/form";
 import { AdminApiError, asOwner } from "@/lib/admin/session";
 import { coreApi } from "@/lib/core/client";
 import type { components } from "@/lib/core-api";
 import { formatBRL } from "@/lib/format/money";
 
 type Category = components["schemas"]["AdminCategory"];
+type CategoryInput = components["schemas"]["CategoryInput"];
 type Item = components["schemas"]["AdminItem"];
 type Link = components["schemas"]["CategoryItemLink"];
 
@@ -21,7 +38,10 @@ const categoryName = (form: FormData) => {
   return { "pt-BR": text(form, "name.pt"), ...(en ? { en } : {}) };
 };
 
-async function createCategory(_: FormState, form: FormData): Promise<FormState> {
+async function createCategory(
+  _: FormState,
+  form: FormData,
+): Promise<FormState> {
   "use server";
   return attempt(async () => {
     await asOwner((headers) =>
@@ -45,19 +65,21 @@ function readLinks(form: FormData): Link[] {
     .getAll("linked")
     .map(String)
     .filter((itemId) => !checked(form, `${itemId}.remove`))
-    .map((itemId) => {
-      const override = text(form, `${itemId}.price`);
-      const priceOverride = override ? cents(override) : null;
-      if (override && priceOverride === null) throw new AdminApiError("VALIDATION_FAILED", "preço");
-      return { itemId, displayOrder: Number(text(form, `${itemId}.order`)) || 0, priceOverride };
-    });
+    .map((itemId) => ({
+      itemId,
+      displayOrder: Number(text(form, `${itemId}.order`)) || 0,
+      priceOverride: optionalPrice(form, `${itemId}.price`, "preço"),
+    }));
   const added = text(form, "add.itemId");
   if (added) {
-    const override = text(form, "add.price");
     links.push({
       itemId: added,
       displayOrder: Number(text(form, "add.order")) || links.length + 1,
-      priceOverride: override ? cents(override) : null,
+      priceOverride: optionalPrice(
+        form,
+        "add.price",
+        "preço do item adicionado",
+      ),
     });
   }
   return links;
@@ -66,32 +88,74 @@ function readLinks(form: FormData): Link[] {
 async function saveCategory(_: FormState, form: FormData): Promise<FormState> {
   "use server";
   const categoryId = text(form, "categoryId");
+  const menuId = text(form, "menuId");
   return attempt(async () => {
     const links = readLinks(form);
-    await asOwner((headers) =>
-      coreApi().PUT("/v1/admin/categories/{categoryId}", {
+    const putCategory = (body: CategoryInput) =>
+      asOwner((headers) =>
+        coreApi().PUT("/v1/admin/categories/{categoryId}", {
+          headers,
+          params: { path: { categoryId } },
+          body,
+        }),
+      );
+    // Two calls. The items cannot be read back (categoryLinks), so they go
+    // second and the category is put back if they fail (COM-129).
+    const categories = await asOwner((headers) =>
+      coreApi().GET("/v1/admin/categories", {
         headers,
-        params: { path: { categoryId } },
-        body: {
-          menuId: text(form, "menuId"),
-          name: categoryName(form),
-          displayOrder: Number(text(form, "displayOrder")) || 1,
-        },
+        params: { query: { menuId } },
       }),
     );
-    await asOwner((headers) =>
-      coreApi().PUT("/v1/admin/categories/{categoryId}/items", {
-        headers,
-        params: { path: { categoryId } },
-        body: links,
-      }),
+    const current = categories.find((c) => c.id === categoryId);
+    if (!current) throw new AdminApiError("NOT_FOUND");
+    const before: CategoryInput = {
+      menuId: current.menuId,
+      parentId: current.parentId ?? null,
+      name: current.name,
+      image: current.image ?? null,
+      displayOrder: current.displayOrder,
+    };
+    // A replace: keep what this form does not edit (parent, image).
+    const next: CategoryInput = {
+      ...before,
+      menuId,
+      name: categoryName(form),
+      displayOrder: Number(text(form, "displayOrder")) || 1,
+    };
+    const changed =
+      !sameText(before.name, next.name) ||
+      before.displayOrder !== next.displayOrder ||
+      before.menuId !== next.menuId;
+    await saveBoth(
+      changed
+        ? {
+            label: "o nome e a ordem da categoria",
+            save: () => putCategory(next),
+            undo: () => putCategory(before),
+          }
+        : null,
+      {
+        label: "os itens",
+        save: () =>
+          asOwner((headers) =>
+            coreApi().PUT("/v1/admin/categories/{categoryId}/items", {
+              headers,
+              params: { path: { categoryId } },
+              body: links,
+            }),
+          ),
+      },
     );
     revalidatePath(PATH);
     return "Categoria salva. O totem mostra na próxima jornada.";
   });
 }
 
-async function deleteCategory(_: FormState, form: FormData): Promise<FormState> {
+async function deleteCategory(
+  _: FormState,
+  form: FormData,
+): Promise<FormState> {
   "use server";
   const categoryId = text(form, "categoryId");
   return attempt(async () => {
@@ -106,16 +170,18 @@ async function deleteCategory(_: FormState, form: FormData): Promise<FormState> 
   });
 }
 
-export default function CategoriesPage({ searchParams }: PageProps<"/admin/categorias">) {
+export default function CategoriesPage({
+  searchParams,
+}: PageProps<"/admin/categorias">) {
   return (
     <>
       <PageHeader
         title="Categorias"
         description="As categorias de cada cardápio e os itens de cada uma, com o preço nesse cardápio."
       />
-      <Suspense>
+      <Streamed fallback={<FormSkeleton />}>
         <Categories searchParams={searchParams} />
-      </Suspense>
+      </Streamed>
     </>
   );
 }
@@ -144,7 +210,8 @@ async function Categories({
   });
   if ("error" in loaded) return <LoadError message={loaded.error} />;
   const { menus, items, menu, categories } = loaded.data;
-  if (!menu) return <LoadError message="Crie um cardápio primeiro, em Cardápios." />;
+  if (!menu)
+    return <LoadError message="Crie um cardápio primeiro, em Cardápios." />;
 
   return (
     <>
@@ -153,8 +220,10 @@ async function Categories({
           <Link
             key={m.id}
             href={`${PATH}?menu=${m.id}`}
-            className={`rounded-full px-4 py-2 text-sm font-bold ${
-              m.id === menu.id ? "bg-accent text-on-accent" : "bg-surface text-ink"
+            className={`rounded-[10px] px-4 py-2 text-sm font-bold ${
+              m.id === menu.id
+                ? "bg-accent text-on-accent"
+                : "bg-surface text-ink"
             }`}
           >
             {m.name["pt-BR"]}
@@ -170,10 +239,14 @@ async function Categories({
         />
       ))}
       <Card>
-        <h2 className="mb-4 font-display text-xl font-semibold">
+        <h2 className="mb-4 text-lg font-bold tracking-[-0.01em]">
           Nova categoria em {menu.name["pt-BR"]}
         </h2>
-        <ActionForm action={createCategory} resetOnSave className="grid gap-4 sm:grid-cols-4">
+        <ActionForm
+          action={createCategory}
+          resetOnSave
+          className="grid gap-4 sm:grid-cols-4"
+        >
           <input type="hidden" name="menuId" value={menu.id} />
           <Field label="Nome (PT)">
             <input name="name.pt" required className={inputClass} />
@@ -237,7 +310,11 @@ function CategoryCard({
             />
           </Field>
           <Field label="Categoria (EN)">
-            <input name="name.en" defaultValue={category.name.en} className={inputClass} />
+            <input
+              name="name.en"
+              defaultValue={category.name.en}
+              className={inputClass}
+            />
           </Field>
           <Field label="Ordem">
             <input
@@ -271,7 +348,9 @@ function CategoryCard({
                       {item?.name["pt-BR"] ?? link.itemId}
                     </Link>
                     {item && (
-                      <span className="ml-2 text-xs text-muted">base {formatBRL(item.price)}</span>
+                      <span className="ml-2 text-xs text-muted">
+                        base {formatBRL(item.price)}
+                      </span>
                     )}
                   </td>
                   <td>
@@ -289,7 +368,9 @@ function CategoryCard({
                       defaultValue={
                         link.priceOverride == null
                           ? ""
-                          : (link.priceOverride / 100).toFixed(2).replace(".", ",")
+                          : (link.priceOverride / 100)
+                              .toFixed(2)
+                              .replace(".", ",")
                       }
                       placeholder="base"
                       inputMode="decimal"

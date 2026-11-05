@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 
 import {
   cancelPayment,
@@ -13,6 +13,12 @@ import {
 } from "@/app/kiosk/actions";
 import { formatBRL } from "@/lib/format/money";
 import type { Result } from "@/lib/kiosk/core";
+import {
+  clearLostPayment,
+  type LostPayments,
+  lostFor,
+  type PaymentCalls,
+} from "@/lib/kiosk/payment-recovery";
 import { format, type Strings } from "@/lib/kiosk/strings";
 
 import { ChevronLeft } from "../icons";
@@ -24,7 +30,23 @@ const POLL_MS = 1_000;
 const AUTHORISE_TIMEOUT_MS = 120_000;
 /** After the timeout, how often to try cancelling again while the Core API cannot. */
 const CANCEL_RETRY_MS = 10_000;
+/** While an order's placement is unknown, how long to wait between checks. */
+const VERIFY_RETRY_MS = 5_000;
+/** After this long verifying, the screen also offers the counter. */
+const VERIFY_SLOW_MS = 60_000;
 const METHODS: PaymentMethod[] = ["PIX", "CREDIT", "DEBIT"];
+
+/** A Server Action that never reached the BFF (kiosk offline) has an unknown outcome. */
+function settle<T>(call: Promise<Result<T>>): Promise<Result<T>> {
+  return call.catch((): Result<T> => ({ ok: false, code: "CORE_UNAVAILABLE" }));
+}
+
+/** The payment calls lost-payment recovery uses, each answer unknown when offline. */
+export const paymentCalls: PaymentCalls = {
+  startPayment: (...args) => settle(startPayment(...args)),
+  pollPayment: (id) => settle(pollPayment(id)),
+  cancelPayment: (id) => settle(cancelPayment(id)),
+};
 
 type Step =
   | { kind: "method" }
@@ -34,7 +56,9 @@ type Step =
   | { kind: "expired"; method: PaymentMethod }
   | { kind: "error"; method: PaymentMethod; basket: boolean }
   /** Paid, but the order was not placed: only staff can sort it out (BR-PAY-05, 08). */
-  | { kind: "placeFailed"; method: PaymentMethod; order: Order };
+  | { kind: "placeFailed"; method: PaymentMethod; order: Order }
+  /** Paid, and Go has not said whether the order was placed: keep asking with the same key. */
+  | { kind: "verifying"; method: PaymentMethod; order: Order; slow: boolean };
 
 /** Codes that mean the basket itself must change before paying. */
 const BASKET_CODES = new Set([
@@ -60,6 +84,7 @@ export function CheckoutFlow({
   onBack,
   onCancelOrder,
   onBusy,
+  lostRef,
 }: {
   journey: Journey;
   strings: Strings;
@@ -69,10 +94,18 @@ export function CheckoutFlow({
   onCancelOrder: () => void;
   /** Told while waiting on the terminal or the Core API, when idle checking stops. */
   onBusy: (busy: boolean) => void;
+  /**
+   * Attempts that got no answer: Go may have made their payment (COM-97). The
+   * journey owns them, so leaving the checkout does not forget them (COM-110).
+   */
+  lostRef: RefObject<LostPayments>;
 }) {
   const [step, setStep] = useState<Step>({ kind: "method" });
   const busy =
-    step.kind === "working" || step.kind === "authorising" || step.kind === "placeFailed";
+    step.kind === "working" ||
+    step.kind === "authorising" ||
+    step.kind === "placeFailed" ||
+    step.kind === "verifying";
   useEffect(() => onBusy(busy), [busy, onBusy]);
   // One key per payment attempt; a retry after an error reuses it, a new attempt gets a new one.
   const [paymentKey, setPaymentKey] = useState(() => crypto.randomUUID());
@@ -88,13 +121,47 @@ export function CheckoutFlow({
 
   async function place(method: PaymentMethod, order: Order) {
     setStep({ kind: "working", method, label: "pay.placing" });
-    const placed = await placeOrder(order.id, checkout.placeKey);
+    const placed = await settle(placeOrder(order.id, checkout.placeKey));
     if (placed.ok) return onPlaced(placed.data);
     // The payment is taken: never offer another payment or a basket change.
     // Placing again is safe, since the same key returns the same order.
     console.warn(`Order not placed after payment: ${placed.code}`);
+    // No answer within the 15 s budget is not a failure: the order may exist.
+    if (placed.code === "CORE_UNAVAILABLE") {
+      return setStep({ kind: "verifying", method, order, slow: false });
+    }
     setStep({ kind: "placeFailed", method, order });
   }
+
+  // While placement is unknown, ask again with the same key until Go answers.
+  const verifying = step.kind === "verifying" ? step.order : null;
+  useEffect(() => {
+    if (!verifying) return;
+    let live = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const slowAt = Date.now() + VERIFY_SLOW_MS;
+    const check = async () => {
+      const placed = await settle(placeOrder(verifying.id, checkout.placeKey));
+      if (!live) return;
+      if (placed.ok) return onPlaced(placed.data);
+      if (placed.code !== "CORE_UNAVAILABLE") {
+        return setStep((s) =>
+          s.kind === "verifying" ? { kind: "placeFailed", method: s.method, order: s.order } : s,
+        );
+      }
+      if (Date.now() >= slowAt) {
+        setStep((s) => (s.kind === "verifying" && !s.slow ? { ...s, slow: true } : s));
+      }
+      timer = setTimeout(check, VERIFY_RETRY_MS);
+    };
+    timer = setTimeout(check, VERIFY_RETRY_MS);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+    // `checkout` and `onPlaced` are stable for one order.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verifying]);
 
   async function pay(method: PaymentMethod, key: string) {
     if (attempting.current) return;
@@ -110,7 +177,8 @@ export function CheckoutFlow({
     setStep({ kind: "working", method, label: "pay.preparing" });
     let order = checkout.order;
     if (!order) {
-      const created = await createOrder(checkout.orderKey, {
+      const created = await settle(
+        createOrder(checkout.orderKey, {
         orderNonce: journey.orderNonce!,
         orderType: journey.orderType!,
         language: journey.language,
@@ -118,12 +186,32 @@ export function CheckoutFlow({
         discountCode: journey.discountCode,
         cpfCnpj: journey.cpfCnpj,
         journeyStartedTimestamp: journey.journeyStartedTimestamp,
-      });
+        }),
+      );
       if (!created.ok) return fail(method, created);
       order = created.data;
       onOrderCreated(order);
     }
-    const started = await startPayment(order.id, method, key);
+    let started = await start(order.id, method, key);
+    if (!started.ok && started.code === "PAYMENT_IN_PROGRESS") {
+      // An earlier attempt's answer was lost but Go made that payment: clear it first.
+      const recovery = await clearLostPayment(
+        order.id,
+        lostFor(lostRef.current, order.id).filter((a) => a.key !== key),
+        paymentCalls,
+      );
+      lostRef.current = {
+        orderId: order.id,
+        attempts: lostFor(lostRef.current, order.id).filter((a) => !recovery.settled.includes(a.key)),
+      };
+      if (recovery.outcome === "paid") return place(method, order);
+      if (recovery.outcome === "free") {
+        // A fresh key: Go may have stored the refusal under the old one.
+        const fresh = crypto.randomUUID();
+        setPaymentKey(fresh);
+        started = await start(order.id, method, fresh);
+      }
+    }
     if (started.ok) {
       setStep({ kind: "authorising", method, payment: started.data, cancelling: false });
     } else if (started.code === "ORDER_NOT_AWAITING_PAYMENT") {
@@ -132,6 +220,17 @@ export function CheckoutFlow({
     } else {
       fail(method, started);
     }
+  }
+
+  /** Starts a payment, remembering it while Go's answer is unknown. */
+  async function start(orderId: string, method: PaymentMethod, key: string) {
+    const others = () => lostFor(lostRef.current, orderId).filter((a) => a.key !== key);
+    lostRef.current = { orderId, attempts: [...others(), { key, method }] };
+    const started = await settle(startPayment(orderId, method, key));
+    if (started.ok || started.code !== "CORE_UNAVAILABLE") {
+      lostRef.current = { orderId, attempts: others() };
+    }
+    return started;
   }
 
   const newAttempt = (method: PaymentMethod) => {
@@ -153,7 +252,7 @@ export function CheckoutFlow({
     /** True when the payment was cancelled and the expired screen is up. */
     const expire = async () => {
       setStep((s) => (s.kind === "authorising" ? { ...s, cancelling: true } : s));
-      const result = await cancelPayment(polling);
+      const result = await settle(cancelPayment(polling));
       if (!live) return true;
       if (result.ok) {
         setStep({ kind: "expired", method: result.data.method });
@@ -165,7 +264,8 @@ export function CheckoutFlow({
     };
 
     const tick = async () => {
-      const result = await pollPayment(polling);
+      // A rejected call (kiosk offline) is no answer: keep polling (COM-136).
+      const result = await settle(pollPayment(polling));
       if (!live) return;
       if (result.ok) {
         const payment = result.data;
@@ -198,7 +298,7 @@ export function CheckoutFlow({
   async function cancel() {
     if (step.kind !== "authorising") return;
     setStep({ ...step, cancelling: true });
-    const result = await cancelPayment(step.payment.id);
+    const result = await settle(cancelPayment(step.payment.id));
     if (result.ok) return setStep({ kind: "method" });
     // Already final: the poll reports how it ended. Any other failure brings the button back.
     if (result.code !== "PAYMENT_NOT_CANCELLABLE") {
@@ -269,6 +369,15 @@ export function CheckoutFlow({
             label: strings["pay.placeRetry"],
             onPress: () => void place(step.method, step.order),
           }}
+        />
+      );
+    case "verifying":
+      return (
+        <VerifyingScreen
+          tag={strings["pay.verifyingTag"]}
+          title={strings["pay.verifyingTitle"]}
+          body={strings["pay.verifyingBody"]}
+          slow={step.slow ? strings["pay.verifyingSlow"] : null}
         />
       );
     case "error":
@@ -517,6 +626,54 @@ function ProblemScreen({
           <button onClick={onCancelOrder} className="mt-[24px] text-[28.5px] font-bold text-danger">
             {cancelLabel}
           </button>
+        )}
+      </div>
+    </main>
+  );
+}
+
+/** Paid, placement unknown: no buttons, since nothing the guest taps can help (BR-ORD-04). */
+function VerifyingScreen({
+  tag,
+  title,
+  body,
+  slow,
+}: {
+  tag: string;
+  title: string;
+  body: string;
+  slow: string | null;
+}) {
+  return (
+    <main className="flex h-full flex-col bg-ground px-[84px] pt-[108px] pb-[72px] text-ink">
+      <span className="flex items-center gap-[21px] text-[31.5px] font-bold">
+        <span className="flex size-[66px] items-center justify-center rounded-full bg-sage text-ink">
+          <svg
+            width="30"
+            height="30"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M5 12.5l4.5 4.5L19 7.5" />
+          </svg>
+        </span>
+        {tag}
+      </span>
+      <h1 className="mt-auto font-display text-[120px] leading-[0.95] font-semibold tracking-[-0.03em] whitespace-pre-line">
+        {title}
+      </h1>
+      <p className="mt-[36px] max-w-[810px] text-[33px] leading-[1.45] text-muted">{body}</p>
+      <div className="mt-auto flex min-h-[200px] flex-col items-center gap-[36px]" role="status">
+        <span className="size-[72px] animate-spin rounded-full border-[6px] border-line border-t-accent" />
+        {slow && (
+          <p className="max-w-[810px] text-center text-[30px] leading-[1.45] font-semibold">
+            {slow}
+          </p>
         )}
       </div>
     </main>

@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Item e adicionais</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button{font:inherit;color:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 720px; height: 1280px; box-sizing: border-box; background: {{surface}}; color: {{ink}}; font-family: Manrope, system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <div style="height: 380px; flex-shrink: 0; background: {{heroBg}}; color: {{imgFg}}; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden">
+    <sc-if value="{{hasImg}}" hint-placeholder-val="{{true}}">
+      <img src="{{img}}" alt="{{itemName}}" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover">
+    </sc-if>
+    <sc-if value="{{noImg}}" hint-placeholder-val="{{false}}">
+      <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"></rect><circle cx="8.5" cy="8.5" r="1.8"></circle><path d="M21 15l-5-5L5 21"></path></svg>
+    </sc-if>
+    <a href="Menu.dc.html" aria-label="Voltar ao cardápio" style="position: absolute; top: 28px; left: 32px; height: 56px; padding: 0 22px 0 14px; border-radius: 28px; background: {{surface}}; color: {{ink}}; display: flex; align-items: center; gap: 8px; font-size: 19px; font-weight: 700">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>
+      Cardápio
+    </a>
+  </div>
+
+  <div style="flex-grow: 1; min-height: 0; overflow: hidden; padding: 36px 44px 0; display: flex; flex-direction: column; gap: 32px">
+    <div style="display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 16px">
+        <h1 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 54px; letter-spacing: -0.02em">{{itemName}}</h1>
+        <div style="font-size: 28px; font-weight: 700; color: {{price}}">{{basePrice}}</div>
+      </div>
+      <p style="margin: 0; font-size: 21px; line-height: 1.45; color: {{muted}}; max-width: 560px">{{description}}</p>
+    </div>
+
+    <section style="display: flex; flex-direction: column; gap: 16px">
+      <div style="display: flex; justify-content: space-between; align-items: baseline">
+        <h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 30px">{{group1Title}}</h2>
+        <div style="font-size: 16px; font-weight: 700; color: {{detailText}}">Escolha um</div>
+      </div>
+      <div role="radiogroup" aria-label="{{group1Title}}" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+        <sc-for list="{{choices}}" as="opt" hint-placeholder-count="3">
+          <button type="button" role="radio" aria-checked="{{opt.checked}}" onClick="{{opt.pick}}" style="{{opt.style}}">{{opt.label}}</button>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 8px">
+      <div style="display: flex; justify-content: space-between; align-items: baseline">
+        <h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 30px">Adicionais</h2>
+        <div style="font-size: 16px; font-weight: 600; color: {{muted}}">{{addonCounter}}</div>
+      </div>
+      <div style="display: flex; flex-direction: column">
+        <sc-for list="{{addons}}" as="ad" hint-placeholder-count="4">
+          <button type="button" aria-pressed="{{ad.pressed}}" onClick="{{ad.toggle}}" style="{{ad.style}}">
+            <span style="display: flex; align-items: center; gap: 18px">
+              <span style="{{ad.boxStyle}}">
+                <sc-if value="{{ad.on}}" hint-placeholder-val="{{false}}">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{checkFg}}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>
+                </sc-if>
+              </span>
+              <span style="font-size: 21px; font-weight: 600">{{ad.label}}</span>
+            </span>
+            <span style="font-size: 19px; font-weight: 600; color: {{muted}}">{{ad.price}}</span>
+          </button>
+        </sc-for>
+      </div>
+    </section>
+  </div>
+
+  <div style="padding: 20px 32px 32px; display: flex; align-items: center; gap: 16px">
+    <div style="display: flex; align-items: center; gap: 4px; height: 104px; padding: 0 10px; border-radius: 52px; background: {{ground}}">
+      <button type="button" onClick="{{dec}}" aria-label="Diminuir quantidade" disabled="{{decDisabled}}" style="{{decStyle}}">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg>
+      </button>
+      <div aria-live="polite" style="min-width: 48px; text-align: center; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 36px">{{qty}}</div>
+      <button type="button" onClick="{{inc}}" aria-label="Aumentar quantidade" style="width: 80px; height: 80px; border-radius: 40px; border: 0; background: {{surface}}; display: flex; align-items: center; justify-content: center">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+      </button>
+    </div>
+    <a href="Menu.dc.html" style="flex-grow: 1; height: 104px; border-radius: 52px; background: {{accent}}; color: {{onAccent}}; display: flex; align-items: center; justify-content: space-between; padding: 0 36px; font-size: 24px; font-weight: 700">
+      <span>Adicionar</span>
+      <span style="font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 32px; letter-spacing: -0.02em; color: {{accentTitle}}">{{total}}</span>
+    </a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["padaria","tomate","verde","acafrao"],"default":"padaria"},"$preview":{"width":720,"height":1280}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { choice: null, addons: null, qty: 1 };
+  }
+  renderVals() {
+    const THEMES = {
+      padaria: { ground:'#F3EFE8', surface:'#FFFFFF', ink:'#2B211C', muted:'#625750', line:'#E5DDD2', img:'#E9E2D7', imgFg:'#978B80', accent:'#4E3426', onAccent:'#FAF6F0', accentTitle:'#FAF6F0', detail:'#B07A3A', detailText:'#8A5A2B', price:'#6B4430', checkFg:'#FFFFFF', chip:'#EAD9C6', chipOn:'#4E3426', chipOnFg:'#FAF6F0' },
+      verde: { ground:'#EEECE6', surface:'#FFFFFF', ink:'#141A17', muted:'#5B615C', line:'#E3E1DA', img:'#E6E2D8', imgFg:'#8A8F88', accent:'#1F3D31', onAccent:'#F4F2EC', accentTitle:'#F4F2EC', detail:'#B9892C', detailText:'#7F5E14', price:'#1F3D31', checkFg:'#FFFFFF', chip:'#EEECE6', chipOn:'#1F3D31', chipOnFg:'#F4F2EC' },
+      tomate: { ground:'#F3F2ED', surface:'#FFFFFF', ink:'#1B1816', muted:'#5F5B57', line:'#E6E4DE', img:'#ECE7DF', imgFg:'#8C8782', accent:'#C8341F', onAccent:'#FFF6F1', accentTitle:'#FFF6F1', detail:'#C8341F', detailText:'#A32A18', price:'#A32A18', checkFg:'#FFFFFF', chip:'#F3F2ED', chipOn:'#C8341F', chipOnFg:'#FFF6F1' },
+      acafrao: { ground:'#EFEEE9', surface:'#FFFFFF', ink:'#17181C', muted:'#5E5D59', line:'#E4E2DC', img:'#E8E6DF', imgFg:'#8A8985', accent:'#17181C', onAccent:'#F7F5EF', accentTitle:'#F2B134', detail:'#F2B134', detailText:'#8A5E00', price:'#17181C', checkFg:'#17181C', chip:'#EFEEE9', chipOn:'#17181C', chipOnFg:'#F7F5EF' }
+    };
+    const theme = this.props.theme ?? 'padaria';
+    const t = THEMES[theme] || THEMES.padaria;
+    const bakery = theme === 'padaria';
+    const brl = (v) => 'R$ ' + v.toFixed(2).replace('.', ',');
+    const product = bakery ? {
+      name: 'Croque monsieur', base: 34.9, img: '/_blob/815ba165d43ef54e1ded7d6eef3d1541',
+      description: 'Pão tostado, presunto, gruyère e molho bechamel gratinado.',
+      group1: 'Pão', choices: [{ id: 'brioche', label: 'Brioche' }, { id: 'fermentacao', label: 'Fermentação' }, { id: 'ciabatta', label: 'Ciabatta' }], defChoice: 'brioche',
+      addons: [{ id: 'ovo', label: 'Ovo pochê', price: 6.0 }, { id: 'parma', label: 'Presunto de parma', price: 9.0 }, { id: 'gruyere', label: 'Gruyère extra', price: 7.0 }, { id: 'dijon', label: 'Mostarda dijon', price: 2.0 }], defAddons: ['ovo']
+    } : {
+      name: 'Cheddar Bacon', base: 34.9, img: '',
+      description: 'Pão brioche, blend de 160 g, cheddar cremoso, bacon crocante e maionese da casa.',
+      group1: 'Ponto da carne', choices: [{ id: 'mal', label: 'Mal passado' }, { id: 'ao-ponto', label: 'Ao ponto' }, { id: 'bem', label: 'Bem passado' }], defChoice: 'ao-ponto',
+      addons: [{ id: 'bacon', label: 'Bacon extra', price: 5.0 }, { id: 'cheddar', label: 'Cheddar extra', price: 4.0 }, { id: 'ovo', label: 'Ovo', price: 3.0 }, { id: 'cebola', label: 'Cebola caramelizada', price: 3.5 }], defAddons: ['bacon']
+    };
+    const MAX = 3;
+    const choice = product.choices.some((c) => c.id === this.state.choice) ? this.state.choice : product.defChoice;
+    const chosen = (this.state.addons || product.defAddons).filter((id) => product.addons.some((a) => a.id === id));
+    const choices = product.choices.map((o) => {
+      const on = o.id === choice;
+      return {
+        label: o.label,
+        checked: on ? 'true' : 'false',
+        pick: () => this.setState({ choice: o.id }),
+        style: 'height: 76px; border-radius: 16px; font-size: 19px; font-weight: 700; border: 0; ' +
+          (on ? 'background: ' + t.chipOn + '; color: ' + t.chipOnFg + ';' : 'background: ' + t.chip + '; color: ' + t.ink + ';')
+      };
+    });
+    const full = chosen.length >= MAX;
+    const addons = product.addons.map((a, i) => {
+      const on = chosen.includes(a.id);
+      const blocked = !on && full;
+      return {
+        label: a.label,
+        price: '+ ' + brl(a.price),
+        on,
+        pressed: on ? 'true' : 'false',
+        toggle: () => {
+          if (on) this.setState({ addons: chosen.filter((x) => x !== a.id) });
+          else if (!full) this.setState({ addons: chosen.concat(a.id) });
+        },
+        style: 'display: flex; justify-content: space-between; align-items: center; height: 76px; padding: 0 4px; background: transparent; border: 0; text-align: left;' +
+          (i > 0 ? ' border-top: 1px solid ' + t.line + ';' : '') + (blocked ? ' opacity: 0.4;' : ''),
+        boxStyle: 'width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; ' +
+          (on ? 'background: ' + t.detail + ';' : 'background: ' + t.surface + '; border: 2px solid #B5B3AB;')
+      };
+    });
+    const unit = product.base + product.addons.filter((a) => chosen.includes(a.id)).reduce((s, a) => s + a.price, 0);
+    const qty = this.state.qty;
+    return {
+      ...t,
+      itemName: product.name,
+      basePrice: brl(product.base),
+      description: product.description,
+      img: product.img,
+      hasImg: !!product.img,
+      noImg: !product.img,
+      heroBg: bakery ? '#EAD9C6' : t.img,
+      group1Title: product.group1,
+      choices,
+      addons,
+      addonCounter: chosen.length + ' de ' + MAX,
+      qty,
+      total: brl(unit * qty),
+      inc: () => this.setState({ qty: qty + 1 }),
+      dec: () => this.setState({ qty: Math.max(1, qty - 1) }),
+      decDisabled: qty <= 1,
+      decStyle: 'width: 80px; height: 80px; border-radius: 40px; border: 0; background: ' + t.surface + '; display: flex; align-items: center; justify-content: center;' + (qty <= 1 ? ' opacity: 0.4;' : '')
+    };
+  }
+}
+</script>
+</body>
+</html>

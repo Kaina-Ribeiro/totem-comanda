@@ -6,6 +6,16 @@
 // Mock-only control endpoints (not in the contract, called on 4020 directly):
 //   GET  /__mock            current scenario, scenarios, device health, reports
 //   POST /__mock/scenario   {"name": "<scenario>"} resets the state to it
+//   POST /__mock/fault      {"path": "<regex>", "method"?, "status"?, "code"?, "delayMs"?, "times"?}
+//                           makes the next matching Core API calls slow or fail
+//                           (timeouts, 4xx, 5xx, a lost answer); DELETE clears them.
+//                           A 4xx answers a contract Problem: `code` defaults for 401,
+//                           404 and 422 and is required for other 4xx (faults.ts)
+//   POST /__mock/kitchen/backdate {"posCheckNumber": "42", "minutes": 12}
+//                           moves an order's placedAt, readyAt and status history back, to see waiting colours
+//   POST /__mock/clock     {"minutes": 16} moves the mock's clock forward (a pause's automatic resume)
+//   GET  /__mock/device-credentials?kind=KITCHEN  id and secret of a seeded device, for the
+//                           dev index to pair a browser as the kiosk or the kitchen (COM-139)
 
 import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
@@ -14,15 +24,25 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { fileURLToPath } from "node:url";
 
 import { SEED_MEDIA } from "./catalogue.ts";
+import { faultCode, faultReply } from "./faults.ts";
 import { authDevice, problem, type Reply, type Request, type Route, type Schemas } from "./http.ts";
 import { adminRoutes } from "./routes-admin.ts";
 import { catalogueRoutes } from "./routes-catalogue.ts";
-import { serveKitchenStream, kitchenRoutes } from "./routes-kitchen.ts";
+import { currentPace, paceRoutes } from "./pace.ts";
+import { historyOf, serveKitchenStream, kitchenRoutes } from "./routes-kitchen.ts";
 import { optionRoutes } from "./routes-options.ts";
 import { kioskRoutes } from "./routes-kiosk.ts";
 import { orderRoutes } from "./routes-orders.ts";
 import { activeMenu, nextOpening } from "./schedule.ts";
-import { applyScenario, isScenario, now, SCENARIOS, signInDevice, state } from "./state.ts";
+import {
+  applyScenario,
+  isScenario,
+  now,
+  SCENARIOS,
+  seededCredentials,
+  signInDevice,
+  state,
+} from "./state.ts";
 
 const MOCK_PORT = Number(process.env.MOCK_PORT ?? 4020);
 const PRISM_PORT = Number(process.env.PRISM_PORT ?? 4010);
@@ -33,13 +53,16 @@ function deviceConfig(device: (typeof state.devices)[number]): Schemas["DeviceCo
   const r = state.restaurant;
   const at = now();
   const active = activeMenu(state.menus, at, r.timezone);
+  const storePace = currentPace();
   return {
     kioskID: device.id,
     kind: device.kind,
     idleTimerIntervalMilliseconds: device.idleTimerIntervalMilliseconds,
     printerEnabled: device.printerEnabled,
     maintenanceMode: device.maintenanceMode,
-    atCapacityMode: device.atCapacityMode,
+    // At capacity in Aparelhos, or the whole store paused (contract 0.2.0).
+    atCapacityMode: device.atCapacityMode || storePace.pace === "PAUSED",
+    pace: { pace: storePace.pace, pausedUntil: storePace.pausedUntil },
     isOpen: active !== null && (r.isDineInAvailable || r.isTakeOutAvailable),
     restaurant: {
       locationId: r.id,
@@ -78,6 +101,7 @@ const routes: Route[] = [
   ...catalogueRoutes,
   ...optionRoutes,
   ...kitchenRoutes,
+  ...paceRoutes,
   [
     "POST",
     /^\/v1\/devices\/auth$/,
@@ -154,6 +178,78 @@ const routes: Route[] = [
   ],
   [
     "POST",
+    /^\/__mock\/fault$/,
+    (req) => {
+      const body = (req.body ?? {}) as Partial<Fault> & { path?: unknown; code?: unknown };
+      if (typeof body.path !== "string") return { status: 400, body: { error: "path is required" } };
+      const status = typeof body.status === "number" ? body.status : undefined;
+      const coded = faultCode(status, typeof body.code === "string" ? body.code : undefined);
+      if ("error" in coded) return { status: 400, body: { error: coded.error } };
+      const fault: Fault = {
+        path: new RegExp(body.path),
+        method: typeof body.method === "string" ? body.method.toUpperCase() : undefined,
+        status,
+        code: coded.code,
+        delayMs: typeof body.delayMs === "number" ? body.delayMs : 0,
+        times: typeof body.times === "number" ? body.times : 1,
+      };
+      faults.push(fault);
+      console.log(`[mock] fault: ${fault.method ?? "*"} ${body.path} ×${fault.times}`);
+      return { status: 200, body: { faults: faults.length } };
+    },
+  ],
+  [
+    "POST",
+    /^\/__mock\/kitchen\/backdate$/,
+    (req) => {
+      const body = (req.body ?? {}) as { posCheckNumber?: unknown; minutes?: unknown };
+      const order = [...state.orders.values()].find(
+        (o) => o.posCheckNumber === String(body.posCheckNumber),
+      );
+      if (!order || typeof body.minutes !== "number") {
+        return { status: 400, body: { error: "posCheckNumber of a placed order and minutes" } };
+      }
+      const back = (at: string | null | undefined) =>
+        at ? new Date(Date.parse(at) - (body.minutes as number) * 60_000).toISOString() : at;
+      order.placedAt = back(order.placedAt) ?? order.placedAt;
+      order.readyAt = back(order.readyAt) ?? null;
+      for (const change of historyOf(order)) change.at = back(change.at) ?? change.at;
+      return { status: 200, body: { id: order.id, placedAt: order.placedAt } };
+    },
+  ],
+  [
+    "GET",
+    /^\/__mock\/device-credentials$/,
+    (req) => {
+      const kind = req.query.get("kind");
+      if (kind !== "KIOSK" && kind !== "KITCHEN") return { status: 400, body: { error: "kind" } };
+      const credentials = seededCredentials(kind);
+      return credentials
+        ? { status: 200, body: credentials }
+        : { status: 404, body: { error: kind } };
+    },
+  ],
+  [
+    "POST",
+    /^\/__mock\/clock$/,
+    (req) => {
+      const minutes = (req.body as { minutes?: unknown } | null)?.minutes;
+      if (typeof minutes !== "number") return { status: 400, body: { error: "minutes" } };
+      state.clockOffsetMs += minutes * 60_000;
+      currentPace(); // A clock moved past a pause's end resumes now, and says so.
+      return { status: 200, body: { now: now().toISOString() } };
+    },
+  ],
+  [
+    "DELETE",
+    /^\/__mock\/fault$/,
+    () => {
+      faults.length = 0;
+      return { status: 204 };
+    },
+  ],
+  [
+    "POST",
     /^\/__mock\/scenario$/,
     (req) => {
       const name = (req.body as { name?: unknown } | null)?.name;
@@ -164,6 +260,35 @@ const routes: Route[] = [
     },
   ],
 ];
+
+/** A Core API call made slow or failing on purpose, for the next `times` matches. */
+type Fault = {
+  path: RegExp;
+  method?: string;
+  /** Answer with this status instead of the route's answer. */
+  status?: number;
+  /** The problem code of a 4xx answer (see faults.ts). */
+  code?: Schemas["ProblemCode"];
+  /** Wait this long first; with no status the route then answers normally. */
+  delayMs: number;
+  times: number;
+};
+const faults: Fault[] = [];
+
+/** Applies the first matching fault; true when it already answered. */
+async function applyFault(req: Request, res: ServerResponse): Promise<boolean> {
+  if (req.path.startsWith("/__mock")) return false;
+  const fault = faults.find(
+    (f) => f.times > 0 && f.path.test(req.path) && (!f.method || f.method === req.method),
+  );
+  if (!fault) return false;
+  fault.times -= 1;
+  if (fault.times === 0) faults.splice(faults.indexOf(fault), 1);
+  if (fault.delayMs > 0) await new Promise((resolve) => setTimeout(resolve, fault.delayMs));
+  if (fault.status === undefined) return false;
+  send(res, faultReply(fault.status, fault.code));
+  return true;
+}
 
 async function readRaw(req: IncomingMessage): Promise<Buffer> {
   const chunks: Buffer[] = [];
@@ -223,6 +348,7 @@ const server = createServer({ insecureHTTPParser: true }, async (incoming, res) 
     body: parseJson(raw),
     ip: incoming.socket.remoteAddress ?? "",
   };
+  if (await applyFault(req, res)) return;
   if (serveKitchenStream(req, res)) return;
   for (const [method, pattern, handler] of routes) {
     const match = pattern.exec(req.path);

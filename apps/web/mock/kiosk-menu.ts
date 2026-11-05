@@ -17,6 +17,15 @@ const byOrder = <T extends { displayOrder: number }>(list: T[]) =>
 
 const isSoldOut = (item: MockItem, today: string) => item.soldOutDate === today;
 
+/**
+ * Options marked "Acabou" from the kitchen (setKitchenAvailability), by option
+ * id, with the business date. Mock option ids are already per item.
+ */
+export const soldOutOptions = new Map<string, string>();
+let menuDay = "";
+const optionSoldOut = (optionId: string | undefined) =>
+  !!optionId && soldOutOptions.get(optionId) === menuDay;
+
 function resolveOption(
   option: Schemas["AdminOption"],
   catalogue: Catalogue,
@@ -49,9 +58,11 @@ function resolveGroup(
     role: group.role,
     minimum: group.minimum,
     maximum: group.maximum,
-    defaultOption: group.defaultOption ?? null,
+    defaultOption: optionSoldOut(group.defaultOption ?? undefined) ? null : (group.defaultOption ?? null),
     displayOrder: group.displayOrder,
-    options: byOrder(group.options).map((o) => resolveOption(o, catalogue, language)),
+    options: byOrder(group.options)
+      .filter((o) => !optionSoldOut(o.id))
+      .map((o) => resolveOption(o, catalogue, language)),
     compositeOptions: (group.compositeOptions ?? []).map((c) => ({
       type: "TOGGLE" as const,
       positiveOption: resolveOption(c.positiveOption, catalogue, language),
@@ -115,7 +126,13 @@ export function resolveMenu(
   language: Language,
   today: string,
 ): Schemas["Menu"] {
+  menuDay = today;
   const items = new Map(catalogue.items.map((i) => [i.id, i]));
+  // An item whose required choice ran out cannot be built: it leaves the menu too.
+  const buildable = (item: MockItem) =>
+    groupsOf(catalogue, { itemId: item.id }).every(
+      (g) => g.options.length === 0 || g.options.filter((o) => !optionSoldOut(o.id)).length >= g.minimum,
+    );
   const categories = byOrder(
     catalogue.categories.filter((c) => c.menuId === menu.id && !c.parentId),
   );
@@ -129,7 +146,7 @@ export function resolveMenu(
       displayOrder: category.displayOrder,
       childEntities: byOrder(category.items).flatMap((link) => {
         const item = items.get(link.itemId);
-        return item && !isSoldOut(item, today)
+        return item && !isSoldOut(item, today) && buildable(item)
           ? [resolveItem(item, link, catalogue, language)]
           : [];
       }),
@@ -224,6 +241,9 @@ function priceOptions(
   for (const input of inputs) {
     const found = lookup.get(input.optionId);
     if (!found) throw validation(`${where}: unknown option ${input.optionId}`);
+    if (optionSoldOut(input.optionId)) {
+      throw new PricingError(422, "ITEM_UNAVAILABLE", "Option unavailable", text(found.option.name, language) ?? input.optionId);
+    }
     if (input.quantity > found.option.maximumQuantity) {
       throw validation(`${where}: ${input.optionId} above its maximum quantity`);
     }
@@ -313,6 +333,7 @@ export function priceBasket(
   restaurant: { isDineInAvailable: boolean; isTakeOutAvailable: boolean },
   ctx: { today: string; at: Date; language: Language },
 ): { lines: PricedLine[]; total: Schemas["OrderTotal"] } {
+  menuDay = ctx.today;
   if (!input.menuId) throw new PricingError(422, "NO_ACTIVE_MENU", "No menu is active now");
   const typeOpen =
     input.orderType === "DINEIN" ? restaurant.isDineInAvailable : restaurant.isTakeOutAvailable;

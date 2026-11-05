@@ -13,7 +13,7 @@ import {
 import { format, type Strings } from "@/lib/kiosk/strings";
 
 import { ChevronLeft, Minus, Plus } from "../icons";
-import { currentQuote, type Journey } from "./journey-state";
+import { currentQuote, currentQuoteFailure, type Journey } from "./journey-state";
 
 /**
  * Prototype 05-Cart at 1080x1920. Lines with edit, remove and quantity; the
@@ -47,7 +47,7 @@ export function BasketScreen({
   const menu = journey.menu!;
   const orderType = journey.orderType ?? "DINEIN";
   const quote = currentQuote(journey);
-  const failed = journey.quote && !journey.quote.result.ok ? journey.quote.result : null;
+  const failed = currentQuoteFailure(journey);
   const stale = !quote && !failed;
   const empty = journey.basket.length === 0;
 
@@ -194,7 +194,9 @@ function LineRow({
   onRemove: () => void;
 }) {
   const item = findItem(menu, line.itemId);
-  if (!item) return null;
+  // Sold out or off the menu since it was added (a language change reloads the
+  // menu): the line still blocks the quote, so the guest must see it to remove it.
+  if (!item) return <GoneLineRow strings={strings} onRemove={onRemove} />;
   const summary = optionNames(item, line.options).join(", ");
   const editable = (item.optionGroups ?? []).length > 0;
   return (
@@ -245,6 +247,26 @@ function LineRow({
               <Plus size={27} />
             </button>
           </div>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+/** A basket line whose item is no longer on the menu: no price or options, only Remove. */
+function GoneLineRow({ strings, onRemove }: { strings: Strings; onRemove: () => void }) {
+  return (
+    <li className="flex gap-[30px] border-b border-line py-[42px] last:border-0">
+      <span className="flex size-[132px] shrink-0 items-center justify-center rounded-[24px] bg-wheat font-display text-[60px] font-semibold text-ink/25">
+        ?
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-[9px]">
+        <span className="text-[31.5px] font-bold">{strings["basket.goneLine"]}</span>
+        <span className="text-[25.5px] text-muted">{strings["basket.goneLineBody"]}</span>
+        <div className="mt-[9px] flex text-[25.5px] font-bold">
+          <button onClick={onRemove} className="text-detail-text">
+            {strings["basket.remove"]}
+          </button>
         </div>
       </div>
     </li>

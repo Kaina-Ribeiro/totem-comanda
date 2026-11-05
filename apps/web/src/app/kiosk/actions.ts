@@ -3,10 +3,12 @@
 import { after } from "next/server";
 
 import { coreApi } from "@/lib/core/client";
+import { retryUnknown } from "@/lib/core/retry";
 import type { components } from "@/lib/core-api";
 import {
   deviceCall,
   deviceCallAs,
+  failure,
   loadActiveMenu,
   loadLanguagePack,
   type Menu,
@@ -14,11 +16,26 @@ import {
   type Result,
   success,
 } from "@/lib/kiosk/core";
+import { requireDeviceKind } from "@/lib/device/config";
 import { simulatedOutcome, terminalAnswered } from "@/lib/kiosk/simulated-payment";
 import { type Language, mergeStrings, type Strings } from "@/lib/kiosk/strings";
 
 // Server Actions of the kiosk journey. The browser holds the journey state;
 // these are its only way to the Core API, and they hold the device token.
+// Every one of them runs for a KIOSK device only (COM-109): the contract has
+// no such check, so without it a kitchen tablet could quote, pay and place.
+
+const kiosk = <T>(call: Parameters<typeof deviceCallAs<T>>[1]) => deviceCallAs("KIOSK", call);
+
+/** Null for a kiosk; otherwise the Result to return before any Core call. */
+async function notKiosk(): Promise<Result<never> | null> {
+  try {
+    await requireDeviceKind("KIOSK");
+    return null;
+  } catch (error) {
+    return failure(error);
+  }
+}
 
 const isLanguage = (value: unknown): value is Language => value === "pt-BR" || value === "en";
 
@@ -36,10 +53,12 @@ export type JourneyStart = {
  */
 export async function beginJourney(language: Language): Promise<Result<JourneyStart>> {
   if (!isLanguage(language)) return { ok: false, code: "VALIDATION_FAILED" };
+  const refused = await notKiosk();
+  if (refused) return refused;
   const orderNonce = crypto.randomUUID();
 
   const [journey, menu, pack] = await Promise.all([
-    deviceCallAs("KIOSK", (headers) =>
+    deviceCall((headers) =>
       coreApi().POST("/v1/journeys", { headers, body: { orderNonce, language } }),
     ),
     loadActiveMenu(language),
@@ -75,6 +94,8 @@ export async function switchLanguage(
   language: Language,
 ): Promise<Result<{ menu: Menu; strings: Strings }>> {
   if (!isLanguage(language)) return { ok: false, code: "VALIDATION_FAILED" };
+  const refused = await notKiosk();
+  if (refused) return refused;
   const [menu, pack] = await Promise.all([loadActiveMenu(language), loadLanguagePack(language)]);
   if (!menu.ok) return menu;
   return success({ menu: menu.data, strings: mergeStrings(language, pack) });
@@ -85,7 +106,7 @@ export type QuoteInput = components["schemas"]["QuoteRequest"];
 
 /** Totals for the basket (OP-BASKET-01). Called after every basket or discount change. */
 export async function quoteBasket(input: QuoteInput): Promise<Result<OrderTotal>> {
-  return deviceCall((headers) =>
+  return kiosk((headers) =>
     coreApi().POST("/v1/quotes", {
       headers,
       body: {
@@ -107,7 +128,7 @@ export async function recordJourneyEvent(
   orderTotal: number,
 ): Promise<void> {
   after(async () => {
-    const result = await deviceCall((headers) =>
+    const result = await kiosk((headers) =>
       coreApi().POST("/v1/journeys/{orderNonce}/events", {
         headers,
         params: { path: { orderNonce } },
@@ -132,7 +153,7 @@ export async function validateCoupon(input: {
 }): Promise<Result<DiscountItem>> {
   const code = input.code.trim().toUpperCase();
   if (!code) return { ok: false, code: "INVALID_COUPON" };
-  return deviceCall((headers) =>
+  return kiosk((headers) =>
     coreApi().POST("/v1/discounts/validate", {
       headers,
       body: {
@@ -154,15 +175,25 @@ export type PlacedOrder = Schemas["PlacedOrder"];
 
 /**
  * Stores the order as AWAITING_PAYMENT (first half of OP-PAY-01). The Core
- * API reprices every line; `idempotencyKey` makes a retry return the same order.
+ * API reprices every line; `idempotencyKey` makes a retry return the same order,
+ * so an unknown answer is retried with it for up to 15 s.
  */
 export async function createOrder(
   idempotencyKey: string,
   order: Schemas["CreateOrderRequest"],
 ): Promise<Result<Order>> {
-  return deviceCallAs("KIOSK", (headers) =>
+  return retryUnknown((signal) => postOrder(idempotencyKey, order, signal));
+}
+
+function postOrder(
+  idempotencyKey: string,
+  order: Schemas["CreateOrderRequest"],
+  signal: AbortSignal,
+): Promise<Result<Order>> {
+  return kiosk((headers) =>
     coreApi().POST("/v1/orders", {
       headers,
+      signal,
       params: { header: { "Idempotency-Key": idempotencyKey } },
       body: {
         orderNonce: order.orderNonce,
@@ -183,7 +214,7 @@ export async function startPayment(
   method: PaymentMethod,
   idempotencyKey: string,
 ): Promise<Result<Payment>> {
-  return deviceCall((headers) =>
+  return kiosk((headers) =>
     coreApi().POST("/v1/orders/{orderId}/payments", {
       headers,
       params: { path: { orderId }, header: { "Idempotency-Key": idempotencyKey } },
@@ -197,7 +228,7 @@ export async function startPayment(
  * SIMULATED, the BFF answers for the terminal once it has "waited" long enough.
  */
 export async function pollPayment(paymentId: string): Promise<Result<Payment>> {
-  const result = await deviceCall((headers) =>
+  const result = await kiosk((headers) =>
     coreApi().GET("/v1/payments/{paymentId}", { headers, params: { path: { paymentId } } }),
   );
   if (!result.ok) return result;
@@ -207,6 +238,7 @@ export async function pollPayment(paymentId: string): Promise<Result<Payment>> {
 
   const outcome = await simulatedOutcome();
   if (outcome === "MANUAL") return result;
+  // Same request as the checked read above, so no second kind check.
   const simulated = await deviceCall((headers) =>
     coreApi().POST("/v1/payments/{paymentId}/simulate", {
       headers,
@@ -219,20 +251,27 @@ export async function pollPayment(paymentId: string): Promise<Result<Payment>> {
 
 /** Cancels a payment still AUTHORISING; `PAYMENT_NOT_CANCELLABLE` once it is final. */
 export async function cancelPayment(paymentId: string): Promise<Result<Payment>> {
-  return deviceCall((headers) =>
+  return kiosk((headers) =>
     coreApi().POST("/v1/payments/{paymentId}/cancel", { headers, params: { path: { paymentId } } }),
   );
 }
 
-/** Places a paid order (OP-PAY-03): the Core API assigns the order number. */
+/**
+ * Places a paid order (OP-PAY-03): the Core API assigns the order number. An
+ * unknown answer is retried with the same key for up to 15 s; after that it is
+ * still CORE_UNAVAILABLE, which the kiosk shows as "verificando", never "falhou".
+ */
 export async function placeOrder(
   orderId: string,
   idempotencyKey: string,
 ): Promise<Result<PlacedOrder>> {
-  return deviceCall((headers) =>
-    coreApi().POST("/v1/orders/{orderId}/place", {
-      headers,
-      params: { path: { orderId }, header: { "Idempotency-Key": idempotencyKey } },
-    }),
+  return retryUnknown((signal) =>
+    kiosk((headers) =>
+      coreApi().POST("/v1/orders/{orderId}/place", {
+        headers,
+        signal,
+        params: { path: { orderId }, header: { "Idempotency-Key": idempotencyKey } },
+      }),
+    ),
   );
 }

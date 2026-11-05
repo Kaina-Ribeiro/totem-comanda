@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Cozinha · Produção</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button{font:inherit;color:inherit;cursor:pointer}
+.tap{transition:transform .12s ease,background-color .15s ease}
+.tap:active{transform:scale(.97)}
+</style>
+</helmet>
+<div style="width: 1280px; height: 800px; box-sizing: border-box; background: #F3EFE8; color: #2B211C; font-family: Manrope, system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <header style="height: 76px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 24px">
+    <div style="display: flex; align-items: center; gap: 14px">
+      <span style="font-family: Manrope, system-ui, sans-serif; font-weight: 700; font-size: 22px; letter-spacing: -0.02em">Cozinha</span>
+      <span role="status" style="display: flex; align-items: center; gap: 7px; height: 28px; padding: 0 12px; border-radius: 14px; background: #DCDFD2; font-size: 13px; font-weight: 800"><span style="width: 8px; height: 8px; border-radius: 4px; background: #4F6B45"></span>Ao vivo</span>
+    </div>
+    <nav aria-label="Telas da cozinha" style="display: flex; gap: 4px; padding: 4px; border-radius: 16px; background: #E6DED2">
+      <a href="K1-Pedidos.dc.html" class="tap" style="height: 44px; padding: 0 10px 0 18px; border-radius: 14px; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 800; color: #625750">Pedidos <span style="min-width: 26px; height: 26px; padding: 0 7px; box-sizing: border-box; border-radius: 13px; background: #F3EFE8; display: flex; align-items: center; justify-content: center; font-size: 13px">6</span></a>
+      <a href="K3-Producao.dc.html" aria-current="page" class="tap" style="height: 44px; padding: 0 18px; border-radius: 14px; background: #4E3426; color: #FAF6F0; display: flex; align-items: center; font-size: 15px; font-weight: 800">Produção</a>
+      <a href="#retirados" class="tap" style="height: 44px; padding: 0 10px 0 18px; border-radius: 14px; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 800; color: #625750">Retirados <span style="min-width: 26px; height: 26px; padding: 0 7px; box-sizing: border-box; border-radius: 13px; background: #F3EFE8; display: flex; align-items: center; justify-content: center; font-size: 13px">38</span></a>
+    </nav>
+    <div style="display: flex; align-items: center; gap: 10px">
+      <a href="K4-Ritmo.dc.html" class="tap" style="height: 44px; padding: 0 16px; border-radius: 14px; background: #FFFFFF; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 800"><span style="width: 10px; height: 10px; border-radius: 5px; background: #4F6B45"></span>Ritmo normal <span style="font-weight: 600; color: #625750">~8 min</span></a>
+      <span style="font-family: Manrope, system-ui, sans-serif; font-weight: 700; font-size: 20px; min-width: 64px; text-align: right; letter-spacing: -0.02em">10:42</span>
+    </div>
+  </header>
+
+  <div style="padding: 8px 24px 0; display: flex; align-items: flex-end; justify-content: space-between; gap: 16px">
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <h1 style="margin: 0; font-family: Manrope, system-ui, sans-serif; font-weight: 700; font-size: 26px; letter-spacing: -0.02em">Para fazer agora</h1>
+      <p style="margin: 0; font-size: 15px; font-weight: 600; color: #625750">Soma de 4 pedidos abertos (44, 45, 41, 42). Atualiza sozinho quando chega pedido.</p>
+    </div>
+    <div role="radiogroup" aria-label="Quais pedidos somar" style="display: flex; gap: 4px; padding: 4px; border-radius: 16px; background: #E6DED2">
+      <sc-for list="{{scopes}}" as="s" hint-placeholder-count="2">
+        <button type="button" role="radio" aria-checked="{{s.checked}}" onClick="{{s.pick}}" class="tap" style="{{s.style}}">{{s.label}}</button>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1; min-height: 0; padding: 18px 24px 24px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-content: start; gap: 14px">
+    <sc-for list="{{items}}" as="it" hint-placeholder-count="8">
+      <article style="min-height: 200px; box-sizing: border-box; border-radius: 14px; background: #FFFFFF; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 1px 2px rgba(28,28,26,.08)">
+        <div style="display: flex; align-items: baseline; gap: 10px">
+          <span style="font-family: Manrope, system-ui, sans-serif; font-weight: 800; font-size: 52px; letter-spacing: -0.03em; line-height: 0.95">{{it.qty}}</span>
+          <span style="font-family: Manrope, system-ui, sans-serif; font-weight: 700; font-size: 22px; color: #625750; letter-spacing: -0.02em">×</span>
+        </div>
+        <span style="font-size: 19px; font-weight: 800; line-height: 1.2">{{it.name}}</span>
+        <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 5px">
+          <sc-for list="{{it.variants}}" as="v" hint-placeholder-count="1">
+            <li style="display: flex; gap: 8px; font-size: 15px; font-weight: 600; color: #625750"><span style="min-width: 22px; height: 22px; border-radius: 11px; background: #EAD9C6; color: #2B211C; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800">{{v.qty}}</span>{{v.label}}</li>
+          </sc-for>
+        </ul>
+        <span style="margin-top: auto; font-size: 13px; font-weight: 700; color: #625750">Pedidos {{it.orders}}</span>
+      </article>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { scope: 'all' };
+  }
+  renderVals() {
+    const all = [
+      { name: 'Café coado', qty: 1, variants: [], orders: '44', fresh: true },
+      { name: 'Cappuccino', qty: 1, variants: [{ qty: 1, label: 'Leite integral' }], orders: '45', fresh: true },
+      { name: 'Croissant', qty: 2, variants: [], orders: '41' },
+      { name: 'Croque monsieur', qty: 1, variants: [{ qty: 1, label: 'Brioche · Ovo pochê' }], orders: '45', fresh: true },
+      { name: 'Latte', qty: 1, variants: [{ qty: 1, label: 'Leite de aveia' }], orders: '41' },
+      { name: 'Pão na chapa', qty: 2, variants: [{ qty: 2, label: 'Manteiga' }], orders: '44', fresh: true },
+      { name: 'Sanduíche de peru', qty: 1, variants: [{ qty: 1, label: 'Ciabatta' }], orders: '42' },
+      { name: 'Suco de laranja', qty: 1, variants: [{ qty: 1, label: '300 ml' }], orders: '42' }
+    ];
+    const scope = this.state.scope;
+    const items = scope === 'new' ? all.filter((i) => i.fresh) : all;
+    const opts = [{ id: 'all', label: 'Novos + preparando' }, { id: 'new', label: 'Só novos' }];
+    const scopes = opts.map((o) => {
+      const on = o.id === scope;
+      return {
+        label: o.label,
+        checked: on ? 'true' : 'false',
+        pick: () => this.setState({ scope: o.id }),
+        style: 'height: 44px; padding: 0 18px; border-radius: 14px; border: 0; font-size: 15px; font-weight: 800; ' + (on ? 'background: #FFFFFF; color: #2B211C;' : 'background: transparent; color: #625750;')
+      };
+    });
+    return { items, scopes };
+  }
+}
+</script>
+</body>
+</html>

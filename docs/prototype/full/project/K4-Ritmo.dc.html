@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Cozinha · Ritmo</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button{font:inherit;color:inherit;cursor:pointer}
+.tap{transition:transform .12s ease,background-color .15s ease,box-shadow .15s ease}
+.tap:active{transform:scale(.98)}
+</style>
+</helmet>
+<div style="width: 1280px; height: 800px; box-sizing: border-box; background: #F3EFE8; color: #2B211C; font-family: Manrope, system-ui, sans-serif; position: relative; overflow: hidden">
+  <div aria-hidden="true" style="position: absolute; inset: 0; display: flex; flex-direction: column">
+    <div style="height: 76px; display: flex; align-items: center; justify-content: space-between; padding: 0 24px">
+      <span style="font-family: Manrope, system-ui, sans-serif; font-weight: 700; font-size: 22px; letter-spacing: -0.02em">Cozinha</span>
+      <span style="width: 360px; height: 52px; border-radius: 16px; background: #E6DED2"></span>
+      <span style="width: 280px; height: 44px; border-radius: 14px; background: #FFFFFF"></span>
+    </div>
+    <div style="flex-grow: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding: 16px 24px 24px">
+      <sc-for list="{{ghostCols}}" as="g" hint-placeholder-count="3">
+        <div style="border-radius: 16px; background: #EAE3D8; padding: 12px; display: flex; flex-direction: column; gap: 12px">
+          <div style="height: 28px"></div>
+          <div style="height: 228px; border-radius: 12px; background: #FFFFFF"></div>
+          <div style="height: 228px; border-radius: 12px; background: #FFFFFF"></div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  <div style="position: absolute; inset: 0; background: rgba(28,28,26,.45)"></div>
+
+  <div role="dialog" aria-modal="true" aria-labelledby="ritmo-title" style="position: absolute; left: 290px; top: 64px; width: 700px; box-sizing: border-box; border-radius: 16px; background: #FFFFFF; padding: 32px 36px 30px; display: flex; flex-direction: column; gap: 20px; box-shadow: 0 24px 60px rgba(28,28,26,.25)">
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <h2 id="ritmo-title" style="margin: 0; font-family: Manrope, system-ui, sans-serif; font-weight: 700; font-size: 28px; letter-spacing: -0.02em">Ritmo da cozinha</h2>
+      <p style="margin: 0; font-size: 16px; font-weight: 600; color: #625750; line-height: 1.45">O totem mostra ao cliente quanto vai demorar. Vale para a loja toda e aparece também no Início do back office.</p>
+    </div>
+
+    <div role="radiogroup" aria-label="Ritmo" style="display: flex; flex-direction: column; gap: 10px">
+      <sc-for list="{{paces}}" as="p" hint-placeholder-count="3">
+        <button type="button" role="radio" aria-checked="{{p.checked}}" onClick="{{p.pick}}" class="tap" style="{{p.style}}">
+          <span style="{{p.ringStyle}}"><span style="{{p.dotStyle}}"></span></span>
+          <span style="display: flex; flex-direction: column; gap: 3px; text-align: left; flex-grow: 1">
+            <span style="font-size: 19px; font-weight: 800">{{p.title}}</span>
+            <span style="font-size: 15px; font-weight: 600; color: #625750">{{p.desc}}</span>
+          </span>
+          <span style="{{p.badgeStyle}}">{{p.badge}}</span>
+        </button>
+      </sc-for>
+    </div>
+
+    <sc-if value="{{paused}}" hint-placeholder-val="{{true}}">
+      <div style="display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; border-radius: 12px; background: #F3EFE8">
+        <span style="font-size: 15px; font-weight: 800">Por quanto tempo?</span>
+        <div role="radiogroup" aria-label="Duração da pausa" style="display: flex; gap: 8px">
+          <sc-for list="{{durations}}" as="d" hint-placeholder-count="3">
+            <button type="button" role="radio" aria-checked="{{d.checked}}" onClick="{{d.pick}}" class="tap" style="{{d.style}}">{{d.label}}</button>
+          </sc-for>
+        </div>
+        <span style="font-size: 14px; font-weight: 600; color: #625750">{{resumeNote}}</span>
+      </div>
+    </sc-if>
+
+    <div style="display: flex; gap: 12px; padding-top: 4px">
+      <a href="K1-Pedidos.dc.html" class="tap" style="flex: 1 1 0; height: 60px; border-radius: 30px; background: #F3EFE8; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 800">Cancelar</a>
+      <a href="K1-Pedidos.dc.html" class="tap" style="flex: 1.6 1 0; height: 60px; border-radius: 30px; background: #4E3426; color: #FAF6F0; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 800">{{confirmLabel}}</a>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { pace: 'paused', duration: '15' };
+  }
+  renderVals() {
+    const PACES = [
+      { id: 'normal', title: 'Normal', desc: 'Pedido pronto em cerca de 8 min.', badge: '~8 min', tone: '#DCDFD2', current: true },
+      { id: 'busy', title: 'Movimentado', desc: 'O totem avisa que vai demorar um pouco mais.', badge: '~15 min', tone: '#EFE4C9' },
+      { id: 'paused', title: 'Pausar pedidos no totem', desc: 'O totem mostra “Estamos com muitos pedidos” e indica o balcão.', badge: 'Pausado', tone: '#F4E1DB' }
+    ];
+    const pace = this.state.pace;
+    const paces = PACES.map((p) => {
+      const on = p.id === pace;
+      return {
+        title: p.title + (p.current ? ' · agora' : ''),
+        desc: p.desc,
+        badge: p.badge,
+        checked: on ? 'true' : 'false',
+        pick: () => this.setState({ pace: p.id }),
+        style: 'display: flex; align-items: center; gap: 16px; min-height: 76px; padding: 12px 18px; border-radius: 12px; background: ' + (on ? '#FBF8F3' : '#FFFFFF') + '; border: ' + (on ? '2px solid #4E3426' : '1.5px solid #E5DDD2') + ';',
+        ringStyle: 'width: 26px; height: 26px; flex-shrink: 0; border-radius: 13px; box-sizing: border-box; border: 2px solid ' + (on ? '#4E3426' : '#B5ADA3') + '; display: flex; align-items: center; justify-content: center;',
+        dotStyle: 'width: 12px; height: 12px; border-radius: 6px; background: ' + (on ? '#4E3426' : 'transparent') + ';',
+        badgeStyle: 'height: 30px; padding: 0 12px; border-radius: 15px; background: ' + p.tone + '; display: flex; align-items: center; font-size: 14px; font-weight: 800; white-space: nowrap;'
+      };
+    });
+    const DUR = [
+      { id: '15', label: '15 min', until: '10:57' },
+      { id: '30', label: '30 min', until: '11:12' },
+      { id: 'manual', label: 'Até eu retomar' }
+    ];
+    const duration = this.state.duration;
+    const durations = DUR.map((d) => {
+      const on = d.id === duration;
+      return {
+        label: d.label,
+        checked: on ? 'true' : 'false',
+        pick: () => this.setState({ duration: d.id }),
+        style: 'height: 48px; padding: 0 20px; border-radius: 16px; font-size: 15px; font-weight: 800; ' + (on ? 'border: 0; background: #4E3426; color: #FAF6F0;' : 'border: 1.5px solid #E5DDD2; background: #FFFFFF; color: #2B211C;')
+      };
+    });
+    const pick = DUR.find((d) => d.id === duration);
+    const paused = pace === 'paused';
+    const confirmLabel = paused ? (pick.until ? 'Pausar por ' + pick.label : 'Pausar agora') : pace === 'busy' ? 'Mudar para movimentado' : 'Manter normal';
+    const resumeNote = pick.until ? 'Volta sozinho para Normal às ' + pick.until + '. Dá para retomar antes, aqui ou no Início.' : 'Fica pausado até alguém retomar aqui ou no Início do back office.';
+    return { ghostCols: [1, 2, 3], paces, durations, paused, confirmLabel, resumeNote };
+  }
+}
+</script>
+</body>
+</html>

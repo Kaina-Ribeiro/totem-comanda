@@ -1,5 +1,5 @@
-import { Suspense } from "react";
 
+import { FormSkeleton, Streamed } from "@/components/admin/skeleton";
 import { LoadError, PageHeader } from "@/components/admin/ui";
 import { load } from "@/lib/admin/form";
 import { asOwner } from "@/lib/admin/session";
@@ -11,9 +11,9 @@ export default function NewItemPage() {
   return (
     <>
       <PageHeader title="Novo item" description="Depois de criar, coloque o item numa categoria." />
-      <Suspense>
+      <Streamed fallback={<FormSkeleton cards={1} />}>
         <NewItem />
-      </Suspense>
+      </Streamed>
     </>
   );
 }

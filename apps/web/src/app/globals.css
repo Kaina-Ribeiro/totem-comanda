@@ -23,6 +23,16 @@
   --color-sage: #dcdfd2;
   --color-oat: #e2ded8;
   --color-image-bg: #e9e2d7;
+  /* Work screens (second canvas, docs/prototype/README.md "Second canvas"). */
+  --color-leaf: #4f6b45;
+  --color-night: #2a1c16;
+  --color-danger-bg: #f4e1db;
+  --color-hover: #efe9e1;
+  /* Kitchen: column trays and the tab bar (K1). */
+  --color-tray: #eae3d8;
+  --color-tabs: #e6ded2;
+  /* Kitchen undo toast button (K1). */
+  --color-toast-button: #3d312a;
 
   --font-display: var(--font-fraunces), Georgia, serif;
   --font-sans: var(--font-manrope), system-ui, sans-serif;
@@ -32,6 +42,20 @@
   /* Cards: 28-36px corner radius on the canvas. */
   --radius-card-sm: 42px;
   --radius-card: 54px;
+
+  /* Kitchen order drawer (K2): slides in from the right over a fading scrim. */
+  --animate-drawer-in: drawer-in 0.2s ease-out;
+  --animate-fade-in: fade-in 0.15s ease-out;
+  @keyframes drawer-in {
+    from {
+      translate: 100% 0;
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
 }
 
 body {

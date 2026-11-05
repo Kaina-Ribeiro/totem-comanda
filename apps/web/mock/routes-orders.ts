@@ -14,6 +14,7 @@ import {
   type Schemas,
 } from "./http.ts";
 import { priceBasket } from "./kiosk-menu.ts";
+import { waitTimeNow } from "./pace.ts";
 import { broadcastKitchen } from "./routes-kitchen.ts";
 import { journeyMenuId, pricingProblem, today } from "./routes-kiosk.ts";
 import { now, state } from "./state.ts";
@@ -55,17 +56,6 @@ function nextCheckNumber(): string {
   }
   state.checkNumbers.last += 1;
   return String(state.checkNumbers.last);
-}
-
-/**
- * Minutes until ready. OPEN QUESTION 2 (docs/data-model-and-api.md): how the
- * Go API computes waitTime. The mock guesses 5 min plus 2 per open order.
- */
-function waitTimeGuess(): number {
-  const open = [...state.orders.values()].filter(
-    (o) => o.status === "PAID" || o.status === "PREPARING",
-  );
-  return 5 + 2 * open.length;
 }
 
 export const orderRoutes: Route[] = [
@@ -231,7 +221,8 @@ export const orderRoutes: Route[] = [
         return ok({
           orderId,
           posCheckNumber: order.posCheckNumber!,
-          waitTime: waitTimeGuess(),
+          // Decision 4: minutes per pace level, set by the owner.
+          waitTime: waitTimeNow(),
           status: order.status,
         } satisfies Schemas["PlacedOrder"]);
       });

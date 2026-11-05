@@ -10,7 +10,18 @@ import { cookies } from "next/headers";
 
 export const CORE_DOWN_COOKIE = "comanda_mock_core_down";
 
-export type MockState = { scenario: string; scenarios: Record<string, string> };
+export type MockDevice = {
+  id: string;
+  kind: "KIOSK" | "KITCHEN";
+  name: string;
+  status: "ACTIVE" | "DISABLED";
+};
+
+export type MockState = {
+  scenario: string;
+  scenarios: Record<string, string>;
+  devices: MockDevice[];
+};
 
 const isDev = () => process.env.NODE_ENV === "development";
 const controlUrl = () => process.env.MOCK_CONTROL_URL;
@@ -45,4 +56,38 @@ export async function setMockScenario(name: string): Promise<void> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
   });
+}
+
+/**
+ * The id and secret of the mock's seeded device of `kind`, for the dev index
+ * to pair this browser as the kiosk or the kitchen (COM-139); null outside
+ * development or without a mock.
+ */
+export async function mockDeviceCredentials(
+  kind: MockDevice["kind"],
+): Promise<{ deviceId: string; deviceSecret: string } | null> {
+  const url = controlUrl();
+  if (!isDev() || !url) return null;
+  try {
+    const response = await fetch(`${url}/device-credentials?kind=${kind}`, { cache: "no-store" });
+    return response.ok
+      ? ((await response.json()) as { deviceId: string; deviceSecret: string })
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether this browser must be paired again to open `kind`'s area: each
+ * device opens only its own (DeviceGate), so a kiosk browser asking for the
+ * kitchen becomes the kitchen screen first. No device, or one the mock does
+ * not know, pairs too.
+ */
+export function needsPairing(
+  currentId: string | undefined,
+  devices: MockDevice[],
+  kind: MockDevice["kind"],
+): boolean {
+  return devices.find((d) => d.id === currentId)?.kind !== kind;
 }

@@ -1,0 +1,224 @@
+{
+  "v": 3,
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-11-04T15:00:00Z"
+  },
+  "title": "Comanda · o que falta",
+  "launch": {
+    "view": "canvas"
+  },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1280,
+      "h": 800,
+      "title": "K1 · Cozinha · Pedidos",
+      "is_interactive": true
+    },
+    "K2-Detalhe.dc.html": {
+      "x": 1360,
+      "y": 0,
+      "w": 1280,
+      "h": 800,
+      "title": "K2 · Cozinha · Detalhe do pedido",
+      "is_interactive": true
+    },
+    "K3-Producao.dc.html": {
+      "x": 2720,
+      "y": 0,
+      "w": 1280,
+      "h": 800,
+      "title": "K3 · Cozinha · Produção",
+      "is_interactive": true
+    },
+    "K4-Ritmo.dc.html": {
+      "x": 4080,
+      "y": 0,
+      "w": 1280,
+      "h": 800,
+      "title": "K4 · Cozinha · Ritmo",
+      "is_interactive": true
+    },
+    "K5-Som.dc.html": {
+      "x": 5440,
+      "y": 0,
+      "w": 1280,
+      "h": 800,
+      "title": "K5 · Cozinha · Ativar som",
+      "is_interactive": true
+    },
+    "A1-Inicio.dc.html": {
+      "x": 0,
+      "y": 1400,
+      "w": 1440,
+      "h": 1180,
+      "title": "A1 · Início",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "A2-Pedidos.dc.html": {
+      "x": 1520,
+      "y": 1400,
+      "w": 1440,
+      "h": 1080,
+      "title": "A2 · Pedidos",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "A3-Estorno.dc.html": {
+      "x": 3040,
+      "y": 1400,
+      "w": 1440,
+      "h": 1080,
+      "title": "A3 · Estorno (fase 4)",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "A4-Esgotados.dc.html": {
+      "x": 4560,
+      "y": 1400,
+      "w": 1440,
+      "h": 1120,
+      "title": "A4 · Esgotados",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "A5-Datas.dc.html": {
+      "x": 6080,
+      "y": 1400,
+      "w": 1440,
+      "h": 1120,
+      "title": "A5 · Datas especiais",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "A6-Item.dc.html": {
+      "x": 0,
+      "y": 2760,
+      "w": 1440,
+      "h": 1560,
+      "title": "A6 · Item",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "A7-TelaTotem.dc.html": {
+      "x": 1520,
+      "y": 2760,
+      "w": 1440,
+      "h": 1300,
+      "title": "A7 · Tela do totem",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "A8-Cupom.dc.html": {
+      "x": 3040,
+      "y": 2760,
+      "w": 1440,
+      "h": 1120,
+      "title": "A8 · Cupom",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "A9-Relatorio.dc.html": {
+      "x": 4560,
+      "y": 2760,
+      "w": 1440,
+      "h": 1240,
+      "title": "A9 · Relatório",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "A10-InicioCelular.dc.html": {
+      "x": 6080,
+      "y": 2760,
+      "w": 390,
+      "h": 844,
+      "title": "A10 · Início no celular",
+      "is_interactive": true
+    },
+    "T1-Cardapio.dc.html": {
+      "x": 0,
+      "y": 4860,
+      "w": 720,
+      "h": 1280,
+      "title": "T1 · Totem · Cardápio com esgotado"
+    },
+    "T2-Item.dc.html": {
+      "x": 800,
+      "y": 4860,
+      "w": 720,
+      "h": 1280,
+      "title": "T2 · Totem · Item com alergênicos",
+      "is_interactive": true
+    },
+    "T3-Pausado.dc.html": {
+      "x": 1600,
+      "y": 4860,
+      "w": 720,
+      "h": 1280,
+      "title": "T3 · Totem · Pausado"
+    },
+    "T4-Fechado.dc.html": {
+      "x": 2400,
+      "y": 4860,
+      "w": 720,
+      "h": 1280,
+      "title": "T4 · Totem · Fechado (data especial)"
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "K2-Detalhe.dc.html",
+    "K3-Producao.dc.html",
+    "K4-Ritmo.dc.html",
+    "K5-Som.dc.html",
+    "A1-Inicio.dc.html",
+    "A2-Pedidos.dc.html",
+    "A3-Estorno.dc.html",
+    "A4-Esgotados.dc.html",
+    "A5-Datas.dc.html",
+    "A6-Item.dc.html",
+    "A7-TelaTotem.dc.html",
+    "A8-Cupom.dc.html",
+    "A9-Relatorio.dc.html",
+    "A10-InicioCelular.dc.html",
+    "T1-Cardapio.dc.html",
+    "T2-Item.dc.html",
+    "T3-Pausado.dc.html",
+    "T4-Fechado.dc.html"
+  ],
+  "notes": {
+    "kitchen": {
+      "x": 0,
+      "y": -320,
+      "text": "Cozinha · tablet na horizontal (1280 × 800)",
+      "kind": "title1",
+      "maxW": 6720
+    },
+    "admin": {
+      "x": 0,
+      "y": 1080,
+      "text": "Back office · página de 1440 e celular",
+      "kind": "title1",
+      "maxW": 7520
+    },
+    "kiosk": {
+      "x": 0,
+      "y": 4560,
+      "text": "Totem · 720 × 1280 (× 1,5 na tela real)",
+      "kind": "title1",
+      "maxW": 3120
+    },
+    "legend": {
+      "x": 6800,
+      "y": -320,
+      "w": 440,
+      "text": "Proposta para aprovação (4 nov 2026). Cada tela corresponde a um gap G-… de docs/plan-next.md. Estorno e impressão só existem com o pagamento real (fase 4). Tokens e fontes: Café e trigo, iguais ao protótipo aprovado.",
+      "fill": "orange"
+    }
+  },
+  "designSystems": []
+}

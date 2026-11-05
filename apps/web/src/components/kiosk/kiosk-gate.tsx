@@ -6,14 +6,15 @@ import { formatNextOpening } from "@/lib/format/next-opening";
 import { AttractScreen } from "./attract-screen";
 import { availableOrderTypes } from "./journey/journey-state";
 import { KioskJourney } from "./journey/kiosk-journey";
+import { PausedScreen } from "./paused-screen";
 import { UnavailableScreen } from "./unavailable-screen";
 
 /** FR-137: gate screens re-read the config every 45 s, so the kiosk opens and closes by itself. */
 const GATE_RECHECK_MS = 45_000;
 
 /**
- * The kiosk's gate (BR-KIOSK-09): maintenance, then at capacity, then closed,
- * else the guest journey. All of these come from the Core API's config. Gate
+ * The kiosk's gate (decision 14): maintenance, then closed, then paused or at
+ * capacity, else the guest journey. All of these come from the Core API's config. Gate
  * screens re-check the config; the journey re-checks only while on attract,
  * so a guest mid-order is never cut off.
  */
@@ -38,6 +39,16 @@ function GateScreen({ config }: { config: DeviceConfig }) {
           brand={brand}
           title="Totem em manutenção"
           body="Faça seu pedido no balcão. Já já voltamos."
+        />
+      );
+    case "paused":
+      return (
+        <PausedScreen
+          brand={brand}
+          pausedUntil={config.pace.pausedUntil}
+          timeZone={restaurant.timezone}
+          languages={restaurant.supportedLanguages.map((l) => l.code)}
+          defaultLanguage={restaurant.defaultLanguage}
         />
       );
     case "at-capacity":

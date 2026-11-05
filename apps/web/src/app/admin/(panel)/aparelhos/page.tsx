@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
-import { Suspense } from "react";
 
 import { ActionForm, SubmitButton } from "@/components/admin/form";
+import { FormSkeleton, Streamed } from "@/components/admin/skeleton";
 import {
   Badge,
   Card,
@@ -94,11 +94,11 @@ export default function DevicesPage() {
         title="Aparelhos"
         description="Totens e telas da cozinha: quem está online, manutenção, lotado e acesso."
       />
-      <Suspense>
+      <Streamed fallback={<FormSkeleton cards={1} fields={3} />}>
         <DeviceList />
-      </Suspense>
+      </Streamed>
       <Card>
-        <h2 className="mb-4 font-display text-xl font-semibold">Cadastrar aparelho</h2>
+        <h2 className="mb-4 text-lg font-bold tracking-[-0.01em]">Cadastrar aparelho</h2>
         <ActionForm action={createDevice} resetOnSave className="grid gap-4 sm:grid-cols-3">
           <Field label="Nome">
             <input name="name" required placeholder="Totem do balcão" className={inputClass} />
@@ -157,7 +157,7 @@ function DeviceCard({ device }: { device: Device }) {
   return (
     <Card className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="font-display text-xl font-semibold">{device.name}</h2>
+        <h2 className="text-lg font-bold tracking-[-0.01em]">{device.name}</h2>
         <code className="text-xs text-muted">{device.id}</code>
         <Badge>{device.kind === "KIOSK" ? "Totem" : "Cozinha"}</Badge>
         {device.status === "DISABLED" ? (

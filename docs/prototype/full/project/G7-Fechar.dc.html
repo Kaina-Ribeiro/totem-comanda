@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Garçom · Fechar conta</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+.tap{transition:transform .12s ease,background-color .15s ease}
+.tap:active{transform:scale(.97)}
+main{scrollbar-width:none}main::-webkit-scrollbar{display:none}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F3EFE8; color: #2B211C; font-family: Manrope, system-ui, sans-serif; font-feature-settings: 'tnum' 1; display: flex; flex-direction: column; overflow: hidden">
+  <header style="background: #FFFFFF; border-bottom: 1px solid #E5DDD2; height: 60px; padding: 0 8px; display: flex; align-items: center; gap: 4px; flex-shrink: 0">
+    <a href="G3-Mesa.dc.html" aria-label="Voltar para a Mesa 12" class="tap" style="width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></a>
+    <h1 style="margin: 0; flex-grow: 1; font-weight: 800; font-size: 18px; letter-spacing: -0.01em">Fechar conta · Mesa 12</h1>
+  </header>
+
+  <main style="flex-grow: 1; min-height: 0; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+    <section aria-label="Resumo da conta" style="border-radius: 12px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 4px 14px">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 12px 0"><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 800">2× Cappuccino</span><span style="font-size: 12px; font-weight: 600; color: #625750">Rodada 1 · Ana</span></span><span style="font-size: 15px; font-weight: 800">R$ 27,80</span></div>
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 12px 0; border-top: 1px solid #E5DDD2"><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 800">1× Croissant</span><span style="font-size: 12px; font-weight: 600; color: #625750">Rodada 1 · Ana</span></span><span style="font-size: 15px; font-weight: 800">R$ 14,00</span></div>
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 12px 0; border-top: 1px solid #E5DDD2"><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 800">1× Croque monsieur</span><span style="font-size: 12px; font-weight: 600; color: #625750">Brioche · Ovo pochê · Rodada 2 · QR Code</span></span><span style="font-size: 15px; font-weight: 800">R$ 40,90</span></div>
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 12px 0; border-top: 1px solid #E5DDD2"><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 800">1× Suco de laranja</span><span style="font-size: 12px; font-weight: 600; color: #625750">Rodada 2 · QR Code</span></span><span style="font-size: 15px; font-weight: 800">R$ 12,90</span></div>
+    </section>
+
+    <section aria-label="Totais" style="border-radius: 12px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 14px; display: flex; flex-direction: column; gap: 8px">
+      <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; color: #625750"><span>Subtotal</span><span>{{subtotalText}}</span></div>
+      <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; color: #625750"><span>Serviço</span><span>{{serviceText}}</span></div>
+      <div style="display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px solid #E5DDD2; font-size: 18px; font-weight: 800"><span>Total</span><span>{{totalText}}</span></div>
+    </section>
+
+    <button type="button" role="switch" aria-checked="{{serviceChecked}}" onClick="{{toggleService}}" class="tap" style="min-height: 64px; padding: 12px 14px; border-radius: 12px; border: 1px solid #E5DDD2; background: #FFFFFF; display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left">
+      <span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 800">Cobrar serviço de 10%</span><span style="font-size: 12px; font-weight: 600; color: #625750">{{serviceHint}}</span></span>
+      <span style="{{trackStyle}}"><span style="width: 22px; height: 22px; border-radius: 11px; background: #FFFFFF"></span></span>
+    </button>
+
+    <label style="border-radius: 12px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 14px; display: flex; flex-direction: column; gap: 6px">
+      <span style="font-size: 15px; font-weight: 800">CPF na nota</span>
+      <input inputmode="numeric" placeholder="000.000.000-00" style="height: 48px; border-radius: 12px; border: 1.5px solid #E5DDD2; padding: 0 12px; font-size: 16px; font-weight: 700; background: #FFFFFF">
+      <span style="font-size: 12px; font-weight: 600; color: #625750">Opcional. Preencha só se o cliente pedir.</span>
+    </label>
+
+    <section aria-labelledby="g-pag" style="border-radius: 12px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+      <h2 id="g-pag" style="margin: 0; font-size: 15px; font-weight: 800">Forma de pagamento</h2>
+      <div role="radiogroup" aria-label="Forma de pagamento" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+        <sc-for list="{{methods}}" as="m" hint-placeholder-count="4">
+          <button type="button" role="radio" aria-checked="{{m.checked}}" onClick="{{m.pick}}" class="tap" style="{{m.style}}"><span style="{{m.ringStyle}}"><span style="{{m.dotStyle}}"></span></span><span>{{m.label}}</span></button>
+        </sc-for>
+      </div>
+      <sc-if value="{{cash}}" hint-placeholder-val="{{false}}">
+        <label style="display: flex; flex-direction: column; gap: 6px; padding-top: 4px">
+          <span style="font-size: 14px; font-weight: 800">Troco para</span>
+          <input inputmode="decimal" placeholder="R$ 0,00" style="height: 48px; border-radius: 12px; border: 1.5px solid #E5DDD2; padding: 0 12px; font-size: 16px; font-weight: 700; background: #FFFFFF">
+          <span style="font-size: 12px; font-weight: 600; color: #625750">Deixe em branco se o cliente não precisa de troco.</span>
+        </label>
+      </sc-if>
+    </section>
+  </main>
+
+  <footer style="flex-shrink: 0; background: #FFFFFF; border-top: 1px solid #E5DDD2; padding: 12px 16px 20px; display: flex; flex-direction: column; gap: 10px">
+    <div style="display: flex; justify-content: space-between; align-items: baseline"><span style="font-size: 14px; font-weight: 700; color: #625750">Total a receber</span><span style="font-size: 20px; font-weight: 800">{{totalText}}</span></div>
+    <a href="G8-Paga.dc.html" class="tap" style="height: 54px; border-radius: 27px; background: #4E3426; color: #FAF6F0; font-size: 16px; font-weight: 800; display: flex; align-items: center; justify-content: center">{{receiveLabel}}</a>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { service: true, method: 'credito' };
+  }
+  renderVals() {
+    const s = this.state;
+    const money = (c) => 'R$ ' + Math.floor(c / 100) + ',' + String(c % 100).padStart(2, '0');
+    const SUB = 9560;
+    const service = s.service ? Math.round(SUB * 0.1) : 0;
+    const total = SUB + service;
+    const METHODS = [['pix', 'Pix na maquininha'], ['credito', 'Crédito'], ['debito', 'Débito'], ['dinheiro', 'Dinheiro']];
+    const methods = METHODS.map(([id, label]) => {
+      const on = s.method === id;
+      return {
+        label, checked: on ? 'true' : 'false',
+        pick: () => this.setState({ method: id }),
+        style: 'min-height: 56px; box-sizing: border-box; padding: 8px 10px; border-radius: 12px; display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: ' + (on ? '800' : '700') + '; text-align: left; ' + (on ? 'border: 2px solid #4E3426; background: #FBF8F3;' : 'border: 1.5px solid #E5DDD2; background: #FFFFFF;'),
+        ringStyle: 'width: 22px; height: 22px; flex-shrink: 0; box-sizing: border-box; border-radius: 11px; border: 2px solid ' + (on ? '#4E3426' : '#B5ADA3') + '; display: flex; align-items: center; justify-content: center;',
+        dotStyle: 'width: 10px; height: 10px; border-radius: 5px; background: ' + (on ? '#4E3426' : 'transparent') + ';'
+      };
+    });
+    return {
+      subtotalText: money(SUB),
+      serviceText: s.service ? money(service) : 'Sem serviço',
+      totalText: money(total),
+      receiveLabel: 'Receber ' + money(total),
+      serviceChecked: s.service ? 'true' : 'false',
+      serviceHint: s.service ? 'Incluído: ' + money(service) + '. Pode tirar se o cliente não quiser.' : 'Sem serviço: a conta fica em ' + money(SUB) + '.',
+      toggleService: () => this.setState({ service: !s.service }),
+      trackStyle: 'width: 48px; height: 28px; flex-shrink: 0; border-radius: 14px; padding: 3px; box-sizing: border-box; display: flex; background: ' + (s.service ? '#4E3426' : '#D6CCC0') + '; justify-content: ' + (s.service ? 'flex-end' : 'flex-start') + ';',
+      methods,
+      cash: s.method === 'dinheiro'
+    };
+  }
+}
+</script>
+</body>
+</html>

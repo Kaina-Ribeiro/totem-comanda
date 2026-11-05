@@ -4,7 +4,15 @@ import { redirect } from "next/navigation";
 
 import { ActionForm, SubmitButton } from "@/components/admin/form";
 import { Card, Checkbox, Field, inputClass } from "@/components/admin/ui";
-import { attempt, cents, checked, type FormState, optionalText, text } from "@/lib/admin/form";
+import {
+  attempt,
+  cents,
+  checked,
+  type FormState,
+  optionalPrice,
+  optionalText,
+  text,
+} from "@/lib/admin/form";
 import { uploadImage } from "@/lib/admin/media";
 import { AdminApiError, asOwner } from "@/lib/admin/session";
 import { coreApi } from "@/lib/core/client";
@@ -26,8 +34,8 @@ const localized = (form: FormData, name: string) => {
 async function readItem(form: FormData, current: Item | null): Promise<ItemInput> {
   const price = cents(text(form, "price"));
   if (price === null) throw new AdminApiError("VALIDATION_FAILED", "preço");
-  const dineIn = cents(text(form, "price.DINEIN"));
-  const takeOut = cents(text(form, "price.TAKE_OUT"));
+  const dineIn = optionalPrice(form, "price.DINEIN", "preço para comer aqui");
+  const takeOut = optionalPrice(form, "price.TAKE_OUT", "preço para viagem");
   const image =
     (await uploadImage(form, "image")) ??
     (checked(form, "removeImage") ? null : (current?.image ?? null));

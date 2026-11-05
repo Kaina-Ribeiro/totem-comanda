@@ -1,16 +1,17 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { type ReactNode, useEffect, useReducer, useState, useTransition } from "react";
+import { type ReactNode, useEffect, useReducer, useRef, useState, useTransition } from "react";
 
 import { beginJourney, quoteBasket, recordJourneyEvent, switchLanguage } from "@/app/kiosk/actions";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { basketDisplayTotal, basketUnits, findItem } from "@/lib/kiosk/menu-view";
+import { abandonLostPayments, noLostPayments } from "@/lib/kiosk/payment-recovery";
 import { BUNDLED, type Language } from "@/lib/kiosk/strings";
 
 import { Globe } from "../icons";
 import { BasketScreen, CancelDialog } from "./basket-screen";
-import { CheckoutFlow } from "./checkout-flow";
+import { CheckoutFlow, paymentCalls } from "./checkout-flow";
 import { CouponRow, CouponSheet } from "./coupon-sheet";
 import { CrossSellSheet } from "./cross-sell-sheet";
 import { IdleGuard } from "./idle-guard";
@@ -67,8 +68,15 @@ export function KioskJourney({
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [taxIdOpen, setTaxIdOpen] = useState(false);
   const [couponOpen, setCouponOpen] = useState(false);
+  // FR-213: a failed language change says so and offers to try the same change again.
+  // Kept with the screen it failed on, so it goes away once the guest moves on.
+  const [languageError, setLanguageError] = useState<{ language: Language; phase: string } | null>(
+    null,
+  );
   // True while the checkout waits on the terminal or the Core API (no idle reset there).
   const [paying, setPaying] = useState(false);
+  // Payment attempts Go never answered, kept past the checkout screen (COM-110).
+  const lostRef = useRef(noLostPayments());
   const [quoteAttempt, setQuoteAttempt] = useState(0);
   const key = quoteKey(journey);
   const needsQuote = phase === "basket" && journey.basket.length > 0;
@@ -115,7 +123,18 @@ export function KioskJourney({
     });
   }
 
+  /**
+   * The order these attempts belong to can no longer be paid: cancel any
+   * payment Go still runs for it, without holding the next guest (COM-110).
+   */
+  function releaseLostPayments() {
+    const abandoned = lostRef.current;
+    lostRef.current = noLostPayments();
+    void abandonLostPayments(abandoned, paymentCalls);
+  }
+
   function reset() {
+    releaseLostPayments();
     setConfirmCancel(false);
     setPaying(false);
     setTaxIdOpen(false);
@@ -143,9 +162,12 @@ export function KioskJourney({
       dispatch({ type: "language", language: next });
       return;
     }
+    setLanguageError(null);
     startTransition(async () => {
-      const result = await switchLanguage(next);
-      if (result.ok) dispatch({ type: "relocalized", language: next, ...result.data });
+      // A Server Action that never reached the BFF (kiosk offline) rejects: same as a failure.
+      const result = await switchLanguage(next).catch(() => null);
+      if (result?.ok) dispatch({ type: "relocalized", language: next, ...result.data });
+      else setLanguageError({ language: next, phase });
     });
   }
 
@@ -161,6 +183,13 @@ export function KioskJourney({
   return (
     <>
       {screen()}
+      {languageError?.phase === phase && (
+        <LanguageErrorNotice
+          message={strings["language.error"]}
+          retryLabel={strings["language.retry"]}
+          onRetry={() => changeLanguage(languageError.language)}
+        />
+      )}
       <IdleGuard
         active={IDLE_PHASES.has(phase) && !(phase === "checkout" && paying) && !confirmCancel}
         timeoutMs={settings.idleMs}
@@ -365,11 +394,20 @@ export function KioskJourney({
           <CheckoutFlow
             journey={journey}
             strings={strings}
-            onOrderCreated={(order) => dispatch({ type: "orderCreated", order })}
-            onPlaced={(placed) => dispatch({ type: "placed", placed })}
+            onOrderCreated={(order) => {
+              // A changed basket made a new order: the old one cannot be paid any more.
+              if (lostRef.current.orderId !== order.id) releaseLostPayments();
+              dispatch({ type: "orderCreated", order });
+            }}
+            onPlaced={(placed) => {
+              // Paid and placed: nothing of this order is left to clear.
+              lostRef.current = noLostPayments();
+              dispatch({ type: "placed", placed });
+            }}
             onBack={() => dispatch({ type: "openBasket" })}
             onCancelOrder={askCancel}
             onBusy={setPaying}
+            lostRef={lostRef}
           />
         );
       case "success":
@@ -403,6 +441,29 @@ function LanguageButton({ label, onPress }: { label: string; onPress: () => void
       <Globe size={36} />
       {label}
     </button>
+  );
+}
+
+/** FR-213: the language could not be loaded; the button repeats the same change. */
+function LanguageErrorNotice({
+  message,
+  retryLabel,
+  onRetry,
+}: {
+  message: string;
+  retryLabel: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div
+      role="alert"
+      className="fixed inset-x-12 bottom-12 z-40 flex items-center justify-between gap-6 rounded-card-sm bg-ink px-[42px] py-[33px] text-[28.5px] font-semibold text-on-accent"
+    >
+      <span>{message}</span>
+      <button onClick={onRetry} className="shrink-0 font-bold text-detail-light underline">
+        {retryLabel}
+      </button>
+    </div>
   );
 }
 

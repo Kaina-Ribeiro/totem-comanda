@@ -1,5 +1,5 @@
-import { Suspense } from "react";
 
+import { ReportSkeleton, Streamed } from "@/components/admin/skeleton";
 import { Card, inputClass, LoadError, PageHeader } from "@/components/admin/ui";
 import { load } from "@/lib/admin/form";
 import { asOwner } from "@/lib/admin/session";
@@ -15,9 +15,9 @@ export default function ReportPage({ searchParams }: PageProps<"/admin/relatorio
         title="Relatório do dia"
         description="Pedidos pagos no totem, por dia de funcionamento."
       />
-      <Suspense>
+      <Streamed fallback={<ReportSkeleton />}>
         <Report searchParams={searchParams} />
-      </Suspense>
+      </Streamed>
     </>
   );
 }
@@ -60,7 +60,7 @@ async function Report({
             className={inputClass}
           />
         </label>
-        <button className="h-11 rounded-full bg-accent px-5 text-sm font-bold text-on-accent">
+        <button className="h-10 rounded-[10px] bg-accent px-4 text-sm font-bold text-on-accent transition-transform active:scale-[.98]">
           Ver
         </button>
       </form>
@@ -72,7 +72,7 @@ async function Report({
       </div>
 
       <Card className="flex flex-col gap-3">
-        <h2 className="font-display text-xl font-semibold">Comer aqui × para viagem</h2>
+        <h2 className="text-lg font-bold tracking-[-0.01em]">Comer aqui × para viagem</h2>
         {(
           [
             ["DINEIN", "Comer aqui"],
@@ -85,7 +85,8 @@ async function Report({
               <div className="flex justify-between text-sm">
                 <span className="font-semibold">{label}</span>
                 <span className="text-muted">
-                  {totals.orders} pedidos · {formatBRL(totals.revenue)}
+                  {totals.orders === 1 ? "1 pedido" : `${totals.orders} pedidos`} ·{" "}
+                  {formatBRL(totals.revenue)}
                 </span>
               </div>
               <div className="h-2.5 overflow-hidden rounded-full bg-ground">
@@ -100,7 +101,7 @@ async function Report({
       </Card>
 
       <Card className="p-0">
-        <h2 className="px-5 pt-5 font-display text-xl font-semibold">Mais vendidos</h2>
+        <h2 className="px-5 pt-5 text-lg font-bold tracking-[-0.01em]">Mais vendidos</h2>
         {report.bestSellers.length === 0 ? (
           <p className="p-5 text-sm text-muted">Nenhum pedido pago neste dia.</p>
         ) : (
@@ -132,7 +133,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <Card className="flex flex-col gap-1">
       <span className="text-sm font-semibold text-muted">{label}</span>
-      <span className="font-display text-3xl font-semibold">{value}</span>
+      <span className="text-3xl font-extrabold tracking-[-0.03em]">{value}</span>
     </Card>
   );
 }

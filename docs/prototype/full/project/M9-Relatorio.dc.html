@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Celular · Relatório</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button{font:inherit;color:inherit;cursor:pointer}
+.tap{transition:transform .12s ease,background-color .15s ease}
+.tap:active{transform:scale(.97)}
+nav,main,.chips{scrollbar-width:none}nav::-webkit-scrollbar,main::-webkit-scrollbar,.chips::-webkit-scrollbar{display:none}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F3EFE8; color: #2B211C; font-family: Manrope, system-ui, sans-serif; font-feature-settings: 'tnum' 1; display: flex; flex-direction: column; overflow: hidden">
+  <header style="background: #FFFFFF; border-bottom: 1px solid #E5DDD2; padding: 14px 16px 10px; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0">
+    <div style="display: flex; align-items: center; justify-content: space-between">
+      <span style="font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 500; font-size: 22px">Comanda</span>
+      <span style="height: 28px; padding: 0 10px; border-radius: 14px; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; background: #DCDFD2"><span style="width: 7px; height: 7px; border-radius: 4px; background: #4F6B45"></span>Aberto</span>
+    </div>
+    <nav aria-label="Back office" style="display: flex; gap: 6px; overflow-x: auto; margin: 0 -16px; padding: 0 16px">
+      <a href="M1-Inicio.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Início</a>
+      <a href="M2-Pedidos.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Pedidos</a>
+      <a href="M4-Esgotados.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Esgotados</a>
+      <a href="M9-Relatorio.dc.html" aria-current="page" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; background: #EAD9C6; display: flex; align-items: center; font-size: 14px; font-weight: 800">Relatório</a>
+      <a href="M6-Itens.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Cardápio</a>
+      <a href="M0-Mais.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Mais</a>
+    </nav>
+  </header>
+
+  <main style="flex-grow: 1; min-height: 0; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <h1 style="margin: 0; font-weight: 700; font-size: 24px; letter-spacing: -0.02em">Relatório</h1>
+        <span style="font-size: 13px; font-weight: 700; color: #625750">{{periodText}}</span>
+      </div>
+      <button type="button" class="tap" style="height: 40px; flex-shrink: 0; padding: 0 12px; border-radius: 12px; border: 1px solid #E5DDD2; background: #FFFFFF; font-size: 14px; font-weight: 800; display: flex; align-items: center; gap: 6px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"></path></svg>CSV</button>
+    </div>
+
+    <div class="chips" role="radiogroup" aria-label="Período" style="display: flex; gap: 6px; overflow-x: auto; margin: 0 -16px; padding: 0 16px; flex-shrink: 0">
+      <sc-for list="{{presets}}" as="p" hint-placeholder-count="6">
+        <button type="button" role="radio" aria-checked="{{p.checked}}" onClick="{{p.pick}}" class="tap" style="{{p.style}}">{{p.label}}</button>
+      </sc-for>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+      <sc-for list="{{kpis}}" as="k" hint-placeholder-count="4">
+        <div style="border-radius: 12px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 12px; display: flex; flex-direction: column; gap: 2px">
+          <span style="font-size: 12px; font-weight: 700; color: #625750">{{k.label}}</span>
+          <span style="font-size: 18px; font-weight: 800; letter-spacing: -0.02em">{{k.value}}</span>
+          <span style="font-size: 11px; font-weight: 700; color: #625750; line-height: 1.3">{{k.sub}}</span>
+        </div>
+      </sc-for>
+    </div>
+
+    <section aria-labelledby="fd" style="border-radius: 12px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+      <h2 id="fd" style="margin: 0; font-size: 15px; font-weight: 800">Faturamento por dia</h2>
+      <div role="img" aria-label="{{chartLabel}}" style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; align-items: end; height: 150px">
+        <sc-for list="{{days}}" as="d" hint-placeholder-count="7">
+          <span style="display: flex; flex-direction: column; justify-content: flex-end; gap: 4px; height: 100%">
+            <span style="font-size: 10px; font-weight: 800; color: #625750; text-align: center">{{d.short}}</span>
+            <span style="{{d.barStyle}}"></span>
+          </span>
+        </sc-for>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px">
+        <sc-for list="{{days}}" as="d" hint-placeholder-count="7">
+          <span style="text-align: center; font-size: 11px; font-weight: 700; color: #625750; line-height: 1.2">{{d.wd}}<br>{{d.day}}</span>
+        </sc-for>
+      </div>
+    </section>
+
+    <section aria-labelledby="mv" style="border-radius: 12px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 4px 14px">
+      <h2 id="mv" style="margin: 0; padding: 10px 0 6px; font-size: 15px; font-weight: 800">Mais vendidos</h2>
+      <sc-for list="{{top}}" as="t" hint-placeholder-count="5">
+        <div style="display: flex; align-items: center; gap: 10px; min-height: 44px; border-top: 1px solid #E5DDD2">
+          <span style="width: 20px; font-size: 13px; font-weight: 800; color: #8A5A2B">{{t.rank}}</span>
+          <span style="flex-grow: 1; font-size: 14px; font-weight: 700">{{t.name}}</span>
+          <span style="font-size: 12px; font-weight: 700; color: #625750">{{t.qty}} un</span>
+          <span style="width: 92px; text-align: right; font-size: 14px; font-weight: 800">{{t.rev}}</span>
+        </div>
+      </sc-for>
+    </section>
+
+    <section aria-labelledby="cp" style="border-radius: 12px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 4px 14px; margin-bottom: 8px">
+      <h2 id="cp" style="margin: 0; padding: 10px 0 6px; font-size: 15px; font-weight: 800">Cupons, cancelados e estornos</h2>
+      <sc-for list="{{coupons}}" as="c" hint-placeholder-count="4">
+        <div style="display: flex; align-items: center; gap: 10px; min-height: 44px; border-top: 1px solid #E5DDD2">
+          <span style="flex-grow: 1; font-size: 14px; font-weight: 700">{{c.name}}</span>
+          <span style="font-size: 12px; font-weight: 700; color: #625750">{{c.n}}×</span>
+          <span style="width: 92px; text-align: right; font-size: 14px; font-weight: 800">{{c.v}}</span>
+        </div>
+      </sc-for>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { preset: '7d' };
+  }
+  renderVals() {
+    const P = [['today', 'Hoje'], ['yesterday', 'Ontem'], ['7d', '7 dias'], ['30d', '30 dias'], ['month', 'Este mês'], ['lastmonth', 'Mês passado'], ['custom', 'Escolher datas…']];
+    const preset = this.state.preset;
+    const presets = P.map(([id, label]) => {
+      const on = id === preset;
+      return { label, checked: on ? 'true' : 'false', pick: () => this.setState({ preset: id }), style: 'height: 40px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; font-size: 14px; font-weight: 800; ' + (on ? 'border: 0; background: #4E3426; color: #FAF6F0;' : 'border: 1px solid #E5DDD2; background: #FFFFFF; color: #2B211C;') };
+    });
+    const kpis = [
+      { label: 'Faturamento', value: 'R$ 8.932,40', sub: '+6% que os 7 dias anteriores' },
+      { label: 'Pedidos', value: '341', sub: 'Média de 49 por dia' },
+      { label: 'Ticket médio', value: 'R$ 26,19', sub: 'Igual aos 7 dias anteriores' },
+      { label: 'Cancelados e estornos', value: '3', sub: 'R$ 96,20, fora do faturamento' }
+    ];
+    const D = [['qui', '29', 1152.30], ['sex', '30', 1240.10], ['sáb', '31', 1610.20], ['dom', '1', 812.40], ['seg', '2', 1334.10], ['ter', '3', 1498.70], ['qua', '4', 1284.60]];
+    const max = Math.max.apply(null, D.map((d) => d[2]));
+    const days = D.map(([wd, day, v]) => ({
+      wd, day,
+      short: (v / 1000).toFixed(1).replace('.', ',') + 'k',
+      barStyle: 'display: block; height: ' + Math.round((v / max) * 110) + 'px; border-radius: 8px 8px 3px 3px; background: ' + (v === max ? '#4E3426' : '#D8B98A') + ';'
+    }));
+    const top = [
+      ['Croque monsieur', '61', 'R$ 2.128,90'], ['Cappuccino', '128', 'R$ 1.779,20'], ['Croissant', '84', 'R$ 1.176,00'], ['Fermentação natural', '38', 'R$ 1.064,00'], ['Pão na chapa', '97', 'R$ 824,50']
+    ].map(([name, qty, rev], i) => ({ rank: String(i + 1), name, qty, rev }));
+    const coupons = [
+      { name: 'Cupom DESCONTO5', n: '41', v: '− R$ 152,30' },
+      { name: 'Cupom MANHA10', n: '23', v: '− R$ 118,40' },
+      { name: 'Cancelados antes de preparar', n: '2', v: 'R$ 54,30' },
+      { name: 'Estornados', n: '1', v: 'R$ 41,90' }
+    ];
+    const LABEL = { today: 'Hoje, 4 de novembro', yesterday: 'Ontem, 3 de novembro', '7d': '29 out a 4 nov', '30d': '6 out a 4 nov', month: '1 a 4 de novembro', lastmonth: 'Outubro de 2026', custom: 'Escolha as datas' };
+    return { presets, kpis, days, top, coupons, periodText: LABEL[preset], chartLabel: 'Faturamento por dia, de 29 de outubro a 4 de novembro. Maior: sábado 31, R$ 1.610,20.' };
+  }
+}
+</script>
+</body>
+</html>

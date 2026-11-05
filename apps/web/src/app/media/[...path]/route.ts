@@ -1,5 +1,7 @@
 import { connection } from "next/server";
 
+import { MEDIA_TIMEOUT_MS } from "@/lib/core/client";
+
 /**
  * Menu photos. MediaAsset.url and menu `image` fields are paths like
  * `/media/croque.jpg` on the Core API; the browser never talks to the Core
@@ -22,7 +24,9 @@ export async function GET(_request: Request, { params }: RouteContext<"/media/[.
   }
   let upstream: Response;
   try {
-    upstream = await fetch(`${base}/media/${path.map(encodeURIComponent).join("/")}`);
+    upstream = await fetch(`${base}/media/${path.map(encodeURIComponent).join("/")}`, {
+      signal: AbortSignal.timeout(MEDIA_TIMEOUT_MS),
+    });
   } catch {
     return new Response(null, { status: 502 });
   }

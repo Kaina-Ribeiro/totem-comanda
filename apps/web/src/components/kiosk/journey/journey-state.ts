@@ -158,7 +158,7 @@ export function journeyReducer(state: Journey, action: JourneyAction): Journey {
     case "saveItem": {
       const editGuid = state.item?.editGuid;
       const basket = editGuid
-        ? state.basket.map((line) => (line.guid === editGuid ? action.line : line))
+        ? replaceOrMerge(state.basket, editGuid, action.line)
         : addOrMerge(state.basket, action.line);
       const saved = { ...state, phase: state.item?.returnTo ?? "menu", item: null, basket };
       return editGuid ? saved : withCrossSell(saved, action.line.itemId);
@@ -233,6 +233,15 @@ export function currentQuote(state: Journey): OrderTotal | null {
     : null;
 }
 
+/** The quote error for the basket on screen; an older basket's error is not shown (COM-63). */
+export function currentQuoteFailure(
+  state: Journey,
+): Extract<Result<OrderTotal>, { ok: false }> | null {
+  return state.quote && state.quote.key === quoteKey(state) && !state.quote.result.ok
+    ? state.quote.result
+    : null;
+}
+
 /**
  * After an item is added, suggests its cross-sell group (F-MENU-11) unless the
  * guest turned suggestions off or none of the group's items are in the basket's
@@ -260,6 +269,16 @@ function addOrMerge(basket: BasketLine[], line: BasketLine): BasketLine[] {
   return basket.map((existing) =>
     existing === twin ? { ...existing, quantity: existing.quantity + line.quantity } : existing,
   );
+}
+
+/**
+ * Saves an edited line: if it now matches another line, the two become one
+ * (BR-BASKET-01, COM-64); otherwise it stays in its place.
+ */
+function replaceOrMerge(basket: BasketLine[], editGuid: string, line: BasketLine): BasketLine[] {
+  const others = basket.filter((existing) => existing.guid !== editGuid);
+  if (others.some((existing) => sameChoices(existing, line))) return addOrMerge(others, line);
+  return basket.map((existing) => (existing.guid === editGuid ? line : existing));
 }
 
 /** Order types the restaurant offers, DINEIN first (BR-START-11). */

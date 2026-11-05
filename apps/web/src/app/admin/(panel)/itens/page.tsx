@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Suspense } from "react";
 
+import { ItemListSkeleton, Streamed } from "@/components/admin/skeleton";
 import { Badge, Card, LoadError, PageHeader } from "@/components/admin/ui";
 import { load } from "@/lib/admin/form";
 import { asOwner } from "@/lib/admin/session";
@@ -17,15 +17,15 @@ export default function ItemsPage() {
         actions={
           <Link
             href="/admin/itens/novo"
-            className="rounded-full bg-accent px-5 py-2.5 text-sm font-bold text-on-accent"
+            className="rounded-[10px] bg-accent px-4 py-2.5 text-sm font-bold text-on-accent transition-transform active:scale-[.98]"
           >
             Novo item
           </Link>
         }
       />
-      <Suspense>
+      <Streamed fallback={<ItemListSkeleton />}>
         <ItemList />
-      </Suspense>
+      </Streamed>
     </>
   );
 }

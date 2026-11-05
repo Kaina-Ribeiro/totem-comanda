@@ -112,12 +112,23 @@ tokens, type scale and per-screen notes. It is drawn at 720x1280; the real scree
 so multiply prototype sizes by 1.5. Kiosk UI copy is pt-BR first, with English as the second
 language.
 
+Every other screen (new kiosk states, kitchen, back office on desktop and phone, and the waiter and
+table QR code apps) is in one canvas, sources in `docs/prototype/full/project/`; the README's "Full
+canvas" section lists them. Only the 12 kiosk screens are approved: the rest is a proposal, and
+the waiter and QR apps are outside the MVP. A desktop screen and its phone version share the number
+(`A2-Pedidos` ↔ `M2-Pedidos`).
+
 ## Commands
 
 ```bash
 # Stateful mock Core API (apps/web/mock) behind Prism, which validates every call against the
 # contract. Front end and BFF are built against it until the Go API exists. In apps/web:
 npm run mock        # CORE_API_URL=http://localhost:4010, MOCK_CONTROL_URL=http://localhost:4020/__mock
+npm run mock:orders -- 3                # with the mock running: 3 paid kiosk orders now
+npm run mock:orders -- 3 --days-ago 7   # ...on the same weekday last week (Início, Relatório)
+# A browser is one device and opens only its area (a kiosk browser sent to /kitchen lands on
+# /kiosk). In dev with the mock, "Totem" and "Cozinha" on / pair this browser as the mock's
+# device of that kind first.
 # Extend apps/web/mock with the operations each story needs; Prism flags any drift from the contract.
 
 # Regenerate API types after any contract change
@@ -132,6 +143,17 @@ npx @redocly/cli lint contract/openapi.yaml
 - Do not change `contract/openapi.yaml` silently. Propose the change to Kai first; it needs the
   partner's approval.
 - Never edit generated files.
+- Back office forms (`apps/web/src/lib/admin/form.ts`): read prices with `cents()` / `optionalPrice()`,
+  which refuse what is not a price and never guess. A form saved through two Core calls uses
+  `saveBoth()`: the part that can be read back and undone goes first, and it is put back if the
+  second call fails. The contract has no atomic save.
+- Back office loading (COM-140, COM-141): a page part that loads data goes in
+  `<Streamed fallback={<…Skeleton />}>` (`components/admin/skeleton.tsx`), never a bare
+  `<Suspense>`. The skeleton has the page's shape with its fixed labels as real text; the
+  content then fades in at the same spot, without sliding. `NavProgress` and the page entrance live in
+  `app/admin/(panel)/admin.css` + `template.tsx`, admin only. With `cacheComponents`, visited
+  pages stay in `<main>` hidden (`display: none`): never rely on `:nth-child` across pages or on
+  the URL changing as "the new page is on screen".
 - Open questions in `docs/data-model-and-api.md` (price changed mid-order, `waitTime`, order
   number reset, offline, fiscal fields, device pairing and secret storage) are not decided.
   Do not guess an answer into the code; ask Kai, or isolate it behind one clearly named function.
@@ -180,7 +202,8 @@ Follow these rules exactly. If a request conflicts with them, stop and say which
   approval** (Kai merges alone), and the `v*` tag ruleset lets only admins bypass, because GitHub
   refuses the Actions app as a bypass actor on a personal-account repo. So `RELEASE_TOKEN` must be
   an admin's token (Kai's; Pull requests + Contents read/write) or rc/final tags fail to push.
-  Never reapply `.github/rulesets/*.json` here as they are. Kai manages tokens himself: never ask
+  The version-lines ruleset also has the admin role as bypass (`always`, 4 Nov 2026), so the
+  workflow can delete a shipped `release/*` or `hotfix/*` branch. Never reapply `.github/rulesets/*.json` here as they are. Kai manages tokens himself: never ask
   for, read or handle a token value.
 - Deploy is Cubeship (`deploy/cubeship`), not Jenkins. The apps `comanda/production/web` and
   `comanda/production/mock` build from a tag (`ref: v0.1.0` since 31 Oct 2026), never a branch.
@@ -188,7 +211,11 @@ Follow these rules exactly. If a request conflicts with them, stop and say which
   `deploy`, stage `prod` (needs `DEPLOY_PROD_APPS="comanda/production/mock comanda/production/web"`,
   `CUBESHIP_URL` and the `CUBESHIP_TOKEN` secret); then the merge into master tags it final.
   Without those variables, deploy by hand after `release.mjs deploy-check <rc> --prod` passes.
-  No test stages on Cubeship yet.
+- Test stage is the Cubeship environment `itodev` (5 Nov 2026, COM-70): apps `comanda/itodev/mock`
+  and `comanda/itodev/web`, same Dockerfiles as prod, at https://comanda-itodev.5-189-167-204.sslip.io.
+  `DEPLOY_TEST_APPS="comanda/itodev/mock comanda/itodev/web"`, so every new rc deploys there by
+  itself (mock first). `web` reaches `http://cubeship-comanda-itodev-mock:4010`/`:4020`, has its own
+  `DEVICE_COOKIE_SECRET`, and `mock` runs with `MOCK_AUTO_DEVICES=1`.
 - `v0.1.0` is an annotated tag created by hand (Kai, 30 Oct 2026) on `b230cce`, before this flow;
   it has no rc, so the gate refuses it for prod.
 
@@ -224,7 +251,7 @@ Follow these rules exactly. If a request conflicts with them, stop and say which
 
 ### Deploy (Cubeship here; the original flow named Jenkins `dev_tag` + `environment`)
 Every stage runs a tag, never a branch name. `release.mjs deploy-check <tag> [--prod]` is the gate.
-- Test stages: any `vX.Y.Z-rc` (or final tag), any time. None on Cubeship yet.
+- Test stages: any `vX.Y.Z-rc` (or final tag), any time. On Cubeship: `itodev` (see above).
 - `prod`, on release day: the open line's **last** rc, deployed before the release PR merges
   (Actions → Release → `deploy`, stage `prod`, run from the release branch); the merge then tags
   it final. An older rc is refused.

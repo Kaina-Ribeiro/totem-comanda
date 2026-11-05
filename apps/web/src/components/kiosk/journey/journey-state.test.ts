@@ -4,10 +4,12 @@ import { BUNDLED, format, mergeStrings } from "@/lib/kiosk/strings";
 
 import {
   availableOrderTypes,
+  currentQuoteFailure,
   initialJourney,
   type Journey,
   journeyReducer,
   type Menu,
+  quoteKey,
 } from "./journey-state";
 
 const menu = { id: "mnu-manha", entities: [] } as unknown as Menu;
@@ -73,6 +75,37 @@ describe("basket", () => {
     ]);
   });
 
+  it("merges an edited line into its twin (BR-BASKET-01, COM-64)", () => {
+    const egg = [{ optionId: "opt-ovo-poche", quantity: 1 }];
+    let state = journeyReducer(inMenu, { type: "addLine", line: line("a") });
+    state = journeyReducer(state, { type: "addLine", line: line("b", egg) });
+    state = journeyReducer(state, { type: "openBasket" });
+    state = journeyReducer(state, {
+      type: "openItem",
+      itemId: "itm-croque-monsieur",
+      editGuid: "a",
+    });
+    // The guest adds the egg to line a: it is now the same as line b.
+    state = journeyReducer(state, { type: "saveItem", line: { ...line("a", egg), quantity: 2 } });
+    expect(state.basket.map((l) => [l.guid, l.quantity])).toEqual([["b", 3]]);
+  });
+
+  it("keeps an edited line in its place when no other line matches", () => {
+    const egg = [{ optionId: "opt-ovo-poche", quantity: 1 }];
+    let state = journeyReducer(inMenu, { type: "addLine", line: line("a") });
+    state = journeyReducer(state, { type: "addLine", line: line("b", egg) });
+    state = journeyReducer(state, {
+      type: "openItem",
+      itemId: "itm-croque-monsieur",
+      editGuid: "a",
+    });
+    state = journeyReducer(state, {
+      type: "saveItem",
+      line: line("a", [{ optionId: "opt-sem-queijo", quantity: 1 }]),
+    });
+    expect(state.basket.map((l) => l.guid)).toEqual(["a", "b"]);
+  });
+
   it("edits a line from the basket and returns there", () => {
     let state = journeyReducer(inMenu, { type: "addLine", line: line("a") });
     state = journeyReducer(state, { type: "openBasket" });
@@ -104,6 +137,23 @@ describe("basket", () => {
     expect(
       journeyReducer(state, { type: "quoted", key: "old", result: { ok: true, data: total } }),
     ).toBe(state);
+  });
+
+  it("shows a quote error only for the basket it was about (COM-63)", () => {
+    const one = journeyReducer(inMenu, { type: "addLine", line: line("a") });
+    const failed = journeyReducer(one, {
+      type: "quoted",
+      key: quoteKey(one),
+      result: { ok: false, code: "ITEM_UNAVAILABLE", detail: "itm-a" },
+    });
+    expect(currentQuoteFailure(failed)).toEqual({
+      ok: false,
+      code: "ITEM_UNAVAILABLE",
+      detail: "itm-a",
+    });
+    // The guest changes the basket: the old error must go while the new total loads.
+    const changed = journeyReducer(failed, { type: "addLine", line: line("b") });
+    expect(currentQuoteFailure(changed)).toBeNull();
   });
 });
 

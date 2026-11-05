@@ -1,8 +1,8 @@
 import Image from "next/image";
 import { revalidatePath } from "next/cache";
-import { Suspense } from "react";
 
 import { ActionForm, SubmitButton } from "@/components/admin/form";
+import { SoldOutSkeleton, Streamed } from "@/components/admin/skeleton";
 import { LoadError, PageHeader } from "@/components/admin/ui";
 import { attempt, type FormState, load, text } from "@/lib/admin/form";
 import { asOwner } from "@/lib/admin/session";
@@ -46,9 +46,9 @@ export default function SoldOutPage() {
         title="Esgotados"
         description="Acabou? Um toque tira o item do totem até o fim do dia. Amanhã ele volta sozinho."
       />
-      <Suspense>
+      <Streamed fallback={<SoldOutSkeleton />}>
         <SoldOutList />
-      </Suspense>
+      </Streamed>
     </>
   );
 }
@@ -77,7 +77,7 @@ async function SoldOutList() {
         return (
           <li
             key={item.id}
-            className={`flex items-center gap-3 rounded-2xl border p-3 ${
+            className={`flex items-center gap-3 rounded-[14px] border p-3 ${
               out ? "border-danger/30 bg-danger/5" : "border-line bg-surface"
             }`}
           >

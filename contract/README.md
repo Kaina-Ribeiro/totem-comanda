@@ -4,7 +4,7 @@
 **Comanda Core API** (Go, partner). It is the source of truth: the TypeScript types and the Go server
 interface are both generated from it, so neither side can drift without the build noticing.
 
-Version `0.1.0` · 66 operations · OpenAPI 3.0.3
+Version `0.2.0` · 74 operations · OpenAPI 3.0.3
 
 ## The rules in one screen
 
@@ -28,7 +28,7 @@ Version `0.1.0` · 66 operations · OpenAPI 3.0.3
 | 0 | 4 | Device auth, config, heartbeat, status |
 | 1 | 45 | Back office: restaurant, devices, media, menus and schedules, categories, items, sold out, option groups, tags, cross-sells, discounts |
 | 2 | 13 | Kiosk: active menu, language pack, journeys, quotes, discount check, orders, simulated payments, place |
-| 3 | 4 | Kitchen list, stream (SSE) and status; daily report |
+| 3 | 12 | Kitchen list (open or collected), stream (SSE), status forward and one step back, "Acabou", close the day, store pace; owner cancel and pace; daily report |
 | 4 | not yet | Real payment provider, provider webhooks, NFC-e. Added in a later version. |
 
 ## Front end (Kai)
@@ -95,7 +95,15 @@ Things the contract expects from the implementation:
 - **ETag**: change it whenever the menu, its items, sold-out flags or the language change.
 - **Simulated payments**: until phase 4 the gateway is `SIMULATED`; `/payments/{id}/simulate` sets the
   outcome and must answer `404 SIMULATION_DISABLED` once a real gateway is configured.
-- **Kitchen stream**: Server-Sent Events with `order.paid` and `order.status_changed`, a ping every 15 s.
+- **Kitchen stream**: Server-Sent Events with `order.paid`, `order.status_changed` and
+  `store.pace_changed`, a ping every 15 s.
+- **Kitchen order version**: `version` starts at 1 when paid and goes up by one on every status
+  change, with a `history` entry. A move with `expectedVersion` that no longer matches is
+  `409 STALE_ORDER_VERSION`. Backward moves (READY → PREPARING, COLLECTED → READY) only on the
+  order's own business day.
+- **Store pace**: one per restaurant. PAUSED sets `atCapacityMode` on every kiosk until
+  `pausedUntil`, then Go returns to NORMAL by itself (server clock, restaurant timezone) and sends
+  `store.pace_changed`. `PlacedOrder.waitTime` is the owner's minutes for NORMAL or BUSY.
 
 ## Checking the Go API against the contract
 
@@ -121,7 +129,8 @@ as an error, so drift shows up during development, not on the kiosk.
 From the plan's open questions; each one is marked in the operation it affects.
 
 - Price changed during a journey: keep the quoted price or reject and re-quote (`POST /v1/orders`).
-- How `waitTime` is computed (`PlacedOrder`).
+- ~~How `waitTime` is computed (`PlacedOrder`).~~ Decided in 0.2.0: minutes per pace level
+  (plan decision 4); computing it from the queue comes later.
 - Order number reset and `posCheckNumberDisplayLength`.
 - Offline behaviour of the kiosk.
 - Fiscal fields per item (`FiscalFields`, phase 4).
@@ -133,3 +142,23 @@ From the plan's open questions; each one is marked in the operation it affects.
 - `oapi-codegen` v2.8.1: generated server compiles.
 - `openapi-typescript` 7.13 + `openapi-fetch`: generated types type-check in strict mode.
 - `@stoplight/prism-cli` 5.14.2: mock serves the bakery examples (menu, R$ 82,80 basket, order 42).
+
+## Changes in 0.2.0 (proposal, wave 1 of `docs/plan-next.md`)
+
+Needs the partner's approval before anyone builds on it. Additive for the BFF; for Go it means new
+fields to fill and new operations to implement.
+
+| Change | Where | Plan |
+|:--|:--|:--|
+| `version`, `updatedAt` and `history` on `KitchenOrder`; `expectedVersion` on a move; `STALE_ORDER_VERSION` | `KitchenOrder`, `updateKitchenOrderStatus` | G-K2, G-K3 |
+| Backward moves READY → PREPARING and COLLECTED → READY, same business day | `updateKitchenOrderStatus` | G-K3, decision 2 |
+| `itemId` and `choices[].optionId` on order lines (`options` kept) | `KitchenOrder.lines` | G-K4 |
+| "Acabou" from the kitchen, item or one option, today only | `PUT /v1/kitchen/availability` | G-K4 |
+| Today's collected orders | `GET /v1/kitchen/orders?status=collected` | G-K7 |
+| Cancel a paid order, confirmed with the owner's login | `POST /v1/admin/orders/{orderId}/cancel` | G-K11, decision 12 |
+| Close the day: open orders become `NOT_COLLECTED` (new `OrderStatus`) | `POST /v1/kitchen/close-day` | G-K9 |
+| Store pace NORMAL / BUSY / PAUSED with auto-resume, wait minutes per level, `pace` in the device config | `/v1/kitchen/pace`, `/v1/admin/pace`, `/v1/admin/pace/wait-minutes`, `DeviceConfig.pace` | G-K5, G-T3, decisions 3 and 4 |
+
+Not in 0.2.0 (later waves): availability with a duration and `visible` (G-A4), special dates
+(G-A5), owner orders list (G-A2), item fields, kiosk content, coupon rules, change password,
+report by period, store phone and "close now".

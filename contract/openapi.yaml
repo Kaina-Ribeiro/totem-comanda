@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Comanda Core API
-  version: 0.1.0
+  version: 0.2.0
   license:
     name: Proprietary
   description: |
@@ -610,7 +610,12 @@ paths:
     get:
       tags: [Kitchen]
       operationId: listKitchenOrders
-      summary: Paid orders not yet collected, oldest first
+      summary: Open orders oldest first, or today's collected orders newest first
+      description: |
+        `open` (default): PAID, PREPARING and READY orders, oldest `placedAt` first.
+        `collected` (plan G-K7, "Retirados hoje"): COLLECTED orders of the current
+        business day, newest `updatedAt` first, so the kitchen can find one and move
+        it back to READY.
       x-phase: 3
       security:
         - deviceAuth: []
@@ -620,7 +625,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [open]
+            enum: [open, collected]
             default: open
       responses:
         '200':
@@ -641,9 +646,16 @@ paths:
       summary: Server-Sent Events for the kitchen screen
       description: |
         One event per change. `event: order.paid` and `event: order.status_changed`,
-        each with a `KitchenOrder` as JSON in `data`. A `: ping` comment every 15 s
-        keeps the connection open. If the stream drops, the kitchen falls back to
-        polling `GET /v1/kitchen/orders` every 2 s.
+        each with a `KitchenOrder` as JSON in `data`; a cancelled or not-collected
+        order is an `order.status_changed` with that status. `event: store.pace_changed`
+        carries a `StorePace` whenever the pace changes, including the automatic
+        resume after a pause. A `: ping` comment every 15 s keeps the connection open.
+        If the stream drops, the kitchen falls back to polling `GET /v1/kitchen/orders`
+        every 2 s.
+
+        Events can arrive late or twice. Clients keep the `KitchenOrder` with the
+        highest `version` and drop older ones, so a late event for an undone move
+        never puts a card back.
       x-phase: 3
       security:
         - deviceAuth: []
@@ -665,7 +677,16 @@ paths:
     post:
       tags: [Kitchen]
       operationId: updateKitchenOrderStatus
-      summary: Move an order to PREPARING, READY or COLLECTED
+      summary: Move an order to PREPARING, READY or COLLECTED, forward or one step back
+      description: |
+        Forward: PAID → PREPARING → READY → COLLECTED (PAID → READY is allowed too).
+        Back one step (plan decision 2, for "Desfazer" and "Voltar uma etapa"):
+        READY → PREPARING and COLLECTED → READY, only while the order's business day
+        is the current one. Anything else is `409 INVALID_STATUS_TRANSITION`.
+
+        Each change adds a `history` entry, sets `updatedAt` and increments `version`.
+        With `expectedVersion`, Go applies the move only if the order is still at that
+        version, else `409 STALE_ORDER_VERSION` (another screen moved it first).
       x-phase: 3
       security:
         - deviceAuth: []
@@ -689,11 +710,121 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: Not allowed from the current status (`INVALID_STATUS_TRANSITION`).
+          description: |
+            Not allowed from the current status or day (`INVALID_STATUS_TRANSITION`), or
+            the order is no longer at `expectedVersion` (`STALE_ORDER_VERSION`).
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+
+  /v1/kitchen/availability:
+    put:
+      tags: [Kitchen]
+      operationId: setKitchenAvailability
+      summary: '"Acabou": mark an item or one option sold out for today, or back'
+      description: |
+        Plan G-K4. The kitchen marks what ran out without leaving its screen. The
+        ids come from the order line (`itemId`, `choices[].optionId`). Sold out
+        means today's business date, like `markItemSoldOut`; `soldOut: false` clears
+        it (the 5 s undo). Orders already placed stay open (KDS BR-027). Go changes
+        the menu ETag, so the next kiosk journey loads the new menu.
+      x-phase: 3
+      security:
+        - deviceAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KitchenAvailabilityUpdate'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KitchenAvailability'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v1/kitchen/close-day:
+    post:
+      tags: [Kitchen]
+      operationId: closeKitchenDay
+      summary: '"Encerrar o dia": every open order of today becomes NOT_COLLECTED'
+      description: |
+        Plan G-K9. Moves every PAID, PREPARING and READY order of the current business
+        day to NOT_COLLECTED (never COLLECTED: nobody handed them over), with a history
+        entry, and sends one `order.status_changed` per order. The owner still sees
+        them in the report. Calling it again with nothing open returns `count: 0`.
+      x-phase: 3
+      security:
+        - deviceAuth: []
+      responses:
+        '200':
+          description: Closed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [count]
+                properties:
+                  count:
+                    type: integer
+                    description: Orders moved to NOT_COLLECTED.
+                    example: 2
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/kitchen/pace:
+    get:
+      tags: [Kitchen]
+      operationId: getKitchenPace
+      summary: The store's pace (Normal, Movimentado, Pausado)
+      x-phase: 3
+      security:
+        - deviceAuth: []
+      responses:
+        '200':
+          description: Current pace.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StorePace'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      tags: [Kitchen]
+      operationId: setKitchenPace
+      summary: Set the store's pace from the kitchen
+      description: |
+        Plan G-K5 and decision 3: one store-level pace, set from the kitchen or the
+        back office (`setStorePace`). See `StorePace` for what each level does.
+      x-phase: 3
+      security:
+        - deviceAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StorePaceUpdate'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StorePace'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
 
   # ---------------------------------------------------------------- Admin
   /v1/admin/auth/login:
@@ -1774,6 +1905,120 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/admin/orders/{orderId}/cancel:
+    post:
+      tags: [Admin]
+      operationId: cancelOrder
+      summary: Cancel a paid order that cannot be made
+      description: |
+        Plan G-K11 and decision 12. Confirmed with the owner's login, not a PIN: the
+        kitchen screen asks for the owner's email and password, its BFF signs in with
+        `POST /v1/admin/auth/login`, calls this with that token and drops the token.
+        Allowed from PAID, PREPARING and READY; anything else is
+        `409 INVALID_STATUS_TRANSITION`. Sets CANCELLED with a history entry by OWNER
+        and sends `order.status_changed`. While the gateway is SIMULATED there is no
+        refund; from phase 4 a cancel of a paid order also needs the refund flow.
+        Cancelled orders count on their own line in the report, never in revenue.
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCancelRequest'
+      responses:
+        '200':
+          description: Cancelled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KitchenOrder'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Already collected, cancelled or not collected (`INVALID_STATUS_TRANSITION`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /v1/admin/pace:
+    get:
+      tags: [Admin]
+      operationId: getStorePace
+      summary: The store's pace, for the back office home
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      responses:
+        '200':
+          description: Current pace.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StorePace'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      tags: [Admin]
+      operationId: setStorePace
+      summary: Set the store's pace from the back office ("Pausar" on Início)
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StorePaceUpdate'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StorePace'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v1/admin/pace/wait-minutes:
+    put:
+      tags: [Admin]
+      operationId: setPaceWaitMinutes
+      summary: Minutes shown to the guest for each pace level
+      description: |
+        Plan decision 4: `waitTime` is minutes per pace level, set by the owner.
+        Defaults: NORMAL 8, BUSY 15.
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaceWaitMinutes'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StorePace'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
   /v1/admin/reports/daily:
     get:
       tags: [Admin]
@@ -2052,6 +2297,7 @@ components:
         - INVALID_STATUS_TRANSITION
         - SCHEDULE_OVERLAP
         - DISCOUNT_CODE_TAKEN
+        - STALE_ORDER_VERSION
     Money:
       type: integer
       format: int64
@@ -2140,6 +2386,9 @@ components:
         printerEnabled: false
         maintenanceMode: false
         atCapacityMode: false
+        pace:
+          pace: NORMAL
+          pausedUntil: null
         isOpen: true
         restaurant:
           locationId: rst-padaria-01
@@ -2170,7 +2419,7 @@ components:
         nextOpeningAt: null
         serverTime: '2026-10-30T12:00:00Z'
       description: ENT-KIOSK-01 with the restaurant's brand config.
-      required: [kioskID, kind, idleTimerIntervalMilliseconds, printerEnabled, maintenanceMode, atCapacityMode, isOpen, restaurant, activeMenu, nextOpeningAt, serverTime]
+      required: [kioskID, kind, idleTimerIntervalMilliseconds, printerEnabled, maintenanceMode, atCapacityMode, pace, isOpen, restaurant, activeMenu, nextOpeningAt, serverTime]
       properties:
         kioskID:
           type: string
@@ -2190,7 +2439,23 @@ components:
           example: false
         atCapacityMode:
           type: boolean
+          description: |
+            True while this device is at capacity in Aparelhos, or while the store's
+            pace is PAUSED. The kiosk then shows its at-capacity screen.
           example: false
+        pace:
+          type: object
+          description: |
+            The store's pace, so the paused screen can say when the kiosk comes back.
+            A change of pace changes the config ETag.
+          required: [pace, pausedUntil]
+          properties:
+            pace:
+              $ref: '#/components/schemas/Pace'
+            pausedUntil:
+              type: string
+              format: date-time
+              nullable: true
         isOpen:
           type: boolean
           description: True when a menu is active now.
@@ -2923,7 +3188,10 @@ components:
     # ------------------------------------------------------------ Orders and payments
     OrderStatus:
       type: string
-      enum: [AWAITING_PAYMENT, PAID, PREPARING, READY, COLLECTED, CANCELLED]
+      enum: [AWAITING_PAYMENT, PAID, PREPARING, READY, COLLECTED, CANCELLED, NOT_COLLECTED]
+      description: |
+        NOT_COLLECTED: still open when the kitchen closed the day (`closeKitchenDay`);
+        paid, never handed over. CANCELLED: cancelled by the owner (`cancelOrder`).
     CreateOrderRequest:
       type: object
       required: [orderNonce, orderType, language, orderItems]
@@ -3198,7 +3466,10 @@ components:
         waitTime:
           type: integer
           nullable: true
-          description: Minutes. How it is computed is open question 2.
+          description: |
+            Minutes: the owner's wait minutes for the current pace (NORMAL or BUSY;
+            `PaceWaitMinutes`). Plan decision 4 closes open question 2. Null only if
+            the owner cleared them.
           example: 8
         status:
           $ref: '#/components/schemas/OrderStatus'
@@ -3210,20 +3481,39 @@ components:
         id: ord-7f3a
         posCheckNumber: '42'
         orderType: TAKE_OUT
-        status: PAID
+        status: PREPARING
         placedAt: '2026-10-30T12:04:10Z'
         readyAt: null
+        updatedAt: '2026-10-30T12:05:02Z'
+        version: 2
+        history:
+          - status: PAID
+            at: '2026-10-30T12:04:10Z'
+            by: KIOSK
+          - status: PREPARING
+            at: '2026-10-30T12:05:02Z'
+            by: KITCHEN
         lines:
-          - name: Croque monsieur
+          - itemId: itm-croque
+            name: Croque monsieur
             quantity: 1
             options: [Brioche, Ovo pochê]
-          - name: Cappuccino
+            choices:
+              - optionId: opt-brioche
+                name: Brioche
+                quantity: 1
+              - optionId: opt-ovo-poche
+                name: Ovo pochê
+                quantity: 1
+          - itemId: itm-cappuccino
+            name: Cappuccino
             quantity: 1
             options: [Leite integral]
-          - name: Fermentação natural
-            quantity: 1
-            options: [Inteiro, fatiado]
-      required: [id, posCheckNumber, orderType, status, placedAt, readyAt, lines]
+            choices:
+              - optionId: opt-leite-integral
+                name: Leite integral
+                quantity: 1
+      required: [id, posCheckNumber, orderType, status, placedAt, readyAt, updatedAt, version, history, lines]
       properties:
         id:
           type: string
@@ -3240,21 +3530,65 @@ components:
           type: string
           format: date-time
           nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+          description: Time of the last status change.
+        version:
+          type: integer
+          minimum: 1
+          description: |
+            1 when paid, +1 on every status change. Clients keep the highest version
+            they have seen (stale-event guard, plan G-K3).
+        history:
+          type: array
+          description: Every status the order had, oldest first (plan G-K2). Starts with PAID.
+          items:
+            $ref: '#/components/schemas/KitchenStatusChange'
         lines:
           type: array
           items:
             type: object
-            required: [name, quantity, options]
+            required: [itemId, name, quantity, options, choices]
             properties:
+              itemId:
+                type: string
+                description: For "Acabou" (`setKitchenAvailability`).
               name:
                 type: string
               quantity:
                 type: integer
               options:
                 type: array
-                description: Option names, flattened, in pt-BR.
+                description: Option names, flattened, in pt-BR. Same order as `choices`.
                 items:
                   type: string
+              choices:
+                type: array
+                description: The chosen options with their ids, flattened, in pt-BR.
+                items:
+                  type: object
+                  required: [optionId, name, quantity]
+                  properties:
+                    optionId:
+                      type: string
+                    name:
+                      type: string
+                    quantity:
+                      type: integer
+    KitchenStatusChange:
+      type: object
+      required: [status, at, by]
+      properties:
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        at:
+          type: string
+          format: date-time
+        by:
+          type: string
+          enum: [KIOSK, KITCHEN, OWNER, SYSTEM]
+          description: KIOSK for the payment, SYSTEM for automatic changes.
     KitchenStatusUpdate:
       type: object
       required: [status]
@@ -3262,6 +3596,108 @@ components:
         status:
           type: string
           enum: [PREPARING, READY, COLLECTED]
+        expectedVersion:
+          type: integer
+          minimum: 1
+          description: Optional. The `version` the client saw; a different one is `409 STALE_ORDER_VERSION`.
+    KitchenAvailabilityUpdate:
+      type: object
+      required: [itemId, optionId, soldOut]
+      properties:
+        itemId:
+          type: string
+        optionId:
+          type: string
+          nullable: true
+          description: Null marks the whole item; an id marks only that option of the item.
+        soldOut:
+          type: boolean
+          description: True sold out for today; false back in stock.
+    KitchenAvailability:
+      type: object
+      required: [itemId, optionId, soldOutDate]
+      properties:
+        itemId:
+          type: string
+        optionId:
+          type: string
+          nullable: true
+        soldOutDate:
+          type: string
+          format: date
+          nullable: true
+          description: Today's business date while sold out; null when back in stock.
+    OrderCancelRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          enum: [ITEM_SOLD_OUT, CANNOT_PREPARE, OTHER]
+        note:
+          type: string
+          maxLength: 140
+          nullable: true
+    Pace:
+      type: string
+      enum: [NORMAL, BUSY, PAUSED]
+      description: |
+        NORMAL: the kiosk sells, `waitTime` is the NORMAL minutes.
+        BUSY ("Movimentado"): the kiosk sells, `waitTime` is the BUSY minutes.
+        PAUSED: every kiosk shows the at-capacity screen until `pausedUntil`, when Go
+        returns to NORMAL by itself (server time, restaurant timezone).
+    StorePace:
+      type: object
+      example:
+        pace: PAUSED
+        pausedUntil: '2026-10-30T12:30:00Z'
+        changedAt: '2026-10-30T12:15:00Z'
+        changedBy: KITCHEN
+        waitMinutes:
+          NORMAL: 8
+          BUSY: 15
+      required: [pace, pausedUntil, changedAt, changedBy, waitMinutes]
+      properties:
+        pace:
+          $ref: '#/components/schemas/Pace'
+        pausedUntil:
+          type: string
+          format: date-time
+          nullable: true
+          description: Set only while PAUSED.
+        changedAt:
+          type: string
+          format: date-time
+        changedBy:
+          type: string
+          enum: [KITCHEN, OWNER, SYSTEM]
+          description: SYSTEM for the automatic resume.
+        waitMinutes:
+          $ref: '#/components/schemas/PaceWaitMinutes'
+    StorePaceUpdate:
+      type: object
+      required: [pace]
+      properties:
+        pace:
+          $ref: '#/components/schemas/Pace'
+        pauseMinutes:
+          type: integer
+          enum: [15, 30]
+          description: Required when `pace` is PAUSED, ignored otherwise.
+    PaceWaitMinutes:
+      type: object
+      required: [NORMAL, BUSY]
+      properties:
+        NORMAL:
+          type: integer
+          minimum: 1
+          maximum: 120
+          example: 8
+        BUSY:
+          type: integer
+          minimum: 1
+          maximum: 120
+          example: 15
 
     # ------------------------------------------------------------ Admin
     OwnerLoginRequest:

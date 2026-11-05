@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { applyScenario, signInDevice, state } from "./state";
+import { applyScenario, seededCredentials, signInDevice, state } from "./state";
 
 describe("signInDevice", () => {
   beforeEach(() => applyScenario("normal"));
@@ -33,5 +33,27 @@ describe("signInDevice", () => {
     expect(signInDevice("TOTEM/1", "x", true)).toBeNull();
     expect(signInDevice("TOTEM-3", "", true)).toBeNull();
     expect(signInDevice(undefined, "x", true)).toBeNull();
+  });
+});
+
+describe("seededCredentials (COM-139)", () => {
+  beforeEach(() => applyScenario("normal"));
+
+  it("hands the id and secret of the first active device of a kind", () => {
+    expect(seededCredentials("KITCHEN")).toEqual({
+      deviceId: "KITCHEN-TBT-001",
+      deviceSecret: "kitchen-s3cr3t",
+    });
+    expect(seededCredentials("KIOSK")?.deviceId).toBe("KIOSK-TBT-001");
+  });
+
+  it("follows the scenario: a rotated secret is the new one", () => {
+    applyScenario("secret-rotated");
+    expect(seededCredentials("KIOSK")?.deviceSecret).toBe("rotated-in-the-back-office");
+  });
+
+  it("has none when no device of that kind is active", () => {
+    for (const device of state.devices) if (device.kind === "KITCHEN") device.status = "DISABLED";
+    expect(seededCredentials("KITCHEN")).toBeNull();
   });
 });
