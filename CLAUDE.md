@@ -112,6 +112,12 @@ tokens, type scale and per-screen notes. It is drawn at 720x1280; the real scree
 so multiply prototype sizes by 1.5. Kiosk UI copy is pt-BR first, with English as the second
 language.
 
+Every other screen (new kiosk states, kitchen, back office on desktop and phone, and the waiter and
+table QR code apps) is in one canvas, sources in `docs/prototype/full/project/`; the README's "Full
+canvas" section lists them. Only the 12 kiosk screens are approved: the rest is a proposal, and
+the waiter and QR apps are outside the MVP. A desktop screen and its phone version share the number
+(`A2-Pedidos` ↔ `M2-Pedidos`).
+
 ## Commands
 
 ```bash

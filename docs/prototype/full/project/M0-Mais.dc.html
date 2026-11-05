@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Celular · Mais</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button{font:inherit;color:inherit;cursor:pointer}
+.tap{transition:transform .12s ease,background-color .15s ease}
+.tap:active{transform:scale(.98)}
+nav,main{scrollbar-width:none}nav::-webkit-scrollbar,main::-webkit-scrollbar{display:none}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F3EFE8; color: #2B211C; font-family: Manrope, system-ui, sans-serif; font-feature-settings: 'tnum' 1; display: flex; flex-direction: column; overflow: hidden">
+  <header style="background: #FFFFFF; border-bottom: 1px solid #E5DDD2; padding: 14px 16px 10px; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0">
+    <div style="display: flex; align-items: center; justify-content: space-between">
+      <span style="font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 500; font-size: 22px">Comanda</span>
+      <span style="height: 28px; padding: 0 10px; border-radius: 14px; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; background: #DCDFD2"><span style="width: 7px; height: 7px; border-radius: 4px; background: #4F6B45"></span>Aberto</span>
+    </div>
+    <nav aria-label="Back office" style="display: flex; gap: 6px; overflow-x: auto; margin: 0 -16px; padding: 0 16px" ref="{{navRef}}">
+      <a href="M1-Inicio.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Início</a>
+      <a href="M2-Pedidos.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Pedidos</a>
+      <a href="M4-Esgotados.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Esgotados</a>
+      <a href="M9-Relatorio.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Relatório</a>
+      <a href="M6-Itens.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Cardápio</a>
+      <a href="M0-Mais.dc.html" aria-current="page" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; background: #EAD9C6; display: flex; align-items: center; font-size: 14px; font-weight: 800">Mais</a>
+    </nav>
+  </header>
+
+  <main style="flex-grow: 1; min-height: 0; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px">
+    <div style="display: flex; flex-direction: column; gap: 2px">
+      <h1 style="margin: 0; font-weight: 700; font-size: 24px; letter-spacing: -0.02em">Mais</h1>
+      <span style="font-size: 13px; font-weight: 700; color: #625750">Padaria Café e Trigo</span>
+    </div>
+
+    <sc-for list="{{groups}}" as="g" hint-placeholder-count="2">
+      <section style="display: flex; flex-direction: column; gap: 6px">
+        <h2 style="margin: 0; padding: 0 4px; font-size: 13px; font-weight: 700; color: #625750">{{g.title}}</h2>
+        <ul style="list-style: none; margin: 0; padding: 0 14px; border-radius: 12px; background: #FFFFFF; border: 1px solid #E5DDD2">
+          <sc-for list="{{g.items}}" as="it" hint-placeholder-count="4">
+            <li style="{{it.rowStyle}}">
+              <a href="{{it.href}}" class="tap" style="min-height: 56px; display: flex; align-items: center; gap: 12px">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4E3426" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{it.icon}}"></path></svg>
+                <span style="flex-grow: 1; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 15px; font-weight: 800">{{it.label}}</span><span style="font-size: 12px; font-weight: 600; color: #625750">{{it.hint}}</span></span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#625750" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"></path></svg>
+              </a>
+            </li>
+          </sc-for>
+        </ul>
+      </section>
+    </sc-for>
+
+    <button type="button" class="tap" style="min-height: 52px; border-radius: 12px; border: 1px solid #E5DDD2; background: #FFFFFF; font-size: 15px; font-weight: 800; color: #A3472F">Sair</button>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const ICON = {
+      cardapios: 'M5 4h12a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2zM9 8h6M9 12h4',
+      categorias: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+      itens: 'M3 12V4h8l10 10-8 8zM7.5 7.5h.01',
+      selos: 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z',
+      cupons: 'M3 7h18v3a2 2 0 0 0 0 4v3H3v-3a2 2 0 0 0 0-4zM14 7v10',
+      horarios: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 7v5l3 2',
+      tela: 'M7 2h10a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zM10 18h4',
+      aparelhos: 'M4 5h16v11H4zM9 20h6M12 16v4',
+      loja: 'M4 9l1.5-5h13L20 9M4 9h16v11H4zM10 20v-6h4v6'
+    };
+    const G = [
+      ['Cardápio', [
+        ['Cardápios', 'Manhã e tarde, com horário de troca', 'M10-Cardapios.dc.html', 'cardapios'],
+        ['Categorias', 'Ordem no totem', 'M11-Categorias.dc.html', 'categorias'],
+        ['Itens', 'Preço, foto, alergênicos e opções', 'M6-Itens.dc.html', 'itens'],
+        ['Selos e sugestões', '“Mais pedido” e “Combina com”', 'M12-Selos.dc.html', 'selos'],
+        ['Cupons', '2 ativos', 'M8-Cupom.dc.html', 'cupons']
+      ]],
+      ['Loja', [
+        ['Horários e datas especiais', 'Próxima: Véspera de Natal, 24 dez', 'M5-Datas.dc.html', 'horarios'],
+        ['Tela do totem', 'Fotos de descanso e avisos', 'M7-TelaTotem.dc.html', 'tela'],
+        ['Aparelhos', 'Totem 1 e cozinha online', 'M13-Aparelhos.dc.html', 'aparelhos'],
+        ['Loja e conta', 'Nome, telefone e senha', 'M14-Loja.dc.html', 'loja']
+      ]]
+    ];
+    const groups = G.map(([title, items]) => ({
+      title,
+      items: items.map(([label, hint, href, icon], i) => ({ label, hint, href, icon: ICON[icon], rowStyle: i ? 'border-top: 1px solid #E5DDD2;' : '' }))
+    }));
+    return { groups, navRef: (el) => { if (el) { const a = el.querySelector('[aria-current]'); if (a) el.scrollLeft = a.offsetLeft - 16; } } };
+  }
+}
+</script>
+</body>
+</html>

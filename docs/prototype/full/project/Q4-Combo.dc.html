@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Mesa 12 · Café da manhã</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button{font:inherit;color:inherit;cursor:pointer}
+main{scrollbar-width:none}main::-webkit-scrollbar{display:none}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F3EFE8; color: #2B211C; font-family: Manrope, system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <div style="position: relative; height: 200px; flex-shrink: 0; background: #EFE4C9; overflow: hidden">
+    <img src="/_blob/0471b8153aad0569ffc277ed8052709f" alt="Croissant e café da manhã" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block">
+    <a href="Q2-Cardapio.dc.html" aria-label="Voltar ao cardápio" style="position: absolute; top: 16px; left: 16px; height: 44px; padding: 0 16px 0 10px; border-radius: 22px; background: #FFFFFF; display: flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 700">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>
+      Cardápio
+    </a>
+  </div>
+
+  <main style="flex-grow: 1; min-height: 0; overflow-y: auto; padding: 20px 20px 16px; display: flex; flex-direction: column; gap: 22px">
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px">
+        <h1 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 30px; line-height: 1.1; letter-spacing: -0.02em">Café da manhã</h1>
+        <div style="display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0">
+          <div style="font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 22px; color: #6B4430">R$ 24,90</div>
+          <div style="font-size: 12px; color: #625750">Preços de exemplo</div>
+        </div>
+      </div>
+      <p style="margin: 0; font-size: 15px; line-height: 1.5; color: #625750">Um salgado e uma bebida, à sua escolha.</p>
+    </div>
+
+    <section style="display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px">
+        <h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 22px">Escolha o salgado</h2>
+        <div style="font-size: 13px; font-weight: 700; color: #8A5A2B">Escolha um</div>
+      </div>
+      <div role="radiogroup" aria-label="Escolha o salgado" style="display: flex; flex-direction: column; gap: 8px">
+        <sc-for list="{{salgados}}" as="o" hint-placeholder-count="3">
+          <button type="button" role="radio" aria-checked="{{o.checked}}" onClick="{{o.pick}}" style="{{o.style}}">
+            <span style="display: flex; align-items: center; gap: 12px; font-size: 17px; font-weight: 700"><span style="{{o.dotStyle}}"></span>{{o.label}}</span>
+            <span style="{{o.rightStyle}}">{{o.right}}</span>
+          </button>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px">
+        <h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 22px">Escolha a bebida</h2>
+        <div style="font-size: 13px; font-weight: 700; color: #8A5A2B">Escolha uma</div>
+      </div>
+      <div role="radiogroup" aria-label="Escolha a bebida" style="display: flex; flex-direction: column; gap: 8px">
+        <sc-for list="{{bebidas}}" as="o" hint-placeholder-count="3">
+          <button type="button" role="radio" aria-checked="{{o.checked}}" onClick="{{o.pick}}" style="{{o.style}}">
+            <span style="display: flex; align-items: center; gap: 12px; font-size: 17px; font-weight: 700"><span style="{{o.dotStyle}}"></span>{{o.label}}</span>
+            <span style="{{o.rightStyle}}">{{o.right}}</span>
+          </button>
+        </sc-for>
+      </div>
+    </section>
+
+    <sc-if value="{{showSize}}" hint-placeholder-val="{{false}}">
+      <section style="display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px">
+          <h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 22px">Tamanho do café</h2>
+          <div style="font-size: 13px; font-weight: 700; color: #8A5A2B">Escolha um</div>
+        </div>
+        <div role="radiogroup" aria-label="Tamanho do café" style="display: flex; flex-direction: column; gap: 8px">
+          <sc-for list="{{tamanhos}}" as="o" hint-placeholder-count="2">
+            <button type="button" role="radio" aria-checked="{{o.checked}}" onClick="{{o.pick}}" style="{{o.style}}">
+              <span style="display: flex; align-items: center; gap: 12px; font-size: 17px; font-weight: 700"><span style="{{o.dotStyle}}"></span>{{o.label}}</span>
+              <span style="{{o.rightStyle}}">{{o.right}}</span>
+            </button>
+          </sc-for>
+        </div>
+      </section>
+    </sc-if>
+  </main>
+
+  <footer style="flex-shrink: 0; padding: 14px 20px 26px; background: #FFFFFF; border-top: 1px solid #E5DDD2">
+    <a href="Q5-Carrinho.dc.html" style="height: 60px; border-radius: 30px; background: #4E3426; color: #FAF6F0; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700">Adicionar · {{total}}</a>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { salgado: 'croissant', bebida: 'cappuccino', tamanho: 'pequeno' };
+  }
+  renderVals() {
+    const brl = (c) => 'R$ ' + (c / 100).toFixed(2).replace('.', ',');
+    const BASE = 2490;
+    const SALGADOS = [
+      { id: 'croissant', label: 'Croissant', price: 0 },
+      { id: 'pao-chapa', label: 'Pão na chapa', price: 0 },
+      { id: 'pao-queijo', label: '3 pães de queijo', price: 0 }
+    ];
+    const BEBIDAS = [
+      { id: 'cappuccino', label: 'Cappuccino', price: 0, coffee: true },
+      { id: 'latte', label: 'Latte', price: 100, coffee: true },
+      { id: 'suco', label: 'Suco de laranja', price: 0 }
+    ];
+    const TAMANHOS = [
+      { id: 'pequeno', label: 'Pequeno', price: 0 },
+      { id: 'grande', label: 'Grande', price: 300 }
+    ];
+    const salgado = this.state.salgado;
+    const bebida = this.state.bebida;
+    const tamanho = this.state.tamanho;
+    const bebidaObj = BEBIDAS.find((b) => b.id === bebida);
+    const showSize = !!bebidaObj.coffee;
+
+    const rows = (list, selected, setKey) => list.map((o) => {
+      const on = o.id === selected;
+      return {
+        label: o.label,
+        checked: on ? 'true' : 'false',
+        right: o.price ? '+ ' + brl(o.price) : 'Incluso',
+        rightStyle: 'font-size: 15px; font-weight: 700; color: ' + (o.price ? '#625750' : '#4F6B45') + '; white-space: nowrap;',
+        pick: () => this.setState({ [setKey]: o.id }),
+        style: 'height: 60px; width: 100%; padding: 0 16px; border-radius: 16px; display: flex; align-items: center; justify-content: space-between; text-align: left; background: #FFFFFF; ' +
+          (on ? 'border: 2px solid #4E3426;' : 'border: 1px solid #E5DDD2;'),
+        dotStyle: 'width: 22px; height: 22px; box-sizing: border-box; border-radius: 11px; flex-shrink: 0; ' +
+          (on ? 'background: #4E3426; box-shadow: inset 0 0 0 5px #FFFFFF;' : 'border: 2px solid #B5B3AB;')
+      };
+    });
+
+    const extraBebida = bebidaObj.price;
+    const extraTamanho = showSize ? TAMANHOS.find((t) => t.id === tamanho).price : 0;
+    const total = BASE + extraBebida + extraTamanho;
+
+    return {
+      salgados: rows(SALGADOS, salgado, 'salgado'),
+      bebidas: rows(BEBIDAS, bebida, 'bebida'),
+      tamanhos: rows(TAMANHOS, tamanho, 'tamanho'),
+      showSize,
+      total: brl(total)
+    };
+  }
+}
+</script>
+</body>
+</html>

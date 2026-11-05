@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Mesa 12 · Cardápio</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button{font:inherit;color:inherit;cursor:pointer}
+main{scrollbar-width:none}main::-webkit-scrollbar{display:none}
+nav::-webkit-scrollbar{display:none}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F3EFE8; color: #2B211C; font-family: Manrope, system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+
+  <header style="flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 20px 0">
+    <a href="Q1-Mesa.dc.html" aria-label="Voltar para a mesa" style="height: 44px; padding: 0 16px 0 10px; border-radius: 22px; background: #FFFFFF; display: flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 700">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>
+      Mesa 12
+    </a>
+    <div style="font-size: 14px; font-weight: 600; color: #625750">Padaria Café e Trigo</div>
+  </header>
+
+  <div style="flex-shrink: 0; padding: 14px 20px 0">
+    <h1 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 34px; line-height: 1.1; letter-spacing: -0.02em">Cardápio</h1>
+  </div>
+
+  <nav aria-label="Categorias" style="flex-shrink: 0; display: flex; gap: 8px; overflow-x: auto; padding: 14px 20px; scrollbar-width: none; border-bottom: 1px solid #E5DDD2">
+    <sc-for list="{{chips}}" as="c" hint-placeholder-count="6">
+      <button type="button" aria-pressed="{{c.pressed}}" onClick="{{c.pick}}" style="{{c.style}}">{{c.label}}</button>
+    </sc-for>
+  </nav>
+
+  <main style="flex-grow: 1; min-height: 0; overflow-y: auto; padding: 16px 20px 20px">
+    <sc-if value="{{showCombo}}" hint-placeholder-val="{{false}}">
+      <a href="Q4-Combo.dc.html" style="display: flex; align-items: center; gap: 14px; padding: 12px; border-radius: 24px; background: #FFFFFF; margin-bottom: 16px">
+        <div style="width: 92px; height: 92px; flex-shrink: 0; border-radius: 18px; overflow: hidden; background: #EFE4C9">
+          <img src="/_blob/fad654d6989d25fca51c9d92d94e87fe" alt="" style="width: 100%; height: 100%; object-fit: cover; display: block">
+        </div>
+        <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px">
+          <span style="font-size: 12px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #8A5A2B">Combo</span>
+          <span style="font-size: 18px; font-weight: 700">Café da manhã</span>
+          <span style="font-size: 14px; color: #625750">Um salgado e uma bebida</span>
+          <span style="font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 20px; color: #6B4430">R$ 24,90</span>
+        </div>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#625750" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0; margin-right: 4px"><path d="M9 6l6 6-6 6"></path></svg>
+      </a>
+    </sc-if>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 14px">
+      <sc-for list="{{items}}" as="it" hint-placeholder-count="6">
+        <a href="{{it.href}}" aria-disabled="{{it.soldOut}}" style="display: flex; flex-direction: column; gap: 10px; min-width: 0">
+          <div style="position: relative; height: 150px; border-radius: 20px; overflow: hidden; background: {{it.tint}}; color: #978B80; display: flex; align-items: center; justify-content: center">
+            <sc-if value="{{it.hasImg}}" hint-placeholder-val="{{false}}">
+              <img src="{{it.img}}" alt="{{it.name}}" style="{{it.imgStyle}}">
+            </sc-if>
+            <sc-if value="{{it.noImg}}" hint-placeholder-val="{{true}}">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"></rect><circle cx="8.5" cy="8.5" r="1.8"></circle><path d="M21 15l-5-5L5 21"></path></svg>
+            </sc-if>
+            <sc-if value="{{it.popular}}" hint-placeholder-val="{{false}}">
+              <span style="position: absolute; top: 10px; left: 10px; padding: 5px 10px; border-radius: 12px; background: #FFFFFF; color: #2B211C; font-size: 12px; font-weight: 800">Mais pedido</span>
+            </sc-if>
+            <sc-if value="{{it.isOut}}" hint-placeholder-val="{{false}}">
+              <span style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); white-space: nowrap; padding: 6px 12px; border-radius: 12px; background: #2B211C; color: #FAF6F0; font-size: 13px; font-weight: 800">Esgotado</span>
+            </sc-if>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 3px">
+            <div style="{{it.nameStyle}}">{{it.name}}</div>
+            <div style="{{it.priceStyle}}">{{it.price}}</div>
+          </div>
+        </a>
+      </sc-for>
+    </div>
+  </main>
+
+  <footer style="flex-shrink: 0; padding: 12px 20px 26px; background: #FFFFFF; border-top: 1px solid #E5DDD2">
+    <a href="Q5-Carrinho.dc.html" style="height: 64px; border-radius: 32px; background: #4E3426; color: #FAF6F0; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 10px 0 24px; font-size: 17px; font-weight: 700">
+      <span>2 itens · R$ 53,80</span>
+      <span style="height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-radius: 22px; background: #FAF6F0; color: #2B211C; font-size: 16px; font-weight: 800">Ver pedido</span>
+    </a>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { cat: 'todos' };
+  }
+  renderVals() {
+    const brl = (c) => 'R$ ' + (c / 100).toFixed(2).replace('.', ',');
+    const B = (id) => '/_blob/' + id;
+    const active = this.state.cat;
+    const CATS = [
+      { key: 'todos', label: 'Todos' },
+      { key: 'paes', label: 'Pães' },
+      { key: 'folhados', label: 'Folhados' },
+      { key: 'doces', label: 'Doces' },
+      { key: 'sanduiches', label: 'Sanduíches' },
+      { key: 'cafes', label: 'Cafés' }
+    ];
+    const ITEMS = [
+      { cat: 'paes', name: 'Fermentação natural', price: 2800, tint: '#EFE4C9', img: '98cbb1f4f6b7f3edec9da5925073bf50' },
+      { cat: 'paes', name: 'Baguete tradicional', price: 1200, tint: '#EFE4C9', img: '52aefe2f38711a9dba6c6d98a667e764' },
+      { cat: 'paes', name: 'Brioche', price: 2200, tint: '#EFE4C9', img: '047746f7a157bfdd9c6001ac23ce2a96' },
+      { cat: 'paes', name: 'Centeio com sementes', price: 2600, tint: '#EFE4C9', img: 'a23de7c0c843835788b1621744dd8774', soldOut: true },
+      { cat: 'folhados', name: 'Croissant', price: 1400, tint: '#EAD9C6', img: '0471b8153aad0569ffc277ed8052709f' },
+      { cat: 'folhados', name: 'Croissant de amêndoas', price: 1990, tint: '#EAD9C6', img: 'ffc594607ef0406da7409e8e48bc9786', soldOut: true },
+      { cat: 'doces', name: 'Cookie de chocolate', price: 990, tint: '#E2DED8', img: '7d2f91e3af9882691725f05f3343cffd' },
+      { cat: 'doces', name: 'Donut de morango', price: 1190, tint: '#E2DED8', img: 'efa0d879f959d1026df53e039ac2c7cf' },
+      { cat: 'sanduiches', name: 'Croque monsieur', price: 3490, tint: '#DCDFD2', img: 'a479abedd3198e4acec76278caec4352', popular: true, href: 'Q3-Item.dc.html' },
+      { cat: 'cafes', name: 'Cappuccino', price: 1390, tint: '#EAD9C6', img: 'fad654d6989d25fca51c9d92d94e87fe', popular: true },
+      { cat: 'cafes', name: 'Latte', price: 1490, tint: '#EAD9C6', img: '0574bc346cd2005a374bc24f039ce368' },
+      { cat: 'cafes', name: 'Suco de laranja', price: 1290, tint: '#DCDFD2' }
+    ];
+    const chipStyle = (on) => 'height: 44px; flex-shrink: 0; padding: 0 18px; border-radius: 22px; border: 0; font-size: 15px; font-weight: 700; ' +
+      (on ? 'background: #4E3426; color: #FAF6F0;' : 'background: #FFFFFF; color: #2B211C; box-shadow: inset 0 0 0 1px #D8CEC0;');
+    const chips = CATS.map((c) => ({
+      label: c.label,
+      pressed: c.key === active ? 'true' : 'false',
+      style: chipStyle(c.key === active),
+      pick: () => this.setState({ cat: c.key })
+    }));
+    const list = ITEMS.filter((i) => active === 'todos' || i.cat === active);
+    const items = list.map((i) => ({
+      name: i.name,
+      price: brl(i.price),
+      tint: i.tint,
+      hasImg: !!i.img,
+      noImg: !i.img,
+      img: i.img ? B(i.img) : '',
+      popular: !!i.popular && !i.soldOut,
+      soldOut: i.soldOut ? 'true' : 'false',
+      isOut: !!i.soldOut,
+      href: i.href && !i.soldOut ? i.href : '#',
+      imgStyle: 'width: 100%; height: 100%; object-fit: cover; display: block;' + (i.soldOut ? ' filter: grayscale(1); opacity: 0.55;' : ''),
+      nameStyle: 'font-size: 17px; font-weight: 700; line-height: 1.25; color: ' + (i.soldOut ? '#625750' : '#2B211C') + ';',
+      priceStyle: 'font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 19px; color: ' + (i.soldOut ? '#625750' : '#6B4430') + ';'
+    }));
+    return { chips, items, showCombo: active === 'todos' || active === 'cafes' };
+  }
+}
+</script>
+</body>
+</html>

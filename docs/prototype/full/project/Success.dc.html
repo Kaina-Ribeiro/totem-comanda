@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Pedido confirmado</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+</style>
+</helmet>
+<div style="width: 720px; height: 1280px; box-sizing: border-box; background: {{ground}}; color: {{ink}}; font-family: Manrope, system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; overflow: hidden; padding: 72px 56px 48px; text-align: center">
+  <div style="display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 22px 0 10px; border-radius: 28px; background: {{surface}}">
+    <div style="width: 36px; height: 36px; border-radius: 18px; background: {{accent}}; color: {{accentTitle}}; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>
+    </div>
+    <div style="font-size: 20px; font-weight: 700">Pagamento aprovado</div>
+  </div>
+
+  <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; width: 100%">
+    <div style="font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 500; font-size: 40px; color: {{muted}}">Seu número é o</div>
+    <div style="font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 320px; line-height: 0.88; letter-spacing: -0.01em; color: {{number}}">42</div>
+    <p style="margin: 24px 0 0; font-size: 24px; line-height: 1.45; max-width: 460px">Já estamos preparando. Retire no balcão quando o seu número for chamado.</p>
+  </div>
+
+  <div style="display: flex; flex-direction: column; align-items: center; gap: 28px; width: 100%">
+    <div style="display: flex; align-items: center; gap: 12px; font-size: 19px; font-weight: 600; color: {{muted}}">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"></path><rect x="3" y="9" width="18" height="8" rx="2"></rect><path d="M7 14h10v7H7z"></path></svg>
+      Imprimindo o comprovante e a nota fiscal
+    </div>
+    <a href="Main.dc.html" style="width: 100%; height: 108px; border-radius: 54px; background: {{dark}}; color: {{onDark}}; display: flex; align-items: center; justify-content: space-between; padding: 0 44px; font-size: 26px; font-weight: 700">
+      <span>Concluir</span>
+      <span style="font-size: 17px; font-weight: 600; color: {{onDarkMuted}}">Volta ao início em 15 s</span>
+    </a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["padaria","tomate","verde","acafrao"],"default":"padaria"},"$preview":{"width":720,"height":1280}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const THEMES = {
+      padaria: { ground:'#F3EFE8', surface:'#FFFFFF', ink:'#2B211C', muted:'#625750', accent:'#4E3426', accentTitle:'#FAF6F0', number:'#4E3426', dark:'#2B211C', onDark:'#FAF6F0', onDarkMuted:'#D9C8B8' },
+      verde: { ground:'#EEECE6', surface:'#FFFFFF', ink:'#141A17', muted:'#5B615C', accent:'#1F3D31', accentTitle:'#F4F2EC', number:'#1F3D31', dark:'#141A17', onDark:'#F4F2EC', onDarkMuted:'#D9D5CB' },
+      tomate: { ground:'#F3F2ED', surface:'#FFFFFF', ink:'#1B1816', muted:'#5F5B57', accent:'#C8341F', accentTitle:'#FFF6F1', number:'#C8341F', dark:'#1B1816', onDark:'#FFF6F1', onDarkMuted:'#D9D1CC' },
+      acafrao: { ground:'#EFEEE9', surface:'#FFFFFF', ink:'#17181C', muted:'#5E5D59', accent:'#17181C', accentTitle:'#F2B134', number:'#17181C', dark:'#17181C', onDark:'#F7F5EF', onDarkMuted:'#C9C6BD' }
+    };
+    return THEMES[this.props.theme ?? 'padaria'] || THEMES.padaria;
+  }
+}
+</script>
+</body>
+</html>

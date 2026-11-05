@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Cardápio</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button{font:inherit;color:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 720px; height: 1280px; box-sizing: border-box; background: {{ground}}; color: {{ink}}; font-family: Manrope, system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <header style="display: flex; justify-content: space-between; align-items: center; padding: 28px 32px 20px">
+    <div style="display: flex; align-items: center; gap: 20px">
+      <div style="font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 500; font-size: 26px">{{brandShort}}</div>
+      <a href="OrderType.dc.html" style="display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 18px; border-radius: 24px; background: {{surface}}; font-size: 17px; font-weight: 700">
+        <span>Para viagem</span>
+        <span style="color: {{detailText}}">Trocar</span>
+      </a>
+    </div>
+    <a href="Cancel.dc.html" aria-label="Cancelar pedido" style="width: 56px; height: 56px; border-radius: 28px; background: {{surface}}; display: flex; align-items: center; justify-content: center">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+    </a>
+  </header>
+
+  <div style="flex-grow: 1; display: flex; min-height: 0">
+    <nav aria-label="Categorias" style="width: 176px; flex-shrink: 0; display: flex; flex-direction: column; gap: 6px; padding: 8px 12px 0 20px">
+      <sc-for list="{{categories}}" as="cat" hint-placeholder-count="6">
+        <button type="button" onClick="{{cat.pick}}" aria-pressed="{{cat.pressed}}" style="{{cat.style}}">
+          <span style="{{cat.dotStyle}}"></span>
+          <span>{{cat.label}}</span>
+        </button>
+      </sc-for>
+    </nav>
+
+    <main style="flex-grow: 1; min-width: 0; background: {{surface}}; border-radius: 32px 0 0 0; padding: 32px 28px 0 32px; display: flex; flex-direction: column; gap: 24px; overflow: hidden">
+      <div style="display: flex; justify-content: space-between; align-items: baseline">
+        <h1 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 48px; letter-spacing: -0.02em">{{currentLabel}}</h1>
+        <div style="font-size: 17px; font-weight: 600; color: {{muted}}">{{count}}</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 20px">
+        <sc-for list="{{items}}" as="item" hint-placeholder-count="6">
+          <a href="Item.dc.html" style="display: flex; flex-direction: column; gap: 12px">
+            <div style="{{item.frameStyle}}">
+              <sc-if value="{{item.hasImg}}" hint-placeholder-val="{{false}}">
+                <img src="{{item.img}}" alt="{{item.name}}" style="width: 100%; height: 100%; object-fit: cover; display: block">
+              </sc-if>
+              <sc-if value="{{item.noImg}}" hint-placeholder-val="{{true}}">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"></rect><circle cx="8.5" cy="8.5" r="1.8"></circle><path d="M21 15l-5-5L5 21"></path></svg>
+              </sc-if>
+              <sc-if value="{{item.popular}}" hint-placeholder-val="{{false}}">
+                <div style="position: absolute; top: 12px; left: 12px; padding: 6px 12px; border-radius: 12px; background: {{surface}}; color: {{ink}}; font-size: 14px; font-weight: 700">Mais pedido</div>
+              </sc-if>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px">
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <div style="font-size: 20px; font-weight: 700; line-height: 1.2">{{item.name}}</div>
+                <div style="font-size: 19px; font-weight: 600; color: {{price}}">{{item.price}}</div>
+              </div>
+              <div style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 22px; border: 2px solid {{ink}}; display: flex; align-items: center; justify-content: center">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+              </div>
+            </div>
+          </a>
+        </sc-for>
+      </div>
+    </main>
+  </div>
+
+  <div style="padding: 20px 32px 32px; background: {{surface}}">
+    <a href="Cart.dc.html" style="height: 108px; border-radius: 54px; background: {{accent}}; color: {{onAccent}}; display: flex; align-items: center; justify-content: space-between; padding: 0 44px">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <span style="font-size: 16px; font-weight: 600; color: {{onAccentMuted}}">3 itens</span>
+        <span style="font-size: 26px; font-weight: 700">Ver meu pedido</span>
+      </div>
+      <span style="font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 36px; letter-spacing: -0.02em; color: {{accentTitle}}">{{cartTotal}}</span>
+    </a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["padaria","tomate","verde","acafrao"],"default":"padaria"},"$preview":{"width":720,"height":1280}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { cat: null };
+  }
+  renderVals() {
+    const THEMES = {
+      padaria: { ground:'#F3EFE8', surface:'#FFFFFF', ink:'#2B211C', muted:'#625750', img:'#E9E2D7', imgFg:'#978B80', accent:'#4E3426', onAccent:'#FAF6F0', onAccentMuted:'#D9C8B8', accentTitle:'#FAF6F0', detail:'#B07A3A', detailText:'#8A5A2B', price:'#6B4430', pastels:{ blush:'#EAD9C6', butter:'#EFE4C9', pistache:'#DCDFD2', lavanda:'#E2DED8' } },
+      verde: { ground:'#EEECE6', surface:'#FFFFFF', ink:'#141A17', muted:'#5B615C', img:'#E6E2D8', imgFg:'#8A8F88', accent:'#1F3D31', onAccent:'#F4F2EC', onAccentMuted:'#D9D5CB', accentTitle:'#F4F2EC', detail:'#B9892C', detailText:'#7F5E14', price:'#1F3D31' },
+      tomate: { ground:'#F3F2ED', surface:'#FFFFFF', ink:'#1B1816', muted:'#5F5B57', img:'#ECE7DF', imgFg:'#8C8782', accent:'#C8341F', onAccent:'#FFF6F1', onAccentMuted:'#FFD9CF', accentTitle:'#FFF6F1', detail:'#C8341F', detailText:'#A32A18', price:'#A32A18' },
+      acafrao: { ground:'#EFEEE9', surface:'#FFFFFF', ink:'#17181C', muted:'#5E5D59', img:'#E8E6DF', imgFg:'#8A8985', accent:'#17181C', onAccent:'#F7F5EF', onAccentMuted:'#C9C6BD', accentTitle:'#F2B134', detail:'#F2B134', detailText:'#8A5E00', price:'#17181C' }
+    };
+    const theme = this.props.theme ?? 'padaria';
+    const t = THEMES[theme] || THEMES.padaria;
+    const bakery = theme === 'padaria';
+    const brl = (v) => 'R$ ' + v.toFixed(2).replace('.', ',');
+    const B = (id) => '/_blob/' + id;
+    const P = t.pastels || { blush: '#EAD9C6', butter: '#EFE4C9', pistache: '#DCDFD2', lavanda: '#E2DED8' };
+    const bakeryData = {
+      paes: { label: 'Pães', tint: P.butter, items: [
+        { name: 'Fermentação natural', price: 28.0, popular: true, img: B('98cbb1f4f6b7f3edec9da5925073bf50') },
+        { name: 'Baguete tradicional', price: 12.0, img: B('52aefe2f38711a9dba6c6d98a667e764') },
+        { name: 'Brioche', price: 22.0, img: B('047746f7a157bfdd9c6001ac23ce2a96') },
+        { name: 'Centeio com sementes', price: 26.0, img: B('1fd6c300389dc0de54e99e7f00c7d434') },
+        { name: 'Pão de forma da casa', price: 18.0, img: B('e4442c46c582f2c1c60994ace276d8d1') },
+        { name: 'Croissant', price: 14.0, img: B('0471b8153aad0569ffc277ed8052709f') }
+      ] },
+      doces: { label: 'Doces', tint: P.blush, items: [
+        { name: 'Cupcake de baunilha', price: 14.9, popular: true, img: B('46d601083893b4273b55d9e962af2919') },
+        { name: 'Donut de morango', price: 11.9, img: B('efa0d879f959d1026df53e039ac2c7cf') },
+        { name: 'Cookie de chocolate', price: 9.9, img: B('cba474ec2616d30d3ba050f368b752d6') },
+        { name: 'Cupcake de chocolate', price: 14.9, img: B('b44dbab2fd2e316d93d5b8e0676ce8cf') },
+        { name: 'Croissant de amêndoas', price: 19.9, img: B('0471b8153aad0569ffc277ed8052709f') },
+        { name: 'Tarte de limão', price: 21.9 }
+      ] },
+      salgados: { label: 'Salgados', tint: P.pistache, items: [
+        { name: 'Quiche lorraine', price: 21.9, popular: true },
+        { name: 'Empada de palmito', price: 12.9 },
+        { name: 'Folhado de frango', price: 13.9 },
+        { name: 'Pão de queijo recheado', price: 11.9 }
+      ] },
+      sanduiches: { label: 'Sanduíches', tint: P.lavanda, items: [
+        { name: 'Croque monsieur', price: 34.9, popular: true, img: B('815ba165d43ef54e1ded7d6eef3d1541') },
+        { name: 'Pastrami na fermentação', price: 42.9 },
+        { name: 'Caprese na ciabatta', price: 32.9 },
+        { name: 'Tostex de queijo', price: 24.9 }
+      ] },
+      cafes: { label: 'Cafés', tint: P.butter, items: [
+        { name: 'Cappuccino', price: 13.9, popular: true, img: B('f948181057416973aa88312d166233b0') },
+        { name: 'Latte', price: 14.9, img: B('0574bc346cd2005a374bc24f039ce368') },
+        { name: 'Espresso', price: 7.5 },
+        { name: 'Café coado', price: 9.9 }
+      ] },
+      bebidas: { label: 'Bebidas', tint: P.pistache, items: [
+        { name: 'Suco de laranja', price: 12.9 },
+        { name: 'Limonada siciliana', price: 13.9, popular: true },
+        { name: 'Chá gelado da casa', price: 11.9 },
+        { name: 'Água com gás', price: 6.5 }
+      ] }
+    };
+    const burgerData = {
+      lanches: { label: 'Lanches', tint: t.img, items: [
+        { name: 'Clássico da Casa', price: 29.9, popular: true }, { name: 'Cheddar Bacon', price: 34.9 }, { name: 'Frango Crispy', price: 31.9 },
+        { name: 'Vegetariano', price: 30.9 }, { name: 'Duplo da Casa', price: 39.9 }, { name: 'Kids', price: 22.9 }
+      ] },
+      combos: { label: 'Combos', tint: t.img, items: [
+        { name: 'Combo Clássico', price: 42.9, popular: true }, { name: 'Combo Cheddar Bacon', price: 47.9 }, { name: 'Combo Frango', price: 44.9 }, { name: 'Combo Kids', price: 32.9 }
+      ] },
+      porcoes: { label: 'Porções', tint: t.img, items: [
+        { name: 'Batata média', price: 16.9, popular: true }, { name: 'Batata grande', price: 21.9 }, { name: 'Onion rings', price: 19.9 }, { name: 'Nuggets (10 un.)', price: 24.9 }
+      ] },
+      bebidas: { label: 'Bebidas', tint: t.img, items: [
+        { name: 'Refrigerante lata', price: 7.0 }, { name: 'Suco natural', price: 11.9, popular: true }, { name: 'Água sem gás', price: 5.0 }, { name: 'Chá gelado', price: 8.9 }
+      ] }
+    };
+    const data = bakery ? bakeryData : burgerData;
+    const order = bakery ? ['paes', 'doces', 'salgados', 'sanduiches', 'cafes', 'bebidas'] : ['lanches', 'combos', 'porcoes', 'bebidas'];
+    const active = this.state.cat && data[this.state.cat] ? this.state.cat : (bakery ? 'paes' : 'lanches');
+    const base = 'display: flex; align-items: center; gap: 12px; width: 100%; min-height: 72px; padding: 0 14px; border-radius: 18px; text-align: left; font-size: 20px; border: 0;';
+    const categories = order.map((key) => {
+      const on = key === active;
+      const c = data[key];
+      return {
+        label: c.label,
+        pressed: on ? 'true' : 'false',
+        style: base + (on ? ' background: ' + (bakery ? c.tint : t.surface) + '; color: ' + t.ink + '; font-weight: 800;' : ' background: transparent; color: ' + t.muted + '; font-weight: 600;'),
+        dotStyle: 'width: 10px; height: 10px; border-radius: 5px; flex-shrink: 0; background: ' + (bakery ? c.tint : (on ? t.detail : 'transparent')) + ';' + (bakery ? ' box-shadow: inset 0 0 0 1px rgba(43,33,28,0.15);' : ''),
+        pick: () => this.setState({ cat: key })
+      };
+    });
+    const current = data[active];
+    return {
+      ...t,
+      brandShort: bakery ? '[Padaria]' : '[Restaurante]',
+      cartTotal: bakery ? 'R$ 82,80' : 'R$ 63,80',
+      categories,
+      currentLabel: current.label,
+      count: current.items.length + ' opções',
+      items: current.items.map((i) => ({
+        name: i.name,
+        price: brl(i.price),
+        popular: !!i.popular,
+        hasImg: !!i.img,
+        noImg: !i.img,
+        img: i.img || '',
+        frameStyle: 'height: 160px; border-radius: 20px; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; background: ' + current.tint + '; color: ' + t.imgFg + ';'
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>

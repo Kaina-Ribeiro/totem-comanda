@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Celular · Acabou, até quando?</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+.tap{transition:transform .12s ease,background-color .15s ease}
+.tap:active{transform:scale(.97)}
+nav,main,.chips{scrollbar-width:none}nav::-webkit-scrollbar,main::-webkit-scrollbar,.chips::-webkit-scrollbar{display:none}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; position: relative; background: #F3EFE8; color: #2B211C; font-family: Manrope, system-ui, sans-serif; font-feature-settings: 'tnum' 1; display: flex; flex-direction: column; overflow: hidden">
+  <header style="background: #FFFFFF; border-bottom: 1px solid #E5DDD2; padding: 14px 16px 10px; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0">
+    <div style="display: flex; align-items: center; justify-content: space-between">
+      <span style="font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 500; font-size: 22px">Comanda</span>
+      <span style="height: 28px; padding: 0 10px; border-radius: 14px; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; background: #DCDFD2"><span style="width: 7px; height: 7px; border-radius: 4px; background: #4F6B45"></span>Aberto</span>
+    </div>
+    <nav aria-label="Back office" style="display: flex; gap: 6px; overflow-x: auto; margin: 0 -16px; padding: 0 16px">
+      <a href="M1-Inicio.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Início</a>
+      <a href="M2-Pedidos.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Pedidos</a>
+      <a href="M4-Esgotados.dc.html" aria-current="page" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; background: #EAD9C6; display: flex; align-items: center; font-size: 14px; font-weight: 800">Esgotados</a>
+      <a href="M9-Relatorio.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Relatório</a>
+      <a href="M6-Itens.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Cardápio</a>
+      <a href="M0-Mais.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Mais</a>
+    </nav>
+  </header>
+
+  <main style="flex-grow: 1; min-height: 0; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <h1 style="margin: 0; font-weight: 700; font-size: 24px; letter-spacing: -0.02em">Esgotados</h1>
+      <p style="margin: 0; font-size: 13px; font-weight: 600; color: #625750">Acabou? Escolha até quando. O item volta sozinho para o totem.</p>
+    </div>
+
+    <label style="height: 48px; border-radius: 12px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 0 12px; display: flex; align-items: center; gap: 8px; flex-shrink: 0">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#625750" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+      <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Buscar item</span>
+      <input type="search" placeholder="Buscar item" style="flex-grow: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 16px; font-weight: 600">
+    </label>
+
+    <div class="chips" role="radiogroup" aria-label="Filtrar" style="display: flex; gap: 6px; overflow-x: auto; margin: 0 -16px; padding: 0 16px; flex-shrink: 0">
+      <sc-for list="{{filters}}" as="f" hint-placeholder-count="3">
+        <button type="button" role="radio" aria-checked="{{f.checked}}" onClick="{{f.pick}}" class="tap" style="{{f.style}}">{{f.label}}</button>
+      </sc-for>
+    </div>
+
+    <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+      <sc-for list="{{items}}" as="it" hint-placeholder-count="6">
+        <li style="border-radius: 12px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 10px 10px 10px 12px; display: flex; gap: 12px; align-items: center">
+          <img src="{{it.img}}" alt="" style="{{it.imgStyle}}">
+          <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px">
+            <span style="font-size: 14px; font-weight: 800">{{it.name}}</span>
+            <span style="{{it.statusStyle}}">{{it.status}}</span>
+          </span>
+          <button type="button" onClick="{{it.act}}" class="tap" style="{{it.btnStyle}}">{{it.action}}</button>
+        </li>
+      </sc-for>
+    </ul>
+  </main>
+
+  <sc-if value="{{sheetOpen}}" hint-placeholder-val="{{false}}">
+    <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(43,33,28,.48)"></div>
+    <section role="dialog" aria-modal="true" aria-labelledby="st" style="position: absolute; left: 0; right: 0; bottom: 0; border-radius: 24px 24px 0 0; background: #FFFFFF; padding: 10px 16px 24px; display: flex; flex-direction: column; gap: 14px">
+      <span aria-hidden="true" style="align-self: center; width: 40px; height: 5px; border-radius: 3px; background: #E5DDD2"></span>
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <h2 id="st" style="margin: 0; font-weight: 800; font-size: 20px; letter-spacing: -0.01em">{{sheetTitle}}</h2>
+        <p style="margin: 0; font-size: 14px; font-weight: 600; color: #625750">Até quando ele fica fora?</p>
+      </div>
+      <div role="radiogroup" aria-label="Até quando" style="display: flex; flex-direction: column; gap: 8px">
+        <sc-for list="{{untils}}" as="u" hint-placeholder-count="3">
+          <button type="button" role="radio" aria-checked="{{u.checked}}" onClick="{{u.pick}}" class="tap" style="{{u.style}}"><span style="{{u.ringStyle}}"><span style="{{u.dotStyle}}"></span></span><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 800">{{u.label}}</span><span style="font-size: 12px; font-weight: 600; color: #625750">{{u.hint}}</span></span></button>
+        </sc-for>
+      </div>
+      <sc-if value="{{byDate}}" hint-placeholder-val="{{false}}">
+        <label style="display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 0 12px; border-radius: 12px; background: #F3EFE8">
+          <span style="font-size: 14px; font-weight: 800">Volta no dia</span>
+          <input type="date" value="2026-11-06" style="height: 40px; border-radius: 10px; border: 1px solid #E5DDD2; background: #FFFFFF; padding: 0 10px; font-size: 16px; font-weight: 700">
+        </label>
+      </sc-if>
+      <button type="button" role="switch" aria-checked="{{hideChecked}}" onClick="{{toggleHide}}" style="min-height: 56px; padding: 0 12px; border-radius: 12px; border: 1px solid #E5DDD2; background: #FFFFFF; display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left">
+        <span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 800">Esconder do totem</span><span style="font-size: 12px; font-weight: 600; color: #625750">{{hideHint}}</span></span>
+        <span style="{{trackStyle}}"><span style="{{knobStyle}}"></span></span>
+      </button>
+      <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 8px">
+        <button type="button" onClick="{{close}}" class="tap" style="height: 56px; border-radius: 28px; border: 1.5px solid #E5DDD2; background: #FFFFFF; font-size: 15px; font-weight: 800">Cancelar</button>
+        <button type="button" onClick="{{confirm}}" class="tap" style="height: 56px; border-radius: 28px; border: 0; background: #4E3426; color: #FAF6F0; font-size: 15px; font-weight: 800">{{confirmLabel}}</button>
+      </div>
+    </section>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"startOpen":{"editor":"boolean","default":true},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const B = (id) => '/_blob/' + id;
+    this.state = {
+      filter: 'all', until: 'today', hide: false,
+      sheet: (props.startOpen ?? true) ? 'cookie' : null,
+      items: [
+        { id: 'amendoas', name: 'Croissant de amêndoas', img: B('ffc594607ef0406da7409e8e48bc9786'), st: 'out', note: 'Esgotado hoje · volta amanhã às 06:00' },
+        { id: 'centeio', name: 'Centeio com sementes', img: B('a23de7c0c843835788b1621744dd8774'), st: 'out', note: 'Esgotado até sex, 6 nov' },
+        { id: 'panetone', name: 'Panetone trufado', img: B('34ab4f162599575be61ed7aef89f80fe'), st: 'hidden', note: 'Oculto do totem' },
+        { id: 'croque', name: 'Croque monsieur', img: B('a479abedd3198e4acec76278caec4352'), st: 'on', note: 'No totem · só 1 de 3 pães disponível', warn: true },
+        { id: 'cappuccino', name: 'Cappuccino', img: B('fad654d6989d25fca51c9d92d94e87fe'), st: 'on', note: 'No totem' },
+        { id: 'cookie', name: 'Cookie de chocolate', img: B('7d2f91e3af9882691725f05f3343cffd'), st: 'on', note: 'No totem' }
+      ]
+    };
+  }
+  renderVals() {
+    const s = this.state;
+    const setItem = (id, patch) => this.setState({ items: s.items.map((x) => (x.id === id ? Object.assign({}, x, patch) : x)) });
+    const outCount = s.items.filter((x) => x.st === 'out').length;
+    const hidCount = s.items.filter((x) => x.st === 'hidden').length;
+    const F = [['all', 'Todos'], ['out', 'Esgotados ' + outCount], ['hidden', 'Ocultos ' + hidCount]];
+    const filters = F.map(([id, label]) => {
+      const on = id === s.filter;
+      return { label, checked: on ? 'true' : 'false', pick: () => this.setState({ filter: id }), style: 'height: 40px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; font-size: 14px; font-weight: 800; ' + (on ? 'border: 0; background: #4E3426; color: #FAF6F0;' : 'border: 1px solid #E5DDD2; background: #FFFFFF; color: #2B211C;') };
+    });
+    const items = s.items.filter((x) => s.filter === 'all' || x.st === s.filter).map((x) => {
+      const on = x.st === 'on';
+      return {
+        name: x.name, img: x.img, status: x.note,
+        imgStyle: 'width: 52px; height: 52px; border-radius: 12px; object-fit: cover; flex-shrink: 0;' + (on ? '' : ' filter: grayscale(1); opacity: .6;'),
+        statusStyle: 'font-size: 12px; font-weight: 700; color: ' + (x.warn ? '#8A5A2B' : on ? '#4F6B45' : x.st === 'out' ? '#8C3A24' : '#625750') + ';',
+        action: on ? 'Acabou' : x.st === 'out' ? 'Liberar' : 'Mostrar',
+        btnStyle: 'height: 44px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; font-size: 14px; font-weight: 800; ' + (on ? 'border: 1.5px solid #A3472F; background: #FFFFFF; color: #A3472F;' : 'border: 0; background: #4E3426; color: #FAF6F0;'),
+        act: () => (on ? this.setState({ sheet: x.id, until: 'today', hide: false }) : setItem(x.id, { st: 'on', note: 'No totem', warn: false }))
+      };
+    });
+    const radio = (on) => ({
+      style: 'min-height: 60px; padding: 8px 12px; border-radius: 14px; display: flex; align-items: center; gap: 12px; text-align: left; ' + (on ? 'border: 2px solid #4E3426; background: #FBF8F3;' : 'border: 1.5px solid #E5DDD2; background: #FFFFFF;'),
+      ringStyle: 'width: 22px; height: 22px; flex-shrink: 0; box-sizing: border-box; border-radius: 11px; border: 2px solid ' + (on ? '#4E3426' : '#B5ADA3') + '; display: flex; align-items: center; justify-content: center;',
+      dotStyle: 'width: 10px; height: 10px; border-radius: 5px; background: ' + (on ? '#4E3426' : 'transparent') + ';'
+    });
+    const U = [
+      ['today', 'Só hoje', 'Volta amanhã às 06:00, quando o totem abre.'],
+      ['manual', 'Até eu liberar', 'Fica fora até alguém tocar em Liberar.'],
+      ['date', 'Até uma data', 'Volta sozinho no dia escolhido.']
+    ];
+    const untils = U.map(([id, label, hint]) => Object.assign({ label, hint, checked: id === s.until ? 'true' : 'false', pick: () => this.setState({ until: id }) }, radio(id === s.until)));
+    const target = s.items.find((x) => x.id === s.sheet);
+    const NOTE = { today: 'Esgotado hoje · volta amanhã às 06:00', manual: 'Esgotado até liberar', date: 'Esgotado até sex, 6 nov' };
+    return {
+      filters, items, untils,
+      sheetOpen: !!target,
+      sheetTitle: target ? target.name + ' acabou' : '',
+      byDate: s.until === 'date',
+      hideChecked: s.hide ? 'true' : 'false',
+      hideHint: s.hide ? 'Some do cardápio do totem até voltar.' : 'Continua no totem, cinza, como "Esgotado".',
+      trackStyle: 'width: 48px; height: 28px; flex-shrink: 0; border-radius: 14px; padding: 3px; box-sizing: border-box; display: flex; background: ' + (s.hide ? '#4E3426' : '#D6CCC0') + '; justify-content: ' + (s.hide ? 'flex-end' : 'flex-start') + ';',
+      knobStyle: 'width: 22px; height: 22px; border-radius: 11px; background: #FFFFFF;',
+      toggleHide: () => this.setState({ hide: !s.hide }),
+      close: () => this.setState({ sheet: null }),
+      confirm: () => { if (target) this.setState({ sheet: null, items: s.items.map((x) => (x.id === target.id ? Object.assign({}, x, { st: s.hide ? 'hidden' : 'out', note: s.hide ? 'Oculto do totem' : NOTE[s.until], warn: false }) : x)) }); },
+      confirmLabel: s.hide ? 'Esconder' : 'Marcar esgotado'
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Totem · Item com alergênicos</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button{font:inherit;color:inherit;cursor:pointer}
+button:disabled{cursor:default}
+</style>
+</helmet>
+<div style="width: 720px; height: 1280px; box-sizing: border-box; background: #FFFFFF; color: #2B211C; font-family: Manrope, system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <div style="height: 300px; flex-shrink: 0; background: #EAD9C6; position: relative; overflow: hidden">
+    <img src="/_blob/a479abedd3198e4acec76278caec4352" alt="Croque monsieur" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover">
+    <a href="T1-Cardapio.dc.html" aria-label="Voltar ao cardápio" style="position: absolute; top: 28px; left: 32px; height: 56px; padding: 0 22px 0 14px; border-radius: 28px; background: #FFFFFF; display: flex; align-items: center; gap: 8px; font-size: 19px; font-weight: 700">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>
+      Cardápio
+    </a>
+  </div>
+
+  <div style="flex-grow: 1; min-height: 0; overflow: hidden; padding: 30px 44px 0; display: flex; flex-direction: column; gap: 26px">
+    <div style="display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 16px">
+        <h1 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 54px; letter-spacing: -0.02em">Croque monsieur</h1>
+        <div style="font-size: 28px; font-weight: 700; color: #6B4430">R$ 34,90</div>
+      </div>
+      <p style="margin: 0; font-size: 21px; line-height: 1.45; color: #625750; max-width: 560px">Pão tostado, presunto, gruyère e molho bechamel gratinado.</p>
+      <div style="display: flex; align-items: flex-start; gap: 12px; padding: 14px 18px; border-radius: 18px; background: #F3EFE8">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8A5A2B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0; margin-top: 2px"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16.5v.5"></path></svg>
+        <span style="font-size: 18px; line-height: 1.4"><strong style="font-weight: 800">Contém glúten, leite e ovos.</strong> <span style="color: #625750; font-weight: 600">Pode conter castanhas. 520 kcal.</span></span>
+      </div>
+    </div>
+
+    <section style="display: flex; flex-direction: column; gap: 16px">
+      <div style="display: flex; justify-content: space-between; align-items: baseline">
+        <h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 30px">Pão</h2>
+        <div style="font-size: 16px; font-weight: 700; color: #8A5A2B">Escolha um</div>
+      </div>
+      <div role="radiogroup" aria-label="Pão" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+        <sc-for list="{{breads}}" as="b" hint-placeholder-count="3">
+          <button type="button" role="radio" aria-checked="{{b.checked}}" disabled="{{b.out}}" onClick="{{b.pick}}" style="{{b.style}}"><span>{{b.label}}</span><sc-if value="{{b.out}}" hint-placeholder-val="{{false}}"><span style="font-size: 14px; font-weight: 700">Esgotado</span></sc-if></button>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 8px">
+      <div style="display: flex; justify-content: space-between; align-items: baseline">
+        <h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 30px">Adicionais</h2>
+        <div style="font-size: 16px; font-weight: 600; color: #625750">{{counter}}</div>
+      </div>
+      <div style="display: flex; flex-direction: column">
+        <sc-for list="{{addons}}" as="ad" hint-placeholder-count="4">
+          <button type="button" aria-pressed="{{ad.pressed}}" onClick="{{ad.toggle}}" style="{{ad.style}}">
+            <span style="display: flex; align-items: center; gap: 18px">
+              <span style="{{ad.boxStyle}}">
+                <sc-if value="{{ad.on}}" hint-placeholder-val="{{false}}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg></sc-if>
+              </span>
+              <span style="font-size: 21px; font-weight: 600">{{ad.label}}</span>
+            </span>
+            <span style="font-size: 19px; font-weight: 600; color: #625750">{{ad.price}}</span>
+          </button>
+        </sc-for>
+      </div>
+    </section>
+  </div>
+
+  <div style="padding: 20px 32px 32px; display: flex; align-items: center; gap: 16px">
+    <div style="display: flex; align-items: center; gap: 4px; height: 104px; padding: 0 10px; border-radius: 52px; background: #F3EFE8">
+      <button type="button" aria-label="Diminuir quantidade" disabled style="width: 80px; height: 80px; border-radius: 40px; border: 0; background: #FFFFFF; display: flex; align-items: center; justify-content: center; opacity: 0.4"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
+      <div aria-live="polite" style="min-width: 48px; text-align: center; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 36px">1</div>
+      <button type="button" aria-label="Aumentar quantidade" style="width: 80px; height: 80px; border-radius: 40px; border: 0; background: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+    </div>
+    <a href="T1-Cardapio.dc.html" style="flex-grow: 1; height: 104px; border-radius: 52px; background: #4E3426; color: #FAF6F0; display: flex; align-items: center; justify-content: space-between; padding: 0 36px; font-size: 24px; font-weight: 700">
+      <span>Adicionar</span>
+      <span style="font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 32px; letter-spacing: -0.02em">{{total}}</span>
+    </a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":720,"height":1280}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { picked: ['ovo'] };
+  }
+  renderVals() {
+    const brl = (v) => 'R$ ' + v.toFixed(2).replace('.', ',');
+    const BREADS = [{ id: 'brioche', label: 'Brioche' }, { id: 'fermentacao', label: 'Fermentação', out: true }, { id: 'ciabatta', label: 'Ciabatta', out: true }];
+    const breads = BREADS.map((b) => {
+      const on = b.id === 'brioche';
+      return {
+        label: b.label, out: !!b.out, checked: on ? 'true' : 'false', pick: () => {},
+        style: 'height: 76px; border-radius: 16px; border: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 19px; font-weight: 700; ' +
+          (on ? 'background: #4E3426; color: #FAF6F0;' : b.out ? 'background: #F3EFE8; color: #625750; text-decoration: none; opacity: 0.75;' : 'background: #EAD9C6; color: #2B211C;')
+      };
+    });
+    const MAX = 3;
+    const ADDONS = [
+      { id: 'sem', label: 'Sem adicionais', price: 0, exclusive: true },
+      { id: 'ovo', label: 'Ovo pochê', price: 6.0 },
+      { id: 'parma', label: 'Presunto de parma', price: 9.0 },
+      { id: 'gruyere', label: 'Gruyère extra', price: 7.0 }
+    ];
+    const picked = this.state.picked;
+    const nonEx = picked.filter((id) => id !== 'sem');
+    const full = nonEx.length >= MAX;
+    const addons = ADDONS.map((a, i) => {
+      const on = picked.includes(a.id);
+      const blocked = !on && full && !a.exclusive;
+      return {
+        label: a.label,
+        price: a.exclusive ? '' : '+ ' + brl(a.price),
+        on, pressed: on ? 'true' : 'false',
+        toggle: () => {
+          if (a.exclusive) this.setState({ picked: on ? [] : ['sem'] });
+          else if (on) this.setState({ picked: picked.filter((x) => x !== a.id) });
+          else if (!full) this.setState({ picked: nonEx.concat(a.id) });
+        },
+        style: 'display: flex; justify-content: space-between; align-items: center; height: 76px; padding: 0 4px; background: transparent; border: 0; text-align: left;' + (i > 0 ? ' border-top: 1px solid #E5DDD2;' : '') + (blocked ? ' opacity: 0.4;' : ''),
+        boxStyle: 'width: 34px; height: 34px; box-sizing: border-box; border-radius: ' + (a.exclusive ? '17px' : '9px') + '; display: flex; align-items: center; justify-content: center; ' + (on ? 'background: #B07A3A;' : 'background: #FFFFFF; border: 2px solid #B5B3AB;')
+      };
+    });
+    const unit = 34.9 + ADDONS.filter((a) => picked.includes(a.id)).reduce((s, a) => s + a.price, 0);
+    return { breads, addons, counter: picked.includes('sem') ? 'Sem adicionais' : nonEx.length + ' de ' + MAX, total: brl(unit) };
+  }
+}
+</script>
+</body>
+</html>

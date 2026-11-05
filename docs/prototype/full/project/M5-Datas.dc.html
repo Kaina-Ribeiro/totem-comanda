@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Celular · Datas especiais</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+.tap{transition:transform .12s ease,background-color .15s ease}
+.tap:active{transform:scale(.97)}
+main{scrollbar-width:none}main::-webkit-scrollbar{display:none}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F3EFE8; color: #2B211C; font-family: Manrope, system-ui, sans-serif; font-feature-settings: 'tnum' 1; display: flex; flex-direction: column; overflow: hidden">
+  <header style="background: #FFFFFF; border-bottom: 1px solid #E5DDD2; height: 60px; padding: 0 8px; display: flex; align-items: center; gap: 4px; flex-shrink: 0">
+    <a href="M0-Mais.dc.html" aria-label="Voltar para Mais" class="tap" style="width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></a>
+    <h1 style="margin: 0; flex-grow: 1; font-weight: 800; font-size: 18px; letter-spacing: -0.01em">Datas especiais</h1>
+    <button type="button" class="tap" style="margin-right: 4px; height: 40px; padding: 0 14px; border-radius: 12px; border: 0; background: #4E3426; color: #FAF6F0; font-size: 14px; font-weight: 800">Nova data</button>
+  </header>
+
+  <main style="flex-grow: 1; min-height: 0; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+    <p style="margin: 0; font-size: 13px; font-weight: 600; color: #625750">Feriados e férias. Nesses dias o horário da semana não vale.</p>
+
+    <ul style="list-style: none; margin: 0; padding: 4px 10px; border-radius: 12px; background: #FFFFFF; border: 1px solid #E5DDD2">
+      <sc-for list="{{dates}}" as="d" hint-placeholder-count="5">
+        <li style="{{d.rowStyle}}">
+          <span style="width: 44px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; line-height: 1.1"><span style="font-size: 18px; font-weight: 800">{{d.day}}</span><span style="font-size: 11px; font-weight: 800; color: #625750">{{d.month}}</span></span>
+          <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 800">{{d.name}}</span><span style="font-size: 12px; font-weight: 600; color: #625750">{{d.hours}}</span></span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#625750" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"></path></svg>
+        </li>
+      </sc-for>
+    </ul>
+
+    <section aria-labelledby="ed" style="border-radius: 12px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 14px; display: flex; flex-direction: column; gap: 12px">
+      <h2 id="ed" style="margin: 0; font-size: 17px; font-weight: 800">Editar: Natal</h2>
+      <label style="display: flex; flex-direction: column; gap: 6px">
+        <span style="font-size: 13px; font-weight: 800">Nome</span>
+        <input value="Natal" style="height: 48px; border-radius: 12px; border: 1.5px solid #E5DDD2; padding: 0 12px; font-size: 16px; font-weight: 700; background: #FFFFFF">
+      </label>
+      <div role="radiogroup" aria-label="Duração" style="display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: #F3EFE8">
+        <sc-for list="{{spans}}" as="s" hint-placeholder-count="2">
+          <button type="button" role="radio" aria-checked="{{s.checked}}" onClick="{{s.pick}}" style="{{s.style}}">{{s.label}}</button>
+        </sc-for>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+        <label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: 800">{{fromLabel}}</span><input type="date" value="2026-12-25" style="height: 48px; border-radius: 12px; border: 1.5px solid #E5DDD2; padding: 0 8px; font-size: 16px; font-weight: 700; background: #FFFFFF; min-width: 0"></label>
+        <sc-if value="{{isRange}}" hint-placeholder-val="{{false}}">
+          <label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: 800">Até</span><input type="date" value="2026-12-26" style="height: 48px; border-radius: 12px; border: 1.5px solid #E5DDD2; padding: 0 8px; font-size: 16px; font-weight: 700; background: #FFFFFF; min-width: 0"></label>
+        </sc-if>
+      </div>
+      <div role="radiogroup" aria-label="Como fica" style="display: flex; flex-direction: column; gap: 6px">
+        <sc-for list="{{modes}}" as="m" hint-placeholder-count="2">
+          <button type="button" role="radio" aria-checked="{{m.checked}}" onClick="{{m.pick}}" class="tap" style="{{m.style}}"><span style="{{m.ringStyle}}"><span style="{{m.dotStyle}}"></span></span>{{m.label}}</button>
+        </sc-for>
+      </div>
+      <sc-if value="{{special}}" hint-placeholder-val="{{false}}">
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+          <label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: 800">Abre</span><input type="time" value="06:00" style="height: 48px; border-radius: 12px; border: 1.5px solid #E5DDD2; padding: 0 10px; font-size: 16px; font-weight: 700; background: #FFFFFF; min-width: 0"></label>
+          <label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: 800">Fecha</span><input type="time" value="14:00" style="height: 48px; border-radius: 12px; border: 1.5px solid #E5DDD2; padding: 0 10px; font-size: 16px; font-weight: 700; background: #FFFFFF; min-width: 0"></label>
+        </div>
+      </sc-if>
+
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <span style="font-size: 13px; font-weight: 800">O cliente vê no totem</span>
+        <div style="border-radius: 14px; background: #4E3426; color: #FAF6F0; padding: 18px 16px; display: flex; flex-direction: column; gap: 6px">
+          <span style="font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 22px; line-height: 1.15">{{previewTitle}}</span>
+          <span style="font-size: 13px; font-weight: 600; color: #D9C8B8">{{previewBody}}</span>
+          <span style="align-self: flex-start; margin-top: 4px; height: 26px; padding: 0 10px; border-radius: 13px; background: rgba(250,246,240,.14); display: inline-flex; align-items: center; font-size: 12px; font-weight: 800; color: #D8B98A">{{previewNote}}</span>
+        </div>
+      </div>
+    </section>
+
+    <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 8px; padding-bottom: 8px">
+      <button type="button" class="tap" style="height: 52px; border-radius: 26px; border: 1.5px solid #A3472F; background: #FFFFFF; color: #A3472F; font-size: 15px; font-weight: 800">Apagar</button>
+      <button type="button" class="tap" style="height: 52px; border-radius: 26px; border: 0; background: #4E3426; color: #FAF6F0; font-size: 15px; font-weight: 800">Salvar</button>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { span: 'one', mode: 'closed' };
+  }
+  renderVals() {
+    const D = [
+      ['24', 'dez', 'Véspera de Natal', 'qui · 06:00 – 14:00'],
+      ['25', 'dez', 'Natal', 'sex · fechado o dia todo'],
+      ['31', 'dez', 'Réveillon', 'qui · 06:00 – 15:00'],
+      ['1', 'jan', 'Ano-novo', 'sex · fechado o dia todo'],
+      ['5', 'jan', 'Férias coletivas', '5 a 11 jan · fechado']
+    ];
+    const dates = D.map(([day, month, name, hours], i) => ({
+      day, month, name, hours,
+      rowStyle: 'display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 6px 4px;' + (i ? ' border-top: 1px solid #E5DDD2;' : '') + (name === 'Natal' ? ' background: #FBF5EC; border-radius: 10px;' : '')
+    }));
+    const seg = (on) => 'flex: 1 1 0; height: 40px; border-radius: 10px; border: 0; font-size: 14px; font-weight: 800; ' + (on ? 'background: #FFFFFF; box-shadow: 0 1px 3px rgba(28,28,26,.14);' : 'background: transparent; color: #625750;');
+    const span = this.state.span;
+    const spans = [['one', 'Um dia'], ['range', 'Vários dias']].map(([id, label]) => ({ label, checked: id === span ? 'true' : 'false', pick: () => this.setState({ span: id }), style: seg(id === span) }));
+    const mode = this.state.mode;
+    const modes = [['closed', 'Fechado o dia todo'], ['special', 'Horário especial']].map(([id, label]) => {
+      const on = id === mode;
+      return {
+        label, checked: on ? 'true' : 'false', pick: () => this.setState({ mode: id }),
+        style: 'min-height: 48px; padding: 0 12px; border-radius: 14px; display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 700; text-align: left; ' + (on ? 'border: 2px solid #4E3426; background: #FBF8F3;' : 'border: 1.5px solid #E5DDD2; background: #FFFFFF;'),
+        ringStyle: 'width: 22px; height: 22px; flex-shrink: 0; box-sizing: border-box; border-radius: 11px; border: 2px solid ' + (on ? '#4E3426' : '#B5ADA3') + '; display: flex; align-items: center; justify-content: center;',
+        dotStyle: 'width: 10px; height: 10px; border-radius: 5px; background: ' + (on ? '#4E3426' : 'transparent') + ';'
+      };
+    });
+    const special = mode === 'special';
+    return {
+      dates, spans, modes, special,
+      isRange: span === 'range',
+      fromLabel: span === 'range' ? 'De' : 'Dia',
+      previewTitle: special ? 'Abrimos até 14:00 hoje' : 'Fechado hoje: Natal',
+      previewBody: special ? 'Horário especial de Natal. Peça até as 13:45.' : 'Voltamos sábado às 06:00. Boas festas!',
+      previewNote: special ? 'Fecha às 14:00' : 'Abre sábado às 06:00'
+    };
+  }
+}
+</script>
+</body>
+</html>

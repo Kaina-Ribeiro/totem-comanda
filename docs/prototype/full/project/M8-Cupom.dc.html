@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Celular · Novo cupom</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+.tap{transition:transform .12s ease,background-color .15s ease}
+.tap:active{transform:scale(.97)}
+main{scrollbar-width:none}main::-webkit-scrollbar{display:none}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F3EFE8; color: #2B211C; font-family: Manrope, system-ui, sans-serif; font-feature-settings: 'tnum' 1; display: flex; flex-direction: column; overflow: hidden">
+  <header style="background: #FFFFFF; border-bottom: 1px solid #E5DDD2; height: 60px; padding: 0 8px; display: flex; align-items: center; gap: 4px; flex-shrink: 0">
+    <a href="M0-Mais.dc.html" aria-label="Voltar para Mais" class="tap" style="width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></a>
+    <h1 style="margin: 0; flex-grow: 1; font-weight: 800; font-size: 18px; letter-spacing: -0.01em">Novo cupom</h1>
+  </header>
+
+  <main style="flex-grow: 1; min-height: 0; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+    <section aria-label="Resumo" style="border-radius: 14px; background: #4E3426; color: #FAF6F0; padding: 16px; display: flex; flex-direction: column; gap: 6px">
+      <span style="align-self: flex-start; height: 30px; padding: 0 12px; border-radius: 8px; border: 1.5px dashed #D8B98A; display: inline-flex; align-items: center; font-size: 15px; font-weight: 800; letter-spacing: .04em; color: #D8B98A">{{headline}}</span>
+      <span style="font-size: 14px; font-weight: 700; line-height: 1.45">{{summary}}</span>
+      <span style="font-size: 12px; font-weight: 600; color: #D9C8B8; line-height: 1.45">{{example}}</span>
+    </section>
+
+    <section aria-label="Como funciona" style="border-radius: 12px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 14px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <span style="font-size: 13px; font-weight: 800">Como o cliente ganha</span>
+        <div role="radiogroup" aria-label="Como o cliente ganha" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 12px; background: #F3EFE8">
+          <sc-for list="{{methods}}" as="m" hint-placeholder-count="2">
+            <button type="button" role="radio" aria-checked="{{m.checked}}" onClick="{{m.pick}}" style="{{m.style}}">{{m.label}}</button>
+          </sc-for>
+        </div>
+      </div>
+      <sc-if value="{{byCode}}" hint-placeholder-val="{{true}}">
+        <label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: 800">Código</span><input value="MANHA10" autocapitalize="characters" style="height: 48px; border-radius: 12px; border: 1.5px solid #E5DDD2; padding: 0 12px; font-size: 16px; font-weight: 800; letter-spacing: .04em; background: #FFFFFF"></label>
+      </sc-if>
+      <div style="display: grid; grid-template-columns: 116px minmax(0, 1fr); gap: 8px; align-items: end">
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <span style="font-size: 13px; font-weight: 800">Tipo</span>
+          <div role="radiogroup" aria-label="Tipo de desconto" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 12px; background: #F3EFE8">
+            <sc-for list="{{kinds}}" as="k" hint-placeholder-count="2">
+              <button type="button" role="radio" aria-checked="{{k.checked}}" onClick="{{k.pick}}" style="{{k.style}}">{{k.label}}</button>
+            </sc-for>
+          </div>
+        </div>
+        <label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: 800">Desconto</span><input inputmode="decimal" value="{{amount}}" placeholder="{{amountPh}}" onInput="{{setAmount}}" style="{{amountStyle}}"></label>
+      </div>
+      <sc-if value="{{cleared}}" hint-placeholder-val="{{false}}">
+        <p style="margin: 0; font-size: 12px; font-weight: 700; color: #8A5A2B">Mudou o tipo, então o valor foi apagado. Digite de novo.</p>
+      </sc-if>
+    </section>
+
+    <section aria-label="Regras" style="border-radius: 12px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 14px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+        <label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: 800">Pedido mínimo</span><span style="height: 48px; border-radius: 12px; border: 1.5px solid #E5DDD2; padding: 0 12px; display: flex; align-items: center; gap: 6px"><span style="font-weight: 800; color: #625750">R$</span><input inputmode="decimal" value="30,00" style="flex-grow: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 16px; font-weight: 700"></span></label>
+        <sc-if value="{{isPct}}" hint-placeholder-val="{{true}}">
+          <label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: 800">Desconto máximo</span><span style="height: 48px; border-radius: 12px; border: 1.5px solid #E5DDD2; padding: 0 12px; display: flex; align-items: center; gap: 6px"><span style="font-weight: 800; color: #625750">R$</span><input inputmode="decimal" value="15,00" style="flex-grow: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 16px; font-weight: 700"></span></label>
+        </sc-if>
+      </div>
+      <label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: 800">Limite de usos</span><input inputmode="numeric" value="200" style="height: 48px; border-radius: 12px; border: 1.5px solid #E5DDD2; padding: 0 12px; font-size: 16px; font-weight: 700; background: #FFFFFF"><span style="font-size: 12px; font-weight: 600; color: #625750">Somando todos os clientes. Vazio = sem limite.</span></label>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+        <label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: 800">Começa</span><input type="date" value="2026-11-05" style="height: 48px; border-radius: 12px; border: 1.5px solid #E5DDD2; padding: 0 8px; font-size: 16px; font-weight: 700; background: #FFFFFF; min-width: 0"></label>
+        <label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: 800">Termina</span><input type="date" value="2026-11-30" style="height: 48px; border-radius: 12px; border: 1.5px solid #E5DDD2; padding: 0 8px; font-size: 16px; font-weight: 700; background: #FFFFFF; min-width: 0"></label>
+      </div>
+    </section>
+  </main>
+
+  <footer style="flex-shrink: 0; background: #FFFFFF; border-top: 1px solid #E5DDD2; padding: 12px 16px 20px">
+    <button type="button" class="tap" style="width: 100%; height: 54px; border-radius: 27px; border: 0; background: #4E3426; color: #FAF6F0; font-size: 16px; font-weight: 800">Criar cupom</button>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { method: 'code', kind: 'pct', amount: '10', cleared: false };
+  }
+  renderVals() {
+    const s = this.state;
+    const seg = (on) => 'min-height: 42px; padding: 0 8px; border-radius: 10px; border: 0; font-size: 13px; font-weight: 800; line-height: 1.15; ' + (on ? 'background: #FFFFFF; box-shadow: 0 1px 3px rgba(28,28,26,.14);' : 'background: transparent; color: #625750;');
+    const methods = [['code', 'Digitando código'], ['auto', 'Automático']].map(([id, label]) => ({ label, checked: id === s.method ? 'true' : 'false', pick: () => this.setState({ method: id }), style: seg(id === s.method) }));
+    const kinds = [['pct', '%'], ['fixed', 'R$']].map(([id, label]) => ({ label, checked: id === s.kind ? 'true' : 'false', pick: () => { if (id !== s.kind) this.setState({ kind: id, amount: '', cleared: true }); }, style: seg(id === s.kind) }));
+    const isPct = s.kind === 'pct';
+    const has = s.amount !== '';
+    const off = isPct ? s.amount + '% de desconto' : 'R$ ' + s.amount + ' de desconto';
+    return {
+      methods, kinds, isPct,
+      byCode: s.method === 'code',
+      amount: s.amount,
+      amountPh: isPct ? 'Ex.: 10' : 'Ex.: 5,00',
+      amountStyle: 'height: 48px; box-sizing: border-box; width: 100%; border-radius: 12px; border: 1.5px solid ' + (has ? '#E5DDD2' : '#B07A3A') + '; padding: 0 12px; font-size: 16px; font-weight: 800; background: #FFFFFF;',
+      setAmount: (e) => this.setState({ amount: e.target.value, cleared: false }),
+      cleared: s.cleared && !has,
+      headline: s.method === 'code' ? 'MANHA10' : 'Automático',
+      summary: !has ? 'Falta o valor do desconto. O resumo aparece aqui quando você digitar.' : off + ' em pedidos a partir de R$ 30,00' + (isPct ? ', até R$ 15,00 por pedido.' : '.') + (s.method === 'code' ? ' O cliente digita o código no carrinho.' : ' Vale sozinho para todos os pedidos.'),
+      example: has && isPct && s.amount === '10' ? 'Pedido de R$ 82,80 → desconto de R$ 8,28 → total R$ 74,52.' : 'Vale de 5 a 30 de novembro, até 200 usos.'
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Celular · Categorias</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+.tap{transition:transform .12s ease,background-color .15s ease}
+.tap:active{transform:scale(.97)}
+main{scrollbar-width:none}main::-webkit-scrollbar{display:none}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F3EFE8; color: #2B211C; font-family: Manrope, system-ui, sans-serif; font-feature-settings: 'tnum' 1; display: flex; flex-direction: column; overflow: hidden">
+  <header style="background: #FFFFFF; border-bottom: 1px solid #E5DDD2; height: 60px; padding: 0 8px; display: flex; align-items: center; gap: 4px; flex-shrink: 0">
+    <a href="M0-Mais.dc.html" aria-label="Voltar para Mais" class="tap" style="width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></a>
+    <h1 style="margin: 0; flex-grow: 1; font-weight: 800; font-size: 18px; letter-spacing: -0.01em">Categorias</h1>
+    <button type="button" class="tap" style="margin-right: 4px; height: 40px; padding: 0 14px; border-radius: 12px; border: 0; background: #4E3426; color: #FAF6F0; font-size: 14px; font-weight: 800">Nova categoria</button>
+  </header>
+
+  <main style="flex-grow: 1; min-height: 0; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+    <p style="margin: 0; font-size: 13px; font-weight: 600; color: #625750; line-height: 1.45">A ordem aqui é a ordem no totem. Use as setas para mudar.</p>
+
+    <ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+      <sc-for list="{{rows}}" as="r" hint-placeholder-count="5">
+        <li style="display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 14px; background: #FFFFFF; border: 1px solid #E5DDD2">
+          <div style="display: flex; align-items: center; gap: 12px">
+            <span style="width: 28px; height: 28px; border-radius: 14px; background: #F3EFE8; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; flex-shrink: 0">{{r.pos}}</span>
+            <img src="{{r.src}}" alt="" style="width: 56px; height: 56px; border-radius: 12px; object-fit: cover; background: #E9E2D7; flex-shrink: 0">
+            <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px">
+              <span style="font-size: 16px; font-weight: 800">{{r.name}}</span>
+              <span style="font-size: 12px; font-weight: 600; color: #625750">{{r.count}}</span>
+            </span>
+            <button type="button" role="switch" aria-checked="{{r.onChecked}}" aria-label="Mostrar {{r.name}} no totem" onClick="{{r.toggle}}" style="width: 52px; height: 44px; padding: 0; border: 0; background: transparent; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
+              <span style="{{r.track}}"><span style="width: 22px; height: 22px; border-radius: 11px; background: #FFFFFF"></span></span>
+            </button>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center">
+            <sc-for list="{{r.menus}}" as="mm" hint-placeholder-count="2"><span style="height: 22px; padding: 0 8px; border-radius: 11px; display: inline-flex; align-items: center; font-size: 11px; font-weight: 800; background: #EFE9E1; color: #4A3F38">{{mm.label}}</span></sc-for>
+          </div>
+          <sc-if value="{{r.hasWarn}}" hint-placeholder-val="{{false}}">
+            <p role="alert" style="margin: 0; padding: 8px 10px; border-radius: 10px; background: #F4E1DB; color: #8C3A24; font-size: 12px; font-weight: 800; line-height: 1.4">Some do totem: nenhum item disponível</p>
+          </sc-if>
+          <div style="display: flex; gap: 8px; justify-content: flex-end">
+            <button type="button" aria-label="{{r.upLabel}}" aria-disabled="{{r.upDis}}" onClick="{{r.up}}" class="tap" style="{{r.upStyle}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"></path></svg></button>
+            <button type="button" aria-label="{{r.downLabel}}" aria-disabled="{{r.downDis}}" onClick="{{r.down}}" class="tap" style="{{r.downStyle}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button>
+          </div>
+        </li>
+      </sc-for>
+    </ol>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      order: ['paes', 'folhados', 'doces', 'sanduiches', 'cafes'],
+      on: { paes: true, folhados: true, doces: true, sanduiches: true, cafes: true }
+    };
+  }
+  renderVals() {
+    const s = this.state;
+    // Item counts are example values until the catalogue is loaded.
+    const CATS = {
+      paes: { name: 'Pães', items: 6, avail: 5, menus: ['manha', 'tarde'], img: '621de3f26136bac8e8a1108db13d8bb8' },
+      folhados: { name: 'Folhados', items: 3, avail: 0, menus: ['manha'], img: '0471b8153aad0569ffc277ed8052709f' },
+      doces: { name: 'Doces', items: 4, avail: 4, menus: ['tarde'], img: '7d2f91e3af9882691725f05f3343cffd' },
+      sanduiches: { name: 'Sanduíches', items: 3, avail: 3, menus: ['manha', 'tarde'], img: 'a479abedd3198e4acec76278caec4352' },
+      cafes: { name: 'Cafés', items: 5, avail: 5, menus: ['manha', 'tarde'], img: 'fad654d6989d25fca51c9d92d94e87fe' }
+    };
+    const MENU_NAME = { manha: 'Manhã', tarde: 'Tarde' };
+    const n = s.order.length;
+    const btn = (off) => 'width: 44px; height: 44px; border-radius: 12px; border: 1px solid #E5DDD2; background: #FFFFFF; display: flex; align-items: center; justify-content: center; ' + (off ? 'opacity: .35;' : 'cursor: pointer;');
+    const rows = s.order.map((id, i) => {
+      const c = CATS[id];
+      const shown = s.on[id];
+      const move = (to) => {
+        const o = s.order.slice();
+        o.splice(i, 1);
+        o.splice(to, 0, id);
+        this.setState({ order: o });
+      };
+      const status = c.avail === c.items ? 'todos disponíveis' : c.avail === 0 ? 'todos esgotados' : c.avail + ' de ' + c.items + ' disponíveis';
+      return {
+        pos: String(i + 1), name: c.name, src: '/_blob/' + c.img,
+        count: c.items + ' itens · ' + status,
+        menus: c.menus.map((m) => ({ label: MENU_NAME[m] })),
+        hasWarn: shown && c.avail === 0,
+        onChecked: shown ? 'true' : 'false',
+        toggle: () => this.setState({ on: { ...s.on, [id]: !shown } }),
+        track: 'width: 48px; height: 28px; flex-shrink: 0; border-radius: 14px; padding: 3px; box-sizing: border-box; display: flex; background: ' + (shown ? '#4E3426' : '#D6CCC0') + '; justify-content: ' + (shown ? 'flex-end' : 'flex-start') + ';',
+        up: () => { if (i > 0) move(i - 1); },
+        down: () => { if (i < n - 1) move(i + 1); },
+        upDis: i === 0 ? 'true' : 'false', downDis: i === n - 1 ? 'true' : 'false',
+        upStyle: btn(i === 0), downStyle: btn(i === n - 1),
+        upLabel: 'Subir ' + c.name, downLabel: 'Descer ' + c.name
+      };
+    });
+    return { rows };
+  }
+}
+</script>
+</body>
+</html>

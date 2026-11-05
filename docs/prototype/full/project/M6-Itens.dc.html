@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Celular · Itens do cardápio</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+.tap{transition:transform .12s ease,background-color .15s ease}
+.tap:active{transform:scale(.97)}
+nav,main,.chips{scrollbar-width:none}nav::-webkit-scrollbar,main::-webkit-scrollbar,.chips::-webkit-scrollbar{display:none}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F3EFE8; color: #2B211C; font-family: Manrope, system-ui, sans-serif; font-feature-settings: 'tnum' 1; display: flex; flex-direction: column; overflow: hidden">
+  <header style="background: #FFFFFF; border-bottom: 1px solid #E5DDD2; padding: 14px 16px 10px; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0">
+    <div style="display: flex; align-items: center; justify-content: space-between">
+      <span style="font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 500; font-size: 22px">Comanda</span>
+      <span style="height: 28px; padding: 0 10px; border-radius: 14px; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; background: #DCDFD2"><span style="width: 7px; height: 7px; border-radius: 4px; background: #4F6B45"></span>Aberto</span>
+    </div>
+    <nav aria-label="Back office" ref="{{navRef}}" style="display: flex; gap: 6px; overflow-x: auto; margin: 0 -16px; padding: 0 16px">
+      <a href="M1-Inicio.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Início</a>
+      <a href="M2-Pedidos.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Pedidos</a>
+      <a href="M4-Esgotados.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Esgotados</a>
+      <a href="M9-Relatorio.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Relatório</a>
+      <a href="M6-Itens.dc.html" aria-current="page" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; background: #EAD9C6; display: flex; align-items: center; font-size: 14px; font-weight: 800">Cardápio</a>
+      <a href="M0-Mais.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Mais</a>
+    </nav>
+  </header>
+
+  <main style="flex-grow: 1; min-height: 0; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+    <div style="display: flex; align-items: center; justify-content: space-between">
+      <h1 style="margin: 0; font-weight: 700; font-size: 24px; letter-spacing: -0.02em">Itens</h1>
+      <button type="button" class="tap" style="height: 40px; padding: 0 14px; border-radius: 12px; border: 0; background: #4E3426; color: #FAF6F0; font-size: 14px; font-weight: 800">Novo item</button>
+    </div>
+
+    <div style="border-radius: 12px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 12px 14px; display: flex; align-items: center; gap: 10px">
+      <span style="width: 8px; height: 8px; border-radius: 4px; background: #4F6B45; flex-shrink: 0"></span>
+      <span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 800">No ar: Cardápio da manhã</span><span style="font-size: 12px; font-weight: 600; color: #625750">Até 11:00 · depois entra o Cardápio da tarde, até 20:00</span></span>
+    </div>
+
+    <label style="height: 48px; border-radius: 12px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 0 12px; display: flex; align-items: center; gap: 8px; flex-shrink: 0">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#625750" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+      <input type="search" aria-label="Buscar item" placeholder="Buscar item" style="flex-grow: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 16px; font-weight: 600">
+    </label>
+
+    <div class="chips" role="radiogroup" aria-label="Categoria" style="display: flex; gap: 6px; overflow-x: auto; margin: 0 -16px; padding: 0 16px; flex-shrink: 0">
+      <sc-for list="{{cats}}" as="c" hint-placeholder-count="6">
+        <button type="button" role="radio" aria-checked="{{c.checked}}" onClick="{{c.pick}}" class="tap" style="{{c.style}}">{{c.label}}</button>
+      </sc-for>
+    </div>
+
+    <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+      <sc-for list="{{items}}" as="it" hint-placeholder-count="6">
+        <li>
+          <a href="M6-Item.dc.html" class="tap" style="border-radius: 12px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 10px 12px; display: flex; gap: 12px; align-items: center">
+            <img src="{{it.img}}" alt="" style="{{it.imgStyle}}">
+            <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px">
+              <span style="font-size: 14px; font-weight: 800">{{it.name}}</span>
+              <span style="font-size: 12px; font-weight: 600; color: #625750">{{it.cat}} · {{it.price}}</span>
+            </span>
+            <span style="{{it.chipStyle}}">{{it.state}}</span>
+          </a>
+        </li>
+      </sc-for>
+    </ul>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { cat: 'all' };
+  }
+  renderVals() {
+    const B = (id) => '/_blob/' + id;
+    const chip = (bg, fg) => 'height: 24px; flex-shrink: 0; padding: 0 9px; border-radius: 12px; display: inline-flex; align-items: center; font-size: 11px; font-weight: 800; white-space: nowrap; background: ' + bg + '; color: ' + (fg || '#2B211C') + ';';
+    const ST = { on: ['No totem', chip('#DCDFD2')], warn: ['1 de 3 pães', chip('#EFE4C9', '#6B4430')], out: ['Esgotado', chip('#F4E1DB', '#8C3A24')] };
+    const ALL = [
+      ['Croque monsieur', 'Sanduíches', 'R$ 34,90', 'a479abedd3198e4acec76278caec4352', 'warn'],
+      ['Cappuccino', 'Cafés', 'R$ 13,90', 'fad654d6989d25fca51c9d92d94e87fe', 'on'],
+      ['Latte', 'Cafés', 'R$ 14,90', '0574bc346cd2005a374bc24f039ce368', 'on'],
+      ['Fermentação natural', 'Pães', 'R$ 28,00', '98cbb1f4f6b7f3edec9da5925073bf50', 'on'],
+      ['Baguete tradicional', 'Pães', 'R$ 12,00', '52aefe2f38711a9dba6c6d98a667e764', 'on'],
+      ['Brioche', 'Pães', 'R$ 22,00', '047746f7a157bfdd9c6001ac23ce2a96', 'on'],
+      ['Centeio com sementes', 'Pães', 'R$ 26,00', 'a23de7c0c843835788b1621744dd8774', 'out'],
+      ['Croissant', 'Folhados', 'R$ 14,00', '0471b8153aad0569ffc277ed8052709f', 'on'],
+      ['Croissant de amêndoas', 'Folhados', 'R$ 19,90', 'ffc594607ef0406da7409e8e48bc9786', 'out'],
+      ['Cookie de chocolate', 'Doces', 'R$ 9,90', '7d2f91e3af9882691725f05f3343cffd', 'on'],
+      ['Donut de morango', 'Doces', 'R$ 11,90', 'efa0d879f959d1026df53e039ac2c7cf', 'on']
+    ];
+    const cat = this.state.cat;
+    const items = ALL.filter((r) => cat === 'all' || r[1] === cat).map(([name, c, price, img, st]) => ({
+      name, cat: c, price, img: B(img), state: ST[st][0], chipStyle: ST[st][1],
+      imgStyle: 'width: 52px; height: 52px; border-radius: 12px; object-fit: cover; flex-shrink: 0;' + (st === 'out' ? ' filter: grayscale(1); opacity: .6;' : '')
+    }));
+    const cats = [['all', 'Todas'], ['Pães', 'Pães'], ['Folhados', 'Folhados'], ['Doces', 'Doces'], ['Sanduíches', 'Sanduíches'], ['Cafés', 'Cafés']].map(([id, label]) => {
+      const on = id === cat;
+      return { label, checked: on ? 'true' : 'false', pick: () => this.setState({ cat: id }), style: 'height: 40px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; font-size: 14px; font-weight: 800; ' + (on ? 'border: 0; background: #4E3426; color: #FAF6F0;' : 'border: 1px solid #E5DDD2; background: #FFFFFF; color: #2B211C;') };
+    });
+    return { cats, items, navRef: (el) => { if (el) { const a = el.querySelector('[aria-current]'); if (a) el.scrollLeft = a.offsetLeft - 16; } } };
+  }
+}
+</script>
+</body>
+</html>
