@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { closeDay, historyOf } from "./routes-kitchen.ts";
+import { closeDay, collectedToday, historyOf } from "./routes-kitchen.ts";
 import { applyScenario, state } from "./state.ts";
 import type { Schemas } from "./http.ts";
 
@@ -68,5 +68,37 @@ describe("closeDay", () => {
     place("1", "PAID", at);
     closeDay(at);
     expect(closeDay(at)).toBe(0);
+  });
+});
+
+describe("collectedToday", () => {
+  beforeEach(() => {
+    applyScenario("normal");
+    state.orders.clear();
+  });
+
+  /** A collected order placed at `at` and handed over `seconds` later (same business day). */
+  function collected(id: string, at: Date, seconds: number) {
+    const order = place(id, "COLLECTED", at);
+    const when = new Date(at.getTime() + seconds * 1000).toISOString();
+    historyOf(order).push({ status: "COLLECTED", at: when, by: "KITCHEN" });
+    return order;
+  }
+
+  it("lists today's collected orders, newest hand-over first", () => {
+    const at = new Date();
+    collected("a", at, 5);
+    collected("b", at, 30);
+    collected("c", at, 12);
+    place("open", "READY", at);
+    place("gone", "NOT_COLLECTED", at);
+    expect(collectedToday(at).map((o) => o.id)).toEqual(["b", "c", "a"]);
+  });
+
+  it("leaves out orders collected on another business day", () => {
+    const at = new Date();
+    const old = place("old", "COLLECTED", new Date(at.getTime() - DAY));
+    historyOf(old).push({ status: "COLLECTED", at: old.placedAt!, by: "KITCHEN" });
+    expect(collectedToday(at)).toEqual([]);
   });
 });

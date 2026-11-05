@@ -8,10 +8,15 @@ export type KitchenOrder = components["schemas"]["KitchenOrder"];
 export type KitchenStatus = components["schemas"]["KitchenStatusUpdate"]["status"];
 export type KitchenAvailability = components["schemas"]["KitchenAvailability"];
 
-/** Paid orders not yet collected, oldest first. */
-export function listKitchenOrders(): Promise<Result<KitchenOrder[]>> {
+/**
+ * `open`: paid orders not yet collected, oldest first. `collected`: today's
+ * collected orders, newest hand-over first ("Retirados hoje", plan G-K7).
+ */
+export function listKitchenOrders(
+  status: "open" | "collected" = "open",
+): Promise<Result<KitchenOrder[]>> {
   return deviceCallAs("KITCHEN", (headers) =>
-    coreApi().GET("/v1/kitchen/orders", { headers, params: { query: { status: "open" } } }),
+    coreApi().GET("/v1/kitchen/orders", { headers, params: { query: { status } } }),
   );
 }
 
