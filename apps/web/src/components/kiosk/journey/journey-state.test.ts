@@ -75,6 +75,37 @@ describe("basket", () => {
     ]);
   });
 
+  it("merges an edited line into its twin (BR-BASKET-01, COM-64)", () => {
+    const egg = [{ optionId: "opt-ovo-poche", quantity: 1 }];
+    let state = journeyReducer(inMenu, { type: "addLine", line: line("a") });
+    state = journeyReducer(state, { type: "addLine", line: line("b", egg) });
+    state = journeyReducer(state, { type: "openBasket" });
+    state = journeyReducer(state, {
+      type: "openItem",
+      itemId: "itm-croque-monsieur",
+      editGuid: "a",
+    });
+    // The guest adds the egg to line a: it is now the same as line b.
+    state = journeyReducer(state, { type: "saveItem", line: { ...line("a", egg), quantity: 2 } });
+    expect(state.basket.map((l) => [l.guid, l.quantity])).toEqual([["b", 3]]);
+  });
+
+  it("keeps an edited line in its place when no other line matches", () => {
+    const egg = [{ optionId: "opt-ovo-poche", quantity: 1 }];
+    let state = journeyReducer(inMenu, { type: "addLine", line: line("a") });
+    state = journeyReducer(state, { type: "addLine", line: line("b", egg) });
+    state = journeyReducer(state, {
+      type: "openItem",
+      itemId: "itm-croque-monsieur",
+      editGuid: "a",
+    });
+    state = journeyReducer(state, {
+      type: "saveItem",
+      line: line("a", [{ optionId: "opt-sem-queijo", quantity: 1 }]),
+    });
+    expect(state.basket.map((l) => l.guid)).toEqual(["a", "b"]);
+  });
+
   it("edits a line from the basket and returns there", () => {
     let state = journeyReducer(inMenu, { type: "addLine", line: line("a") });
     state = journeyReducer(state, { type: "openBasket" });

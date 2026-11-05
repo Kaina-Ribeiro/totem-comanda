@@ -158,7 +158,7 @@ export function journeyReducer(state: Journey, action: JourneyAction): Journey {
     case "saveItem": {
       const editGuid = state.item?.editGuid;
       const basket = editGuid
-        ? state.basket.map((line) => (line.guid === editGuid ? action.line : line))
+        ? replaceOrMerge(state.basket, editGuid, action.line)
         : addOrMerge(state.basket, action.line);
       const saved = { ...state, phase: state.item?.returnTo ?? "menu", item: null, basket };
       return editGuid ? saved : withCrossSell(saved, action.line.itemId);
@@ -269,6 +269,16 @@ function addOrMerge(basket: BasketLine[], line: BasketLine): BasketLine[] {
   return basket.map((existing) =>
     existing === twin ? { ...existing, quantity: existing.quantity + line.quantity } : existing,
   );
+}
+
+/**
+ * Saves an edited line: if it now matches another line, the two become one
+ * (BR-BASKET-01, COM-64); otherwise it stays in its place.
+ */
+function replaceOrMerge(basket: BasketLine[], editGuid: string, line: BasketLine): BasketLine[] {
+  const others = basket.filter((existing) => existing.guid !== editGuid);
+  if (others.some((existing) => sameChoices(existing, line))) return addOrMerge(others, line);
+  return basket.map((existing) => (existing.guid === editGuid ? line : existing));
 }
 
 /** Order types the restaurant offers, DINEIN first (BR-START-11). */
