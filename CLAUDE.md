@@ -195,7 +195,11 @@ Follow these rules exactly. If a request conflicts with them, stop and say which
   `deploy`, stage `prod` (needs `DEPLOY_PROD_APPS="comanda/production/mock comanda/production/web"`,
   `CUBESHIP_URL` and the `CUBESHIP_TOKEN` secret); then the merge into master tags it final.
   Without those variables, deploy by hand after `release.mjs deploy-check <rc> --prod` passes.
-  No test stages on Cubeship yet.
+- Test stage is the Cubeship environment `itodev` (5 Nov 2026, COM-70): apps `comanda/itodev/mock`
+  and `comanda/itodev/web`, same Dockerfiles as prod, at https://comanda-itodev.5-189-167-204.sslip.io.
+  `DEPLOY_TEST_APPS="comanda/itodev/mock comanda/itodev/web"`, so every new rc deploys there by
+  itself (mock first). `web` reaches `http://cubeship-comanda-itodev-mock:4010`/`:4020`, has its own
+  `DEVICE_COOKIE_SECRET`, and `mock` runs with `MOCK_AUTO_DEVICES=1`.
 - `v0.1.0` is an annotated tag created by hand (Kai, 30 Oct 2026) on `b230cce`, before this flow;
   it has no rc, so the gate refuses it for prod.
 
@@ -231,7 +235,7 @@ Follow these rules exactly. If a request conflicts with them, stop and say which
 
 ### Deploy (Cubeship here; the original flow named Jenkins `dev_tag` + `environment`)
 Every stage runs a tag, never a branch name. `release.mjs deploy-check <tag> [--prod]` is the gate.
-- Test stages: any `vX.Y.Z-rc` (or final tag), any time. None on Cubeship yet.
+- Test stages: any `vX.Y.Z-rc` (or final tag), any time. On Cubeship: `itodev` (see above).
 - `prod`, on release day: the open line's **last** rc, deployed before the release PR merges
   (Actions → Release → `deploy`, stage `prod`, run from the release branch); the merge then tags
   it final. An older rc is refused.
