@@ -14,6 +14,7 @@ import {
   type Schemas,
 } from "./http.ts";
 import { now } from "./state.ts";
+import { broadcastKitchenEvent } from "./stream.ts";
 
 const pace: Schemas["StorePace"] = {
   pace: "NORMAL",
@@ -23,7 +24,12 @@ const pace: Schemas["StorePace"] = {
   waitMinutes: { NORMAL: 8, BUSY: 15 },
 };
 
-/** The pace now, after the automatic resume if the pause is over. */
+const snapshot = (): Schemas["StorePace"] => ({ ...pace, waitMinutes: { ...pace.waitMinutes } });
+
+/** Tells every kitchen stream the pace changed (contract: `store.pace_changed`). */
+const announce = () => broadcastKitchenEvent("store.pace_changed", snapshot());
+
+/** The pace now, after the automatic resume if the pause is over (announced, like Go). */
 export function currentPace(): Schemas["StorePace"] {
   if (pace.pace === "PAUSED" && pace.pausedUntil && Date.parse(pace.pausedUntil) <= now().getTime()) {
     Object.assign(pace, {
@@ -32,8 +38,20 @@ export function currentPace(): Schemas["StorePace"] {
       changedAt: pace.pausedUntil,
       changedBy: "SYSTEM",
     });
+    announce();
   }
-  return { ...pace, waitMinutes: { ...pace.waitMinutes } };
+  return snapshot();
+}
+
+let resumeTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** Resumes by itself when a pause ends, so the kitchen hears it without asking. */
+function scheduleResume() {
+  clearTimeout(resumeTimer);
+  if (pace.pace !== "PAUSED" || !pace.pausedUntil) return;
+  const ms = Math.max(0, Date.parse(pace.pausedUntil) - now().getTime());
+  resumeTimer = setTimeout(currentPace, ms);
+  resumeTimer.unref?.();
 }
 
 /**
@@ -62,6 +80,8 @@ function setPace(req: Request, by: "KITCHEN" | "OWNER"): Reply {
     changedAt: at.toISOString(),
     changedBy: by,
   });
+  announce();
+  scheduleResume();
   return ok(currentPace());
 }
 
