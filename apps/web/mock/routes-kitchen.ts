@@ -116,7 +116,33 @@ export function serveKitchenStream(req: Request, res: ServerResponse): boolean {
   return true;
 }
 
+/**
+ * "Encerrar o dia" (contract closeKitchenDay): every open order of the business
+ * day of `at` becomes NOT_COLLECTED, never COLLECTED. Returns how many moved.
+ */
+export function closeDay(at: Date = now()): number {
+  const day = businessDay(at);
+  let count = 0;
+  for (const order of state.orders.values()) {
+    if (!OPEN.has(order.status) || businessDay(order.placedAt ?? order.createdAt) !== day) continue;
+    order.status = "NOT_COLLECTED";
+    historyOf(order).push({ status: "NOT_COLLECTED", at: at.toISOString(), by: "KITCHEN" });
+    broadcastKitchen("order.status_changed", order);
+    count += 1;
+  }
+  return count;
+}
+
 export const kitchenRoutes: Route[] = [
+  [
+    "POST",
+    /^\/v1\/kitchen\/close-day$/,
+    (req) => {
+      const { error } = authDevice(req);
+      if (error) return error;
+      return ok({ count: closeDay() });
+    },
+  ],
   [
     "GET",
     /^\/v1\/kitchen\/orders$/,
