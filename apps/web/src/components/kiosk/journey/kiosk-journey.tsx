@@ -67,6 +67,11 @@ export function KioskJourney({
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [taxIdOpen, setTaxIdOpen] = useState(false);
   const [couponOpen, setCouponOpen] = useState(false);
+  // FR-213: a failed language change says so and offers to try the same change again.
+  // Kept with the screen it failed on, so it goes away once the guest moves on.
+  const [languageError, setLanguageError] = useState<{ language: Language; phase: string } | null>(
+    null,
+  );
   // True while the checkout waits on the terminal or the Core API (no idle reset there).
   const [paying, setPaying] = useState(false);
   const [quoteAttempt, setQuoteAttempt] = useState(0);
@@ -143,9 +148,12 @@ export function KioskJourney({
       dispatch({ type: "language", language: next });
       return;
     }
+    setLanguageError(null);
     startTransition(async () => {
-      const result = await switchLanguage(next);
-      if (result.ok) dispatch({ type: "relocalized", language: next, ...result.data });
+      // A Server Action that never reached the BFF (kiosk offline) rejects: same as a failure.
+      const result = await switchLanguage(next).catch(() => null);
+      if (result?.ok) dispatch({ type: "relocalized", language: next, ...result.data });
+      else setLanguageError({ language: next, phase });
     });
   }
 
@@ -161,6 +169,13 @@ export function KioskJourney({
   return (
     <>
       {screen()}
+      {languageError?.phase === phase && (
+        <LanguageErrorNotice
+          message={strings["language.error"]}
+          retryLabel={strings["language.retry"]}
+          onRetry={() => changeLanguage(languageError.language)}
+        />
+      )}
       <IdleGuard
         active={IDLE_PHASES.has(phase) && !(phase === "checkout" && paying) && !confirmCancel}
         timeoutMs={settings.idleMs}
@@ -403,6 +418,29 @@ function LanguageButton({ label, onPress }: { label: string; onPress: () => void
       <Globe size={36} />
       {label}
     </button>
+  );
+}
+
+/** FR-213: the language could not be loaded; the button repeats the same change. */
+function LanguageErrorNotice({
+  message,
+  retryLabel,
+  onRetry,
+}: {
+  message: string;
+  retryLabel: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div
+      role="alert"
+      className="fixed inset-x-12 bottom-12 z-40 flex items-center justify-between gap-6 rounded-card-sm bg-ink px-[42px] py-[33px] text-[28.5px] font-semibold text-on-accent"
+    >
+      <span>{message}</span>
+      <button onClick={onRetry} className="shrink-0 font-bold text-detail-light underline">
+        {retryLabel}
+      </button>
+    </div>
   );
 }
 
