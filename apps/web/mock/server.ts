@@ -14,6 +14,8 @@
 //   POST /__mock/kitchen/backdate {"posCheckNumber": "42", "minutes": 12}
 //                           moves an order's placedAt, readyAt and status history back, to see waiting colours
 //   POST /__mock/clock     {"minutes": 16} moves the mock's clock forward (a pause's automatic resume)
+//   GET  /__mock/device-credentials?kind=KITCHEN  id and secret of a seeded device, for the
+//                           dev index to pair a browser as the kiosk or the kitchen (COM-139)
 
 import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
@@ -32,7 +34,15 @@ import { optionRoutes } from "./routes-options.ts";
 import { kioskRoutes } from "./routes-kiosk.ts";
 import { orderRoutes } from "./routes-orders.ts";
 import { activeMenu, nextOpening } from "./schedule.ts";
-import { applyScenario, isScenario, now, SCENARIOS, signInDevice, state } from "./state.ts";
+import {
+  applyScenario,
+  isScenario,
+  now,
+  SCENARIOS,
+  seededCredentials,
+  signInDevice,
+  state,
+} from "./state.ts";
 
 const MOCK_PORT = Number(process.env.MOCK_PORT ?? 4020);
 const PRISM_PORT = Number(process.env.PRISM_PORT ?? 4010);
@@ -205,6 +215,18 @@ const routes: Route[] = [
       order.readyAt = back(order.readyAt) ?? null;
       for (const change of historyOf(order)) change.at = back(change.at) ?? change.at;
       return { status: 200, body: { id: order.id, placedAt: order.placedAt } };
+    },
+  ],
+  [
+    "GET",
+    /^\/__mock\/device-credentials$/,
+    (req) => {
+      const kind = req.query.get("kind");
+      if (kind !== "KIOSK" && kind !== "KITCHEN") return { status: 400, body: { error: "kind" } };
+      const credentials = seededCredentials(kind);
+      return credentials
+        ? { status: 200, body: credentials }
+        : { status: 404, body: { error: kind } };
     },
   ],
   [

@@ -120,6 +120,9 @@ language.
 npm run mock        # CORE_API_URL=http://localhost:4010, MOCK_CONTROL_URL=http://localhost:4020/__mock
 npm run mock:orders -- 3                # with the mock running: 3 paid kiosk orders now
 npm run mock:orders -- 3 --days-ago 7   # ...on the same weekday last week (Início, Relatório)
+# A browser is one device and opens only its area (a kiosk browser sent to /kitchen lands on
+# /kiosk). In dev with the mock, "Totem" and "Cozinha" on / pair this browser as the mock's
+# device of that kind first.
 # Extend apps/web/mock with the operations each story needs; Prism flags any drift from the contract.
 
 # Regenerate API types after any contract change

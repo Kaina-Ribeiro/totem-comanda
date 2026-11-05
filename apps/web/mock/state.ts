@@ -117,6 +117,18 @@ export let state = seed();
 
 export const now = () => new Date(Date.now() + state.clockOffsetMs);
 
+/**
+ * The id and secret of the first active device of `kind`, for the dev index
+ * to pair a browser as that device (COM-139). Mock seeds only: these test
+ * secrets are in this file already.
+ */
+export function seededCredentials(
+  kind: Schemas["DeviceKind"],
+): { deviceId: string; deviceSecret: string } | null {
+  const device = state.devices.find((d) => d.kind === kind && d.status === "ACTIVE");
+  return device ? { deviceId: device.id, deviceSecret: device.secret } : null;
+}
+
 /** Ids a self-registered device may use: they end up in /v1/admin/devices/{deviceId}. */
 const AUTO_DEVICE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 
