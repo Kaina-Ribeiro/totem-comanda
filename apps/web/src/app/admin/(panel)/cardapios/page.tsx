@@ -11,12 +11,21 @@ import {
   LoadError,
   PageHeader,
 } from "@/components/admin/ui";
-import { attempt, checked, type FormState, load, text } from "@/lib/admin/form";
+import {
+  attempt,
+  checked,
+  type FormState,
+  load,
+  sameText,
+  saveBoth,
+  text,
+} from "@/lib/admin/form";
 import { asOwner } from "@/lib/admin/session";
 import { coreApi } from "@/lib/core/client";
 import type { components } from "@/lib/core-api";
 
 type Menu = components["schemas"]["AdminMenu"];
+type MenuInput = components["schemas"]["MenuInput"];
 type Window = components["schemas"]["MenuSchedule"];
 type Weekday = Window["weekday"];
 
@@ -54,25 +63,59 @@ async function createMenu(_: FormState, form: FormData): Promise<FormState> {
 async function saveMenu(_: FormState, form: FormData): Promise<FormState> {
   "use server";
   const menuId = text(form, "menuId");
-  const windows: Window[] = DAYS.filter(([day]) => checked(form, `${day}.open`)).map(([day]) => ({
+  const windows: Window[] = DAYS.filter(([day]) =>
+    checked(form, `${day}.open`),
+  ).map(([day]) => ({
     weekday: day,
     timeStart: text(form, `${day}.start`),
     timeEnd: text(form, `${day}.end`),
   }));
+  const next: MenuInput = {
+    name: menuName(form),
+    showCategoriesPrice: checked(form, "showCategoriesPrice"),
+  };
   return attempt(async () => {
-    await asOwner((headers) =>
-      coreApi().PUT("/v1/admin/menus/{menuId}", {
+    const putMenu = (body: MenuInput) =>
+      asOwner((headers) =>
+        coreApi().PUT("/v1/admin/menus/{menuId}", {
+          headers,
+          params: { path: { menuId } },
+          body,
+        }),
+      );
+    // Two calls, so the menu is put back if the hours fail (COM-129).
+    const current = await asOwner((headers) =>
+      coreApi().GET("/v1/admin/menus/{menuId}", {
         headers,
         params: { path: { menuId } },
-        body: { name: menuName(form), showCategoriesPrice: checked(form, "showCategoriesPrice") },
       }),
     );
-    await asOwner((headers) =>
-      coreApi().PUT("/v1/admin/menus/{menuId}/schedules", {
-        headers,
-        params: { path: { menuId } },
-        body: windows,
-      }),
+    const changed =
+      !sameText(current.name, next.name) ||
+      current.showCategoriesPrice !== next.showCategoriesPrice;
+    await saveBoth(
+      changed
+        ? {
+            label: "o nome do cardápio",
+            save: () => putMenu(next),
+            undo: () =>
+              putMenu({
+                name: current.name,
+                showCategoriesPrice: current.showCategoriesPrice,
+              }),
+          }
+        : null,
+      {
+        label: "os horários",
+        save: () =>
+          asOwner((headers) =>
+            coreApi().PUT("/v1/admin/menus/{menuId}/schedules", {
+              headers,
+              params: { path: { menuId } },
+              body: windows,
+            }),
+          ),
+      },
     );
     revalidatePath(PATH);
     return "Salvo. O totem troca de cardápio sozinho em até 45 s.";
@@ -112,7 +155,10 @@ async function deleteMenu(_: FormState, form: FormData): Promise<FormState> {
   const menuId = text(form, "menuId");
   return attempt(async () => {
     await asOwner((headers) =>
-      coreApi().DELETE("/v1/admin/menus/{menuId}", { headers, params: { path: { menuId } } }),
+      coreApi().DELETE("/v1/admin/menus/{menuId}", {
+        headers,
+        params: { path: { menuId } },
+      }),
     );
     revalidatePath(PATH);
     return "Cardápio apagado.";
@@ -130,13 +176,28 @@ export default function MenusPage() {
         <MenuList />
       </Suspense>
       <Card>
-        <h2 className="mb-4 text-lg font-bold tracking-[-0.01em]">Novo cardápio</h2>
-        <ActionForm action={createMenu} resetOnSave className="grid gap-4 sm:grid-cols-3">
+        <h2 className="mb-4 text-lg font-bold tracking-[-0.01em]">
+          Novo cardápio
+        </h2>
+        <ActionForm
+          action={createMenu}
+          resetOnSave
+          className="grid gap-4 sm:grid-cols-3"
+        >
           <Field label="Nome (PT)">
-            <input name="name.pt" required placeholder="Noite" className={inputClass} />
+            <input
+              name="name.pt"
+              required
+              placeholder="Noite"
+              className={inputClass}
+            />
           </Field>
           <Field label="Nome (EN)">
-            <input name="name.en" placeholder="Evening" className={inputClass} />
+            <input
+              name="name.en"
+              placeholder="Evening"
+              className={inputClass}
+            />
           </Field>
           <div className="flex items-end">
             <SubmitButton pendingLabel="Criando…">Criar</SubmitButton>
@@ -149,7 +210,9 @@ export default function MenusPage() {
 
 async function MenuList() {
   const loaded = await load(async () => {
-    const menus = await asOwner((headers) => coreApi().GET("/v1/admin/menus", { headers }));
+    const menus = await asOwner((headers) =>
+      coreApi().GET("/v1/admin/menus", { headers }),
+    );
     const schedules = await Promise.all(
       menus.map((menu) =>
         asOwner((headers) =>
@@ -184,10 +247,14 @@ function MenuCard({ menu, windows }: { menu: Menu; windows: Window[] }) {
   return (
     <Card className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="text-xl font-bold tracking-[-0.02em]">{menu.name["pt-BR"]}</h2>
+        <h2 className="text-xl font-bold tracking-[-0.02em]">
+          {menu.name["pt-BR"]}
+        </h2>
         {menu.isActive && <Badge tone="ok">No totem agora</Badge>}
         {menu.forcedUntil && (
-          <Badge tone="warn">Forçado até {untilFormat.format(new Date(menu.forcedUntil))}</Badge>
+          <Badge tone="warn">
+            Forçado até {untilFormat.format(new Date(menu.forcedUntil))}
+          </Badge>
         )}
         {windows.length === 0 && <Badge tone="danger">Sem horário</Badge>}
       </div>
@@ -204,7 +271,11 @@ function MenuCard({ menu, windows }: { menu: Menu; windows: Window[] }) {
             />
           </Field>
           <Field label="Nome (EN)">
-            <input name="name.en" defaultValue={menu.name.en} className={inputClass} />
+            <input
+              name="name.en"
+              defaultValue={menu.name.en}
+              className={inputClass}
+            />
           </Field>
         </div>
         <fieldset className="flex min-w-0 flex-col gap-2">
@@ -219,7 +290,11 @@ function MenuCard({ menu, windows }: { menu: Menu; windows: Window[] }) {
                 className="grid grid-cols-2 items-center gap-2 sm:grid-cols-[7rem_minmax(0,1fr)_minmax(0,1fr)] sm:gap-3"
               >
                 <div className="col-span-2 sm:col-span-1">
-                  <Checkbox name={`${day}.open`} label={label} defaultChecked={!!w} />
+                  <Checkbox
+                    name={`${day}.open`}
+                    label={label}
+                    defaultChecked={!!w}
+                  />
                 </div>
                 <input
                   name={`${day}.start`}

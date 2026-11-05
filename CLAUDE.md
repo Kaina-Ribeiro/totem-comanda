@@ -134,6 +134,10 @@ npx @redocly/cli lint contract/openapi.yaml
 - Do not change `contract/openapi.yaml` silently. Propose the change to Kai first; it needs the
   partner's approval.
 - Never edit generated files.
+- Back office forms (`apps/web/src/lib/admin/form.ts`): read prices with `cents()` / `optionalPrice()`,
+  which refuse what is not a price and never guess. A form saved through two Core calls uses
+  `saveBoth()`: the part that can be read back and undone goes first, and it is put back if the
+  second call fails. The contract has no atomic save.
 - Open questions in `docs/data-model-and-api.md` (price changed mid-order, `waitTime`, order
   number reset, offline, fiscal fields, device pairing and secret storage) are not decided.
   Do not guess an answer into the code; ask Kai, or isolate it behind one clearly named function.
