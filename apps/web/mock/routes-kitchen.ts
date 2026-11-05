@@ -16,6 +16,7 @@ import {
 import { soldOutOptions } from "./kiosk-menu.ts";
 import { today } from "./routes-kiosk.ts";
 import { now, state } from "./state.ts";
+import { addKitchenListener, broadcastKitchenEvent } from "./stream.ts";
 
 type StoredOrder = Schemas["Order"] & { deviceId: string; menuId: string };
 
@@ -84,12 +85,9 @@ export function kitchenOrder(order: StoredOrder): Schemas["KitchenOrder"] {
   };
 }
 
-const listeners = new Set<ServerResponse>();
-
-/** Sends one event to every open kitchen stream. */
+/** Sends one order event to every open kitchen stream. */
 export function broadcastKitchen(event: "order.paid" | "order.status_changed", order: StoredOrder) {
-  const frame = `event: ${event}\ndata: ${JSON.stringify(kitchenOrder(order))}\n\n`;
-  for (const res of listeners) res.write(frame);
+  broadcastKitchenEvent(event, kitchenOrder(order));
 }
 
 /** GET /v1/kitchen/stream, answered outside the Reply routes because it never ends. */
@@ -107,11 +105,11 @@ export function serveKitchenStream(req: Request, res: ServerResponse): boolean {
     Connection: "keep-alive",
   });
   res.write(": connected\n\n");
-  listeners.add(res);
+  const remove = addKitchenListener(res);
   const ping = setInterval(() => res.write(": ping\n\n"), PING_MS);
   res.on("close", () => {
     clearInterval(ping);
-    listeners.delete(res);
+    remove();
   });
   return true;
 }

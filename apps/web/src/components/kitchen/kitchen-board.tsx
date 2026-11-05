@@ -25,6 +25,7 @@ import {
 } from "@/lib/kitchen/board";
 import { closeDayError, closedDayLabel } from "@/lib/kitchen/close-day";
 import { applyCollected } from "@/lib/kitchen/collected";
+import { newerPace } from "@/lib/kitchen/pace";
 
 import { CancelDialog, cancelErrorText } from "./cancel-dialog";
 import { CloseDayButton, CloseDayDialog } from "./close-day-dialog";
@@ -46,6 +47,8 @@ const POLL_MS = 2_000;
 const RECONNECT_MS = 30_000;
 /** While live, reload the whole list this often, so a lost event cannot leave the board wrong (KDS WF-11). */
 const FULL_REFRESH_MS = 60_000;
+/** While polling, read the store's pace this often; live, the stream announces it (COM-121). */
+const PACE_POLL_MS = 10_000;
 
 /** Open orders, or today's collected ones, as Go has them; null while Go or the network cannot answer. */
 async function fetchOrders(status: "open" | "collected"): Promise<KitchenOrder[] | null> {
@@ -139,6 +142,9 @@ export function KitchenBoard({
   };
   const onIncoming = useEffectEvent((list: KitchenOrder[]) => alert.arrived(newPaid(list)));
   const onPaceTick = useEffectEvent(() => void reloadPace());
+  /** A pace from Go (stream or read); an older one than the board's is dropped. */
+  const showPace = (next: StorePace) => setPace((current) => newerPace(current, next));
+  const onPaceEvent = useEffectEvent((next: StorePace) => showPace(next));
 
   /** Puts a full reload on the board and in Retirados (the latter only if it loaded). */
   const takeSnapshot = ({ open, collected: done, startedAt }: Snapshot) => {
@@ -183,7 +189,7 @@ export function KitchenBoard({
   /** Reads the pace again; keeps the last one if Go does not answer. */
   async function reloadPace() {
     const result = await readKitchenPace().catch(() => null);
-    if (result?.ok) setPace(result.data);
+    if (result?.ok) showPace(result.data);
   }
 
   /** Saves the pace from the K4 dialog. */
@@ -245,6 +251,7 @@ export function KitchenBoard({
   useEffect(() => {
     let stream: EventSource | null = null;
     let poll: ReturnType<typeof setInterval> | undefined;
+    let pacePoll: ReturnType<typeof setInterval> | undefined;
     let retry: ReturnType<typeof setTimeout> | undefined;
     let closed = false;
     const refresh = async () => {
@@ -255,6 +262,7 @@ export function KitchenBoard({
     const startPolling = () => {
       setLive(false);
       if (!poll) poll = setInterval(refresh, POLL_MS);
+      if (!pacePoll) pacePoll = setInterval(onPaceTick, PACE_POLL_MS);
       retry = setTimeout(connect, RECONNECT_MS);
     };
 
@@ -270,12 +278,19 @@ export function KitchenBoard({
       };
       stream.addEventListener("order.paid", onOrder);
       stream.addEventListener("order.status_changed", onOrder);
+      // The pace set from Início, or Go's automatic resume after a pause (COM-121).
+      stream.addEventListener("store.pace_changed", (event: MessageEvent<string>) =>
+        onPaceEvent(JSON.parse(event.data) as StorePace),
+      );
       stream.onopen = () => {
         setLive(true);
         clearInterval(poll);
+        clearInterval(pacePoll);
         poll = undefined;
-        // Catch up on anything missed while disconnected.
+        pacePoll = undefined;
+        // Catch up on anything missed while disconnected, the pace included.
         void refresh();
+        onPaceTick();
       };
       stream.onerror = () => {
         stream?.close();
@@ -288,6 +303,7 @@ export function KitchenBoard({
       closed = true;
       stream?.close();
       clearInterval(poll);
+      clearInterval(pacePoll);
       clearTimeout(retry);
     };
   }, []);

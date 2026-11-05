@@ -214,6 +214,7 @@ const routes: Route[] = [
       const minutes = (req.body as { minutes?: unknown } | null)?.minutes;
       if (typeof minutes !== "number") return { status: 400, body: { error: "minutes" } };
       state.clockOffsetMs += minutes * 60_000;
+      currentPace(); // A clock moved past a pause's end resumes now, and says so.
       return { status: 200, body: { now: now().toISOString() } };
     },
   ],
