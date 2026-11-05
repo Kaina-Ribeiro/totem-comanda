@@ -61,6 +61,33 @@ export function versusLastWeek(today: number, lastWeek: number, day: number): st
   return `${percent > 0 ? "+" : ""}${percent}% que ${na} ${name} ${passada}`;
 }
 
+/**
+ * Whether today's totals are final: the kiosk is closed and no menu opens again
+ * today. The daily report has no hourly split, so a running total can only be
+ * compared with last week's whole day once today is whole too (COM-127).
+ */
+export function dayIsOver(status: { open: boolean; next: NextOpening | null }): boolean {
+  return !status.open && (status.next === null || status.next.inDays > 0);
+}
+
+/**
+ * The line under a running total (revenue, orders): the comparison once the
+ * day is over; until then last week's whole-day figure, never a percentage of a
+ * partial day against a full one (COM-127). Null when last week had nothing.
+ */
+export function totalVersusLastWeek(
+  today: number,
+  lastWeek: number,
+  day: number,
+  final: boolean,
+  format: (value: number) => string,
+): string | null {
+  if (lastWeek <= 0) return null;
+  if (final) return versusLastWeek(today, lastWeek, day);
+  const weekend = day === 0 || day === 6;
+  return `${weekend ? "O" : "A"} ${DAY_NAME[day]} ${weekend ? "passado" : "passada"} fechou em ${format(lastWeek)}`;
+}
+
 const toMinutes = (time: string) => {
   const [h, m] = time.split(":").map(Number);
   return h * 60 + m;

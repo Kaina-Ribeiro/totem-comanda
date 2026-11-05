@@ -8,10 +8,12 @@ import { PaceSwitch } from "@/components/admin/pace-switch";
 import { LoadError } from "@/components/admin/ui";
 import { attempt, type FormState, load, text } from "@/lib/admin/form";
 import {
+  dayIsOver,
   greeting,
   kioskState,
   localNow,
   signalLabel,
+  totalVersusLastWeek,
   versusLastWeek,
   weekBefore,
   whenLabel,
@@ -103,6 +105,7 @@ async function Home() {
     hour: "2-digit",
     minute: "2-digit",
   }).format(now);
+  const final = dayIsOver(status);
   const soldOut = items.filter((item) => item.soldOutDate !== null && item.soldOutDate >= today);
 
   return (
@@ -130,13 +133,26 @@ async function Home() {
         <Kpi
           label="Faturamento hoje"
           value={formatBRL(todayReport.revenue)}
-          delta={versusLastWeek(todayReport.revenue, lastWeek.revenue, clock.day)}
+          delta={totalVersusLastWeek(
+            todayReport.revenue,
+            lastWeek.revenue,
+            clock.day,
+            final,
+            formatBRL,
+          )}
         />
         <Kpi
           label="Pedidos"
           value={String(todayReport.ordersCount)}
-          delta={versusLastWeek(todayReport.ordersCount, lastWeek.ordersCount, clock.day)}
+          delta={totalVersusLastWeek(
+            todayReport.ordersCount,
+            lastWeek.ordersCount,
+            clock.day,
+            final,
+            (count) => `${count} ${count === 1 ? "pedido" : "pedidos"}`,
+          )}
         />
+        {/* A ratio, so a partial day compares fairly with a whole one. */}
         <Kpi
           label="Ticket médio"
           value={formatBRL(todayReport.averageTicket)}
