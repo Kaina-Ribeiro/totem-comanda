@@ -4,8 +4,8 @@ import { Suspense } from "react";
 
 import { ActionForm, SubmitButton } from "@/components/admin/form";
 import { Card, Checkbox, Field, inputClass, LoadError, PageHeader } from "@/components/admin/ui";
-import { attempt, cents, checked, type FormState, load, text } from "@/lib/admin/form";
-import { AdminApiError, asOwner } from "@/lib/admin/session";
+import { attempt, checked, type FormState, load, optionalPrice, text } from "@/lib/admin/form";
+import { asOwner } from "@/lib/admin/session";
 import { coreApi } from "@/lib/core/client";
 import type { components } from "@/lib/core-api";
 import { formatBRL } from "@/lib/format/money";
@@ -45,19 +45,17 @@ function readLinks(form: FormData): Link[] {
     .getAll("linked")
     .map(String)
     .filter((itemId) => !checked(form, `${itemId}.remove`))
-    .map((itemId) => {
-      const override = text(form, `${itemId}.price`);
-      const priceOverride = override ? cents(override) : null;
-      if (override && priceOverride === null) throw new AdminApiError("VALIDATION_FAILED", "preço");
-      return { itemId, displayOrder: Number(text(form, `${itemId}.order`)) || 0, priceOverride };
-    });
+    .map((itemId) => ({
+      itemId,
+      displayOrder: Number(text(form, `${itemId}.order`)) || 0,
+      priceOverride: optionalPrice(form, `${itemId}.price`, "preço"),
+    }));
   const added = text(form, "add.itemId");
   if (added) {
-    const override = text(form, "add.price");
     links.push({
       itemId: added,
       displayOrder: Number(text(form, "add.order")) || links.length + 1,
-      priceOverride: override ? cents(override) : null,
+      priceOverride: optionalPrice(form, "add.price", "preço do item adicionado"),
     });
   }
   return links;

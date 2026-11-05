@@ -55,15 +55,31 @@ export function orderTypesError(dineIn: boolean, takeOut: boolean): string | nul
   return "Deixe pelo menos um ligado: Comer aqui ou Para viagem. Sem os dois, o totem não tem o que vender.";
 }
 
+// Reais with an optional "R$", "." between thousands and up to two decimals
+// after "," or ".": "28", "28,5", "1.234,50", "13.90". Anything else is not a
+// price ("1e3", "10,005"), and is refused rather than guessed (COM-128).
+const PRICE = /^(?:R\$\s*)?(\d{1,3}(?:\.\d{3})+|\d+)(?:[,.](\d{1,2}))?$/;
+
 /** "28,00" or "28.00" or "28" → 2800 cents; null for empty or invalid. */
 export function cents(value: string): number | null {
-  const clean = value
-    .replace(/[^\d,.-]/g, "")
-    .replace(/\.(?=\d{3}(\D|$))/g, "")
-    .replace(",", ".");
-  if (clean === "") return null;
-  const number = Number(clean);
-  return Number.isFinite(number) && number >= 0 ? Math.round(number * 100) : null;
+  const match = PRICE.exec(value.trim());
+  if (!match) return null;
+  const [, reais, decimals = ""] = match;
+  const total = Number(reais.replaceAll(".", "")) * 100 + Number(decimals.padEnd(2, "0"));
+  return Number.isSafeInteger(total) ? total : null;
+}
+
+/**
+ * An optional price field: null when left empty, the cents when valid, and a
+ * failed save naming `label` when it is not a price, so a typo never silently
+ * drops an override (COM-128).
+ */
+export function optionalPrice(form: FormData, name: string, label: string): number | null {
+  const value = text(form, name);
+  if (!value) return null;
+  const parsed = cents(value);
+  if (parsed === null) throw new AdminApiError("VALIDATION_FAILED", label);
+  return parsed;
 }
 
 /**
