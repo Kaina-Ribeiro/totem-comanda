@@ -1,9 +1,9 @@
 import Image from "next/image";
 import { revalidatePath } from "next/cache";
-import { Suspense } from "react";
 
 import { ActionForm, SubmitButton } from "@/components/admin/form";
-import { LoadError, PageHeader, PageLoading } from "@/components/admin/ui";
+import { SoldOutSkeleton, Streamed } from "@/components/admin/skeleton";
+import { LoadError, PageHeader } from "@/components/admin/ui";
 import { attempt, type FormState, load, text } from "@/lib/admin/form";
 import { asOwner } from "@/lib/admin/session";
 import { coreApi } from "@/lib/core/client";
@@ -46,9 +46,9 @@ export default function SoldOutPage() {
         title="Esgotados"
         description="Acabou? Um toque tira o item do totem até o fim do dia. Amanhã ele volta sozinho."
       />
-      <Suspense fallback={<PageLoading />}>
+      <Streamed fallback={<SoldOutSkeleton />}>
         <SoldOutList />
-      </Suspense>
+      </Streamed>
     </>
   );
 }

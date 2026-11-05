@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
-import { Suspense } from "react";
 
 import { ActionForm, SubmitButton } from "@/components/admin/form";
+import { FormSkeleton, Streamed } from "@/components/admin/skeleton";
 import {
   Badge,
   Card,
@@ -10,7 +10,6 @@ import {
   inputClass,
   LoadError,
   PageHeader,
-  PageLoading,
 } from "@/components/admin/ui";
 import {
   attempt,
@@ -173,9 +172,9 @@ export default function MenusPage() {
         title="Cardápios"
         description="Cada cardápio tem seus horários; o totem mostra sozinho o que vale agora. Fora de todos, mostra Fechado."
       />
-      <Suspense fallback={<PageLoading />}>
+      <Streamed fallback={<FormSkeleton />}>
         <MenuList />
-      </Suspense>
+      </Streamed>
       <Card>
         <h2 className="mb-4 text-lg font-bold tracking-[-0.01em]">
           Novo cardápio

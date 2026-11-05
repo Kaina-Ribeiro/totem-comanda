@@ -1,8 +1,8 @@
 import { revalidatePath } from "next/cache";
-import { Suspense } from "react";
 
 import { ActionForm, SubmitButton } from "@/components/admin/form";
-import { Card, Checkbox, Field, inputClass, LoadError, PageHeader, PageLoading } from "@/components/admin/ui";
+import { FormSkeleton, Streamed } from "@/components/admin/skeleton";
+import { Card, Checkbox, Field, inputClass, LoadError, PageHeader } from "@/components/admin/ui";
 import { attempt, checked, type FormState, load, optionalText, text } from "@/lib/admin/form";
 import { asOwner } from "@/lib/admin/session";
 import { coreApi } from "@/lib/core/client";
@@ -112,9 +112,9 @@ export default function TagsPage() {
         title="Selos e sugestões"
         description="Selos como “Mais pedido” nos itens, e as sugestões que o totem faz ao adicionar um item."
       />
-      <Suspense fallback={<PageLoading />}>
+      <Streamed fallback={<FormSkeleton />}>
         <Lists />
-      </Suspense>
+      </Streamed>
     </>
   );
 }

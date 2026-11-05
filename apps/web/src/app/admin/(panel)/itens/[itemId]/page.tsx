@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Suspense } from "react";
 
-import { Card, LoadError, PageHeader, PageLoading } from "@/components/admin/ui";
+import { FormSkeleton, Streamed, TitledFormSkeleton } from "@/components/admin/skeleton";
+import { Card, LoadError, PageHeader } from "@/components/admin/ui";
 import { load } from "@/lib/admin/form";
 import { AdminApiError, asOwner } from "@/lib/admin/session";
 import { coreApi } from "@/lib/core/client";
@@ -12,9 +12,9 @@ import { OptionGroups } from "./option-groups";
 
 export default function EditItemPage({ params, searchParams }: PageProps<"/admin/itens/[itemId]">) {
   return (
-    <Suspense fallback={<PageLoading />}>
+    <Streamed fallback={<TitledFormSkeleton />}>
       <EditItem params={params} searchParams={searchParams} />
-    </Suspense>
+    </Streamed>
   );
 }
 
@@ -57,9 +57,9 @@ async function EditItem({ params, searchParams }: PageProps<"/admin/itens/[itemI
         </Card>
       )}
       <ItemForm item={item} crossSells={crossSells} />
-      <Suspense fallback={<PageLoading />}>
+      <Streamed fallback={<FormSkeleton cards={1} fields={3} />}>
         <OptionGroups itemId={item.id} />
-      </Suspense>
+      </Streamed>
     </>
   );
 }

@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
-import { Suspense } from "react";
 
 import { ActionForm, SubmitButton } from "@/components/admin/form";
+import { FormSkeleton, Streamed } from "@/components/admin/skeleton";
 import {
   Card,
   Checkbox,
@@ -10,7 +10,6 @@ import {
   inputClass,
   LoadError,
   PageHeader,
-  PageLoading,
 } from "@/components/admin/ui";
 import {
   attempt,
@@ -180,9 +179,9 @@ export default function CategoriesPage({
         title="Categorias"
         description="As categorias de cada cardápio e os itens de cada uma, com o preço nesse cardápio."
       />
-      <Suspense fallback={<PageLoading />}>
+      <Streamed fallback={<FormSkeleton />}>
         <Categories searchParams={searchParams} />
-      </Suspense>
+      </Streamed>
     </>
   );
 }

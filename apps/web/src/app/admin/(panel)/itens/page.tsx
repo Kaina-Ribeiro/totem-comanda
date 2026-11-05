@@ -1,8 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Suspense } from "react";
 
-import { Badge, Card, LoadError, PageHeader, PageLoading } from "@/components/admin/ui";
+import { ItemListSkeleton, Streamed } from "@/components/admin/skeleton";
+import { Badge, Card, LoadError, PageHeader } from "@/components/admin/ui";
 import { load } from "@/lib/admin/form";
 import { asOwner } from "@/lib/admin/session";
 import { coreApi } from "@/lib/core/client";
@@ -23,9 +23,9 @@ export default function ItemsPage() {
           </Link>
         }
       />
-      <Suspense fallback={<PageLoading />}>
+      <Streamed fallback={<ItemListSkeleton />}>
         <ItemList />
-      </Suspense>
+      </Streamed>
     </>
   );
 }

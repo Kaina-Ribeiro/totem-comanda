@@ -1,8 +1,8 @@
 import { revalidatePath } from "next/cache";
 import Image from "next/image";
-import { Suspense } from "react";
 
 import { ActionForm, SubmitButton } from "@/components/admin/form";
+import { FormSkeleton, Streamed } from "@/components/admin/skeleton";
 import {
   Card,
   Checkbox,
@@ -10,7 +10,6 @@ import {
   inputClass,
   LoadError,
   PageHeader,
-  PageLoading,
 } from "@/components/admin/ui";
 import { attempt, checked, type FormState, load, orderTypesError, text } from "@/lib/admin/form";
 import { uploadImage } from "@/lib/admin/media";
@@ -85,12 +84,12 @@ export default function StorePage() {
         title="Loja"
         description="Nome, logo, idiomas e o que o totem mostra quando está fechado."
       />
-      <Suspense fallback={<PageLoading />}>
+      <Streamed fallback={<FormSkeleton cards={1} />}>
         <StoreForm />
-      </Suspense>
-      <Suspense>
+      </Streamed>
+      <Streamed fallback={<FormSkeleton cards={1} fields={3} />}>
         <WaitTimesForm />
-      </Suspense>
+      </Streamed>
     </>
   );
 }

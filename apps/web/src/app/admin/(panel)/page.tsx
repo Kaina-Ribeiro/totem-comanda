@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { connection } from "next/server";
-import { Suspense } from "react";
 
 import { ActionForm, SubmitButton } from "@/components/admin/form";
 import { PaceSwitch } from "@/components/admin/pace-switch";
+import { HomeSkeleton, Streamed } from "@/components/admin/skeleton";
 import { LoadError } from "@/components/admin/ui";
 import { attempt, type FormState, load, text } from "@/lib/admin/form";
 import {
@@ -63,9 +63,9 @@ async function setPace(_: FormState, form: FormData): Promise<FormState> {
 /** Início (plan G-A1, prototypes A1 and A10): how the day is going, at a glance. */
 export default function AdminHomePage() {
   return (
-    <Suspense fallback={<p className="text-sm text-muted">Carregando o dia…</p>}>
+    <Streamed fallback={<HomeSkeleton />}>
       <Home />
-    </Suspense>
+    </Streamed>
   );
 }
 
