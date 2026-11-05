@@ -6,9 +6,11 @@
 // Mock-only control endpoints (not in the contract, called on 4020 directly):
 //   GET  /__mock            current scenario, scenarios, device health, reports
 //   POST /__mock/scenario   {"name": "<scenario>"} resets the state to it
-//   POST /__mock/fault      {"path": "<regex>", "method"?, "status"?, "delayMs"?, "times"?}
+//   POST /__mock/fault      {"path": "<regex>", "method"?, "status"?, "code"?, "delayMs"?, "times"?}
 //                           makes the next matching Core API calls slow or fail
-//                           (timeouts, 5xx, a lost answer); DELETE clears them
+//                           (timeouts, 4xx, 5xx, a lost answer); DELETE clears them.
+//                           A 4xx answers a contract Problem: `code` defaults for 401,
+//                           404 and 422 and is required for other 4xx (faults.ts)
 //   POST /__mock/kitchen/backdate {"posCheckNumber": "42", "minutes": 12}
 //                           moves an order's placedAt, readyAt and status history back, to see waiting colours
 //   POST /__mock/clock     {"minutes": 16} moves the mock's clock forward (a pause's automatic resume)
@@ -20,6 +22,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { fileURLToPath } from "node:url";
 
 import { SEED_MEDIA } from "./catalogue.ts";
+import { faultCode, faultReply } from "./faults.ts";
 import { authDevice, problem, type Reply, type Request, type Route, type Schemas } from "./http.ts";
 import { adminRoutes } from "./routes-admin.ts";
 import { catalogueRoutes } from "./routes-catalogue.ts";
@@ -167,12 +170,16 @@ const routes: Route[] = [
     "POST",
     /^\/__mock\/fault$/,
     (req) => {
-      const body = (req.body ?? {}) as Partial<Fault> & { path?: unknown };
+      const body = (req.body ?? {}) as Partial<Fault> & { path?: unknown; code?: unknown };
       if (typeof body.path !== "string") return { status: 400, body: { error: "path is required" } };
+      const status = typeof body.status === "number" ? body.status : undefined;
+      const coded = faultCode(status, typeof body.code === "string" ? body.code : undefined);
+      if ("error" in coded) return { status: 400, body: { error: coded.error } };
       const fault: Fault = {
         path: new RegExp(body.path),
         method: typeof body.method === "string" ? body.method.toUpperCase() : undefined,
-        status: typeof body.status === "number" ? body.status : undefined,
+        status,
+        code: coded.code,
         delayMs: typeof body.delayMs === "number" ? body.delayMs : 0,
         times: typeof body.times === "number" ? body.times : 1,
       };
@@ -237,6 +244,8 @@ type Fault = {
   method?: string;
   /** Answer with this status instead of the route's answer. */
   status?: number;
+  /** The problem code of a 4xx answer (see faults.ts). */
+  code?: Schemas["ProblemCode"];
   /** Wait this long first; with no status the route then answers normally. */
   delayMs: number;
   times: number;
@@ -254,11 +263,7 @@ async function applyFault(req: Request, res: ServerResponse): Promise<boolean> {
   if (fault.times === 0) faults.splice(faults.indexOf(fault), 1);
   if (fault.delayMs > 0) await new Promise((resolve) => setTimeout(resolve, fault.delayMs));
   if (fault.status === undefined) return false;
-  send(res, {
-    status: fault.status,
-    headers: { "Content-Type": "application/problem+json" },
-    body: { type: "about:blank", title: "Injected fault", status: fault.status },
-  });
+  send(res, faultReply(fault.status, fault.code));
   return true;
 }
 
