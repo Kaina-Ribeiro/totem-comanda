@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 
 import {
   cancelPayment,
@@ -13,7 +13,12 @@ import {
 } from "@/app/kiosk/actions";
 import { formatBRL } from "@/lib/format/money";
 import type { Result } from "@/lib/kiosk/core";
-import { clearLostPayment, type UnknownAttempt } from "@/lib/kiosk/payment-recovery";
+import {
+  clearLostPayment,
+  type LostPayments,
+  lostFor,
+  type PaymentCalls,
+} from "@/lib/kiosk/payment-recovery";
 import { format, type Strings } from "@/lib/kiosk/strings";
 
 import { ChevronLeft } from "../icons";
@@ -35,6 +40,13 @@ const METHODS: PaymentMethod[] = ["PIX", "CREDIT", "DEBIT"];
 function settle<T>(call: Promise<Result<T>>): Promise<Result<T>> {
   return call.catch((): Result<T> => ({ ok: false, code: "CORE_UNAVAILABLE" }));
 }
+
+/** The payment calls lost-payment recovery uses, each answer unknown when offline. */
+export const paymentCalls: PaymentCalls = {
+  startPayment: (...args) => settle(startPayment(...args)),
+  pollPayment: (id) => settle(pollPayment(id)),
+  cancelPayment: (id) => settle(cancelPayment(id)),
+};
 
 type Step =
   | { kind: "method" }
@@ -72,6 +84,7 @@ export function CheckoutFlow({
   onBack,
   onCancelOrder,
   onBusy,
+  lostRef,
 }: {
   journey: Journey;
   strings: Strings;
@@ -81,6 +94,11 @@ export function CheckoutFlow({
   onCancelOrder: () => void;
   /** Told while waiting on the terminal or the Core API, when idle checking stops. */
   onBusy: (busy: boolean) => void;
+  /**
+   * Attempts that got no answer: Go may have made their payment (COM-97). The
+   * journey owns them, so leaving the checkout does not forget them (COM-110).
+   */
+  lostRef: RefObject<LostPayments>;
 }) {
   const [step, setStep] = useState<Step>({ kind: "method" });
   const busy =
@@ -93,8 +111,6 @@ export function CheckoutFlow({
   const [paymentKey, setPaymentKey] = useState(() => crypto.randomUUID());
   // Set while an attempt runs, so a double tap cannot start a second payment.
   const attempting = useRef(false);
-  // Attempts that got no answer: Go may have made their payment (COM-97).
-  const unknownAttempts = useRef<UnknownAttempt[]>([]);
   const checkout = journey.checkout!;
   const total = checkout.order?.orderTotal.total ?? currentQuote(journey)?.total ?? 0;
 
@@ -181,16 +197,13 @@ export function CheckoutFlow({
       // An earlier attempt's answer was lost but Go made that payment: clear it first.
       const recovery = await clearLostPayment(
         order.id,
-        unknownAttempts.current.filter((a) => a.key !== key),
-        {
-          startPayment: (...args) => settle(startPayment(...args)),
-          pollPayment: (id) => settle(pollPayment(id)),
-          cancelPayment: (id) => settle(cancelPayment(id)),
-        },
+        lostFor(lostRef.current, order.id).filter((a) => a.key !== key),
+        paymentCalls,
       );
-      unknownAttempts.current = unknownAttempts.current.filter(
-        (a) => !recovery.settled.includes(a.key),
-      );
+      lostRef.current = {
+        orderId: order.id,
+        attempts: lostFor(lostRef.current, order.id).filter((a) => !recovery.settled.includes(a.key)),
+      };
       if (recovery.outcome === "paid") return place(method, order);
       if (recovery.outcome === "free") {
         // A fresh key: Go may have stored the refusal under the old one.
@@ -211,10 +224,12 @@ export function CheckoutFlow({
 
   /** Starts a payment, remembering it while Go's answer is unknown. */
   async function start(orderId: string, method: PaymentMethod, key: string) {
-    const attempts = unknownAttempts.current.filter((a) => a.key !== key);
-    unknownAttempts.current = [...attempts, { key, method }];
+    const others = () => lostFor(lostRef.current, orderId).filter((a) => a.key !== key);
+    lostRef.current = { orderId, attempts: [...others(), { key, method }] };
     const started = await settle(startPayment(orderId, method, key));
-    if (started.ok || started.code !== "CORE_UNAVAILABLE") unknownAttempts.current = attempts;
+    if (started.ok || started.code !== "CORE_UNAVAILABLE") {
+      lostRef.current = { orderId, attempts: others() };
+    }
     return started;
   }
 
