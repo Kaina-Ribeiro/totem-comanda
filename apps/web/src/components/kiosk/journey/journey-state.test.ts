@@ -4,10 +4,12 @@ import { BUNDLED, format, mergeStrings } from "@/lib/kiosk/strings";
 
 import {
   availableOrderTypes,
+  currentQuoteFailure,
   initialJourney,
   type Journey,
   journeyReducer,
   type Menu,
+  quoteKey,
 } from "./journey-state";
 
 const menu = { id: "mnu-manha", entities: [] } as unknown as Menu;
@@ -104,6 +106,23 @@ describe("basket", () => {
     expect(
       journeyReducer(state, { type: "quoted", key: "old", result: { ok: true, data: total } }),
     ).toBe(state);
+  });
+
+  it("shows a quote error only for the basket it was about (COM-63)", () => {
+    const one = journeyReducer(inMenu, { type: "addLine", line: line("a") });
+    const failed = journeyReducer(one, {
+      type: "quoted",
+      key: quoteKey(one),
+      result: { ok: false, code: "ITEM_UNAVAILABLE", detail: "itm-a" },
+    });
+    expect(currentQuoteFailure(failed)).toEqual({
+      ok: false,
+      code: "ITEM_UNAVAILABLE",
+      detail: "itm-a",
+    });
+    // The guest changes the basket: the old error must go while the new total loads.
+    const changed = journeyReducer(failed, { type: "addLine", line: line("b") });
+    expect(currentQuoteFailure(changed)).toBeNull();
   });
 });
 
