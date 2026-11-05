@@ -99,6 +99,14 @@ export async function setKitchenPace(
   );
 }
 
+/**
+ * "Encerrar o dia" (plan G-K9): Go moves every open order of today to
+ * NOT_COLLECTED and answers how many it moved.
+ */
+export async function closeKitchenDay(): Promise<Result<{ count: number }>> {
+  return deviceCallAs("KITCHEN", (headers) => coreApi().POST("/v1/kitchen/close-day", { headers }));
+}
+
 /** Reads the pace again (the owner may have changed it on Início). */
 export async function readKitchenPace(): Promise<Result<StorePace>> {
   return getKitchenPace();

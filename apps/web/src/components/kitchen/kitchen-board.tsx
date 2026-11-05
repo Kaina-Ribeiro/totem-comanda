@@ -4,6 +4,7 @@ import { useEffect, useEffectEvent, useRef, useState, useTransition } from "reac
 
 import {
   cancelOrder,
+  closeKitchenDay,
   moveOrder,
   readKitchenPace,
   setKitchenPace,
@@ -22,8 +23,10 @@ import {
   PREVIOUS_STATUS,
   type Seen,
 } from "@/lib/kitchen/board";
+import { closeDayError, closedDayLabel } from "@/lib/kitchen/close-day";
 
 import { CancelDialog, cancelErrorText } from "./cancel-dialog";
+import { CloseDayButton, CloseDayDialog } from "./close-day-dialog";
 import { NewOrdersBar, SoundButton, SoundDialog, useNewOrderAlert } from "./new-order-alert";
 import { OrderCard } from "./order-card";
 import { OrderDrawer } from "./order-drawer";
@@ -101,6 +104,9 @@ export function KitchenBoard({
   const [pace, setPace] = useState(initialPace);
   const [paceOpen, setPaceOpen] = useState(false);
   const [paceError, setPaceError] = useState<string | null>(null);
+  // "Encerrar o dia" (G-K9): the confirmation and its last error.
+  const [closeOpen, setCloseOpen] = useState(false);
+  const [closeError, setCloseError] = useState<string | null>(null);
   // "Acabou" (G-K4): the line being asked about, and what this tablet marked today.
   const [soldOutAsk, setSoldOutAsk] = useState<{ line: number; target: SoldOutTarget } | null>(
     null,
@@ -160,6 +166,28 @@ export function KitchenBoard({
       }
       setPace(result.data);
       setPaceOpen(false);
+    });
+  }
+
+  /**
+   * Closes the day: Go moves today's open orders to NOT_COLLECTED. The board
+   * empties at once and then reloads, so anything Go still has open (an order
+   * paid a second later) comes back. A failure keeps the dialog for a retry.
+   */
+  function closeDay() {
+    setCloseError(null);
+    startTransition(async () => {
+      const result = await closeKitchenDay().catch(() => ({ ok: false, code: "NETWORK" }) as const);
+      if (!result.ok) {
+        setCloseError(closeDayError);
+        await refresh();
+        return;
+      }
+      setOrders([]);
+      setCloseOpen(false);
+      openOrder(null);
+      setUndo({ key: `close-day:${Date.now()}`, label: closedDayLabel(result.data.count) });
+      await refresh();
     });
   }
 
@@ -408,6 +436,13 @@ export function KitchenBoard({
             }}
           />
           <SoundButton on={alert.soundOn} onPress={alert.openDialog} />
+          <CloseDayButton
+            disabled={orders.length === 0}
+            onPress={() => {
+              setCloseError(null);
+              setCloseOpen(true);
+            }}
+          />
           <button
             onClick={refreshNow}
             disabled={refreshing}
@@ -581,6 +616,15 @@ export function KitchenBoard({
           error={paceError}
           onCancel={() => setPaceOpen(false)}
           onConfirm={choosePace}
+        />
+      )}
+      {closeOpen && (
+        <CloseDayDialog
+          count={orders.length}
+          busy={pending}
+          error={closeError}
+          onCancel={() => setCloseOpen(false)}
+          onConfirm={closeDay}
         />
       )}
       {cancelling && (
