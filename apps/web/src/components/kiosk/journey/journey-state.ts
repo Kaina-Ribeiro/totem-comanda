@@ -233,6 +233,15 @@ export function currentQuote(state: Journey): OrderTotal | null {
     : null;
 }
 
+/** The quote error for the basket on screen; an older basket's error is not shown (COM-63). */
+export function currentQuoteFailure(
+  state: Journey,
+): Extract<Result<OrderTotal>, { ok: false }> | null {
+  return state.quote && state.quote.key === quoteKey(state) && !state.quote.result.ok
+    ? state.quote.result
+    : null;
+}
+
 /**
  * After an item is added, suggests its cross-sell group (F-MENU-11) unless the
  * guest turned suggestions off or none of the group's items are in the basket's

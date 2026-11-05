@@ -13,7 +13,7 @@ import {
 import { format, type Strings } from "@/lib/kiosk/strings";
 
 import { ChevronLeft, Minus, Plus } from "../icons";
-import { currentQuote, type Journey } from "./journey-state";
+import { currentQuote, currentQuoteFailure, type Journey } from "./journey-state";
 
 /**
  * Prototype 05-Cart at 1080x1920. Lines with edit, remove and quantity; the
@@ -47,7 +47,7 @@ export function BasketScreen({
   const menu = journey.menu!;
   const orderType = journey.orderType ?? "DINEIN";
   const quote = currentQuote(journey);
-  const failed = journey.quote && !journey.quote.result.ok ? journey.quote.result : null;
+  const failed = currentQuoteFailure(journey);
   const stale = !quote && !failed;
   const empty = journey.basket.length === 0;
 
