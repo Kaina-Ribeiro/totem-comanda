@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>CPF na nota</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button{font:inherit;color:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 720px; height: 1280px; box-sizing: border-box; background: rgba(20,26,23,0.72); color: {{ink}}; font-family: Manrope, system-ui, sans-serif; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden">
+  <div role="dialog" aria-modal="true" aria-labelledby="cpf-title" style="background: {{surface}}; border-radius: 40px 40px 0 0; padding: 44px 44px 40px; display: flex; flex-direction: column; gap: 28px">
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <h1 id="cpf-title" style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 46px; letter-spacing: -0.02em">CPF ou CNPJ na nota</h1>
+      <p style="margin: 0; font-size: 20px; color: {{muted}}">Só os números. Pode pular se não quiser.</p>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <label for="cpf-input" style="font-size: 16px; font-weight: 700; color: {{muted}}">Documento</label>
+      <input id="cpf-input" readonly value="{{masked}}" placeholder="000.000.000-00" style="height: 92px; padding: 0 24px; border-radius: 20px; border: 0; border-bottom: 3px solid {{detail}}; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 42px; letter-spacing: 0.03em; color: {{ink}}; background: {{ground}}; outline: none">
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+      <sc-for list="{{keys}}" as="k" hint-placeholder-count="12">
+        <button type="button" onClick="{{k.press}}" aria-label="{{k.aria}}" style="{{k.style}}">{{k.label}}</button>
+      </sc-for>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px">
+      <a href="Cart.dc.html" style="height: 92px; border-radius: 46px; background: {{ground}}; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700">Pular</a>
+      <a href="Cart.dc.html" style="height: 92px; border-radius: 46px; background: {{accent}}; color: {{onAccent}}; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700">Confirmar</a>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["padaria","tomate","verde","acafrao"],"default":"padaria"},"$preview":{"width":720,"height":1280}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { digits: '1234567890' };
+  }
+  mask(d) {
+    let out = '';
+    if (d.length <= 11) {
+      for (let i = 0; i < d.length; i++) {
+        if (i === 3 || i === 6) out += '.';
+        if (i === 9) out += '-';
+        out += d[i];
+      }
+      return out;
+    }
+    for (let i = 0; i < d.length; i++) {
+      if (i === 2 || i === 5) out += '.';
+      if (i === 8) out += '/';
+      if (i === 12) out += '-';
+      out += d[i];
+    }
+    return out;
+  }
+  renderVals() {
+    const THEMES = {
+      padaria: { ground:'#F3EFE8', surface:'#FFFFFF', ink:'#2B211C', muted:'#625750', line:'#E5DDD2', accent:'#4E3426', onAccent:'#FAF6F0', detail:'#B07A3A' },
+      verde: { ground:'#EEECE6', surface:'#FFFFFF', ink:'#141A17', muted:'#5B615C', line:'#E3E1DA', accent:'#1F3D31', onAccent:'#F4F2EC', detail:'#B9892C' },
+      tomate: { ground:'#F3F2ED', surface:'#FFFFFF', ink:'#1B1816', muted:'#5F5B57', line:'#E6E4DE', accent:'#C8341F', onAccent:'#FFF6F1', detail:'#C8341F' },
+      acafrao: { ground:'#EFEEE9', surface:'#FFFFFF', ink:'#17181C', muted:'#5E5D59', line:'#E4E2DC', accent:'#17181C', onAccent:'#F7F5EF', detail:'#F2B134' }
+    };
+    const t = THEMES[this.props.theme ?? 'padaria'] || THEMES.padaria;
+    const d = this.state.digits;
+    const base = 'height: 80px; border-radius: 18px; border: 0; background: ' + t.surface + '; box-shadow: inset 0 0 0 1.5px ' + t.line + '; font-size: 32px; font-weight: 700; display: flex; align-items: center; justify-content: center;';
+    const labels = ['1','2','3','4','5','6','7','8','9','limpar','0','apagar'];
+    const keys = labels.map((l) => {
+      if (l === 'limpar') return { label: 'Limpar', aria: 'Limpar tudo', press: () => this.setState({ digits: '' }), style: base + ' font-size: 19px; color: ' + t.muted + ';' };
+      if (l === 'apagar') return { label: '⌫', aria: 'Apagar último número', press: () => this.setState({ digits: d.slice(0, -1) }), style: base + ' color: ' + t.muted + ';' };
+      return { label: l, aria: l, press: () => { if (d.length < 14) this.setState({ digits: d + l }); }, style: base };
+    });
+    return { ...t, keys, masked: this.mask(d) };
+  }
+}
+</script>
+</body>
+</html>

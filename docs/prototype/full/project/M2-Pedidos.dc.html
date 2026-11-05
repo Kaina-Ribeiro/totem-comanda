@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Celular · Pedidos</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button{font:inherit;color:inherit;cursor:pointer}
+.tap{transition:transform .12s ease,background-color .15s ease}
+.tap:active{transform:scale(.97)}
+nav,main,.chips{scrollbar-width:none}nav::-webkit-scrollbar,main::-webkit-scrollbar,.chips::-webkit-scrollbar{display:none}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F3EFE8; color: #2B211C; font-family: Manrope, system-ui, sans-serif; font-feature-settings: 'tnum' 1; display: flex; flex-direction: column; overflow: hidden">
+  <header style="background: #FFFFFF; border-bottom: 1px solid #E5DDD2; padding: 14px 16px 10px; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0">
+    <div style="display: flex; align-items: center; justify-content: space-between">
+      <span style="font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 500; font-size: 22px">Comanda</span>
+      <span style="height: 28px; padding: 0 10px; border-radius: 14px; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; background: #DCDFD2"><span style="width: 7px; height: 7px; border-radius: 4px; background: #4F6B45"></span>Aberto</span>
+    </div>
+    <nav aria-label="Back office" style="display: flex; gap: 6px; overflow-x: auto; margin: 0 -16px; padding: 0 16px">
+      <a href="M1-Inicio.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Início</a>
+      <a href="M2-Pedidos.dc.html" aria-current="page" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; background: #EAD9C6; display: flex; align-items: center; font-size: 14px; font-weight: 800">Pedidos</a>
+      <a href="M4-Esgotados.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Esgotados</a>
+      <a href="M9-Relatorio.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Relatório</a>
+      <a href="M6-Itens.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Cardápio</a>
+      <a href="M0-Mais.dc.html" style="height: 36px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 700">Mais</a>
+    </nav>
+  </header>
+
+  <main style="flex-grow: 1; min-height: 0; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+    <div style="display: flex; align-items: baseline; justify-content: space-between">
+      <h1 style="margin: 0; font-weight: 700; font-size: 24px; letter-spacing: -0.02em">Pedidos de hoje</h1>
+      <span style="font-size: 13px; font-weight: 700; color: #625750">R$ 1.284,60</span>
+    </div>
+
+    <div class="chips" role="radiogroup" aria-label="Filtrar pedidos" style="display: flex; gap: 6px; overflow-x: auto; margin: 0 -16px; padding: 0 16px; flex-shrink: 0">
+      <sc-for list="{{filters}}" as="f" hint-placeholder-count="4">
+        <button type="button" role="radio" aria-checked="{{f.checked}}" onClick="{{f.pick}}" class="tap" style="{{f.style}}">{{f.label}} <span style="{{f.countStyle}}">{{f.count}}</span></button>
+      </sc-for>
+    </div>
+
+    <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+      <sc-for list="{{rows}}" as="r" hint-placeholder-count="6">
+        <li>
+          <a href="M2-Pedido.dc.html" class="tap" style="border-radius: 12px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 12px; display: flex; gap: 12px; align-items: center">
+            <span style="width: 48px; height: 48px; flex-shrink: 0; border-radius: 12px; background: #F3EFE8; display: flex; align-items: center; justify-content: center; font-size: 19px; font-weight: 800; letter-spacing: -0.02em">{{r.num}}</span>
+            <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px">
+              <span style="font-size: 14px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.items}}</span>
+              <span style="font-size: 12px; font-weight: 600; color: #625750">{{r.time}} · {{r.type}} · {{r.pay}}</span>
+            </span>
+            <span style="flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 4px">
+              <span style="font-size: 14px; font-weight: 800">{{r.total}}</span>
+              <span style="{{r.chipStyle}}">{{r.status}}</span>
+            </span>
+          </a>
+        </li>
+      </sc-for>
+    </ul>
+
+    <sc-if value="{{empty}}" hint-placeholder-val="{{false}}">
+      <div style="border-radius: 12px; background: #FFFFFF; border: 1px solid #E5DDD2; padding: 20px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start">
+        <span style="font-size: 15px; font-weight: 800">Nenhum pedido neste filtro</span>
+        <button type="button" onClick="{{clear}}" style="height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid #E5DDD2; background: #FFFFFF; font-size: 14px; font-weight: 800">Ver todos</button>
+      </div>
+    </sc-if>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { filter: 'all' };
+  }
+  renderVals() {
+    const chip = (bg, fg) => 'height: 22px; padding: 0 8px; border-radius: 11px; display: inline-flex; align-items: center; font-size: 11px; font-weight: 800; white-space: nowrap; background: ' + bg + '; color: ' + (fg || '#2B211C') + ';';
+    const ST = {
+      'Novo': ['kitchen', chip('#EAD9C6')],
+      'Preparando': ['kitchen', chip('#EFE4C9')],
+      'Pronto': ['kitchen', chip('#DCDFD2')],
+      'Retirado': ['done', chip('#E2DED8')],
+      'Não pago': ['unpaid', chip('#F4E1DB', '#8C3A24')]
+    };
+    const ALL = [
+      ['45', '10:41', 'Croque monsieur, Cappuccino', 'Viagem', 'Crédito', 'R$ 54,80', 'Novo'],
+      ['44', '10:40', '2× Pão na chapa, Café coado', 'Aqui', 'Pix', 'R$ 26,90', 'Novo'],
+      ['43', '10:36', 'Latte', 'Viagem', 'Débito', 'R$ 14,90', 'Não pago'],
+      ['42', '10:35', 'Sanduíche de peru, Suco de laranja', 'Viagem', 'Débito', 'R$ 42,80', 'Preparando'],
+      ['41', '10:30', '2× Croissant, Latte', 'Aqui', 'Crédito', 'R$ 42,90', 'Preparando'],
+      ['40', '10:27', '3× Pão de queijo', 'Viagem', 'Pix', 'R$ 16,50', 'Pronto'],
+      ['39', '10:24', 'Cookie de chocolate, Cappuccino', 'Aqui', 'Crédito', 'R$ 23,80', 'Pronto'],
+      ['38', '10:12', 'Croque monsieur, Cappuccino, Fermentação natural', 'Viagem', 'Crédito', 'R$ 78,66', 'Retirado'],
+      ['37', '10:05', '2× Cappuccino', 'Aqui', 'Pix', 'R$ 27,80', 'Retirado']
+    ];
+    const filter = this.state.filter;
+    const rows = ALL.filter((r) => filter === 'all' || ST[r[6]][0] === filter).map(([num, time, items, type, pay, total, status]) => ({
+      num, time, items, type, pay, total, status, chipStyle: ST[status][1]
+    }));
+    const F = [['all', 'Todos', '47'], ['kitchen', 'Na cozinha', '6'], ['done', 'Retirados', '38'], ['unpaid', 'Não pagos', '3']];
+    const filters = F.map(([id, label, count]) => {
+      const on = id === filter;
+      return {
+        label, count, checked: on ? 'true' : 'false',
+        pick: () => this.setState({ filter: id }),
+        style: 'height: 40px; flex-shrink: 0; padding: 0 14px; border-radius: 12px; font-size: 14px; font-weight: 800; display: flex; align-items: center; gap: 6px; ' + (on ? 'border: 0; background: #4E3426; color: #FAF6F0;' : 'border: 1px solid #E5DDD2; background: #FFFFFF; color: #2B211C;'),
+        countStyle: 'font-size: 12px; font-weight: 800; ' + (on ? 'color: #D9C8B8;' : 'color: #625750;')
+      };
+    });
+    return { filters, rows, empty: rows.length === 0, clear: () => this.setState({ filter: 'all' }) };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Seu pedido</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button{font:inherit;color:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 720px; height: 1280px; box-sizing: border-box; background: {{ground}}; color: {{ink}}; font-family: Manrope, system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <header style="display: flex; justify-content: space-between; align-items: center; padding: 28px 32px 0">
+    <a href="Menu.dc.html" style="display: flex; align-items: center; gap: 8px; height: 56px; padding: 0 22px 0 14px; border-radius: 28px; background: {{surface}}; font-size: 19px; font-weight: 700">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>
+      Cardápio
+    </a>
+    <a href="Cancel.dc.html" style="height: 56px; padding: 0 12px; display: flex; align-items: center; font-size: 18px; font-weight: 700; color: {{danger}}">Cancelar pedido</a>
+  </header>
+
+  <div style="flex-grow: 1; min-height: 0; padding: 36px 32px 0; display: flex; flex-direction: column; gap: 20px; overflow: hidden">
+    <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 0 12px">
+      <h1 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 56px; letter-spacing: -0.02em">Seu pedido</h1>
+      <div style="font-size: 18px; font-weight: 600; color: {{muted}}">Para viagem</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; border-radius: 28px; background: {{surface}}; padding: 8px 28px">
+      <sc-for list="{{lines}}" as="line" hint-placeholder-count="3">
+        <div style="{{line.rowStyle}}">
+          <div style="{{line.thumbStyle}}">
+            <sc-if value="{{line.hasImg}}" hint-placeholder-val="{{true}}">
+              <img src="{{line.img}}" alt="" style="width: 100%; height: 100%; object-fit: cover; display: block">
+            </sc-if>
+            <sc-if value="{{line.noImg}}" hint-placeholder-val="{{false}}">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"></rect><circle cx="8.5" cy="8.5" r="1.8"></circle><path d="M21 15l-5-5L5 21"></path></svg>
+            </sc-if>
+          </div>
+          <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+            <div style="display: flex; justify-content: space-between; gap: 12px">
+              <div style="font-size: 22px; font-weight: 700">{{line.name}}</div>
+              <div style="font-size: 22px; font-weight: 700">{{line.price}}</div>
+            </div>
+            <sc-if value="{{line.hasDetail}}" hint-placeholder-val="{{true}}">
+              <div style="font-size: 17px; color: {{muted}}">{{line.detail}}</div>
+            </sc-if>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px">
+              <div style="display: flex; gap: 20px">
+                <sc-if value="{{line.hasDetail}}" hint-placeholder-val="{{true}}">
+                  <a href="Item.dc.html" style="height: 44px; display: flex; align-items: center; font-size: 17px; font-weight: 700; color: {{detailText}}">Editar</a>
+                </sc-if>
+                <button type="button" style="height: 44px; padding: 0; background: transparent; border: 0; font-size: 17px; font-weight: 700; color: {{muted}}">Remover</button>
+              </div>
+              <div style="display: flex; align-items: center; gap: 4px; height: 52px; padding: 0 4px; border-radius: 26px; background: {{ground}}">
+                <button type="button" aria-label="Diminuir quantidade" style="width: 44px; height: 44px; border-radius: 22px; border: 0; background: {{surface}}; display: flex; align-items: center; justify-content: center">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg>
+                </button>
+                <div style="min-width: 32px; text-align: center; font-size: 20px; font-weight: 700">{{line.qty}}</div>
+                <button type="button" aria-label="Aumentar quantidade" style="width: 44px; height: 44px; border-radius: 22px; border: 0; background: {{surface}}; display: flex; align-items: center; justify-content: center">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <a href="Cpf.dc.html" style="display: flex; justify-content: space-between; align-items: center; height: 80px; padding: 0 28px; border-radius: 24px; background: {{cpfBg}}">
+      <span style="font-size: 20px; font-weight: 600">CPF na nota? <span style="font-weight: 500; color: {{muted}}">Opcional</span></span>
+      <span style="font-size: 18px; font-weight: 700; color: {{detailText}}">Adicionar</span>
+    </a>
+  </div>
+
+  <div style="padding: 24px 32px 32px; display: flex; flex-direction: column; gap: 20px">
+    <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 0 12px">
+      <span style="font-size: 22px; font-weight: 600; color: {{muted}}">Total</span>
+      <span style="font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 48px; letter-spacing: -0.02em">{{total}}</span>
+    </div>
+    <a href="Payment.dc.html" style="height: 108px; border-radius: 54px; background: {{accent}}; color: {{onAccent}}; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 700">Escolher como pagar</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["padaria","tomate","verde","acafrao"],"default":"padaria"},"$preview":{"width":720,"height":1280}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const THEMES = {
+      padaria: { ground:'#F3EFE8', surface:'#FFFFFF', ink:'#2B211C', muted:'#625750', line:'#E5DDD2', img:'#E9E2D7', imgFg:'#978B80', accent:'#4E3426', onAccent:'#FAF6F0', detailText:'#8A5A2B', danger:'#A3472F', cpfBg:'#EFE4C9' },
+      verde: { ground:'#EEECE6', surface:'#FFFFFF', ink:'#141A17', muted:'#5B615C', line:'#E3E1DA', img:'#E6E2D8', imgFg:'#8A8F88', accent:'#1F3D31', onAccent:'#F4F2EC', detailText:'#7F5E14', danger:'#9C2F2F', cpfBg:'#FFFFFF' },
+      tomate: { ground:'#F3F2ED', surface:'#FFFFFF', ink:'#1B1816', muted:'#5F5B57', line:'#E6E4DE', img:'#ECE7DF', imgFg:'#8C8782', accent:'#C8341F', onAccent:'#FFF6F1', detailText:'#A32A18', danger:'#9C2F2F', cpfBg:'#FFFFFF' },
+      acafrao: { ground:'#EFEEE9', surface:'#FFFFFF', ink:'#17181C', muted:'#5E5D59', line:'#E4E2DC', img:'#E8E6DF', imgFg:'#8A8985', accent:'#17181C', onAccent:'#F7F5EF', detailText:'#8A5E00', danger:'#9C2F2F', cpfBg:'#FFFFFF' }
+    };
+    const theme = this.props.theme ?? 'padaria';
+    const t = THEMES[theme] || THEMES.padaria;
+    const bakery = theme === 'padaria';
+    const raw = bakery ? [
+      { name: 'Croque monsieur', detail: 'Brioche, ovo pochê', price: 'R$ 40,90', qty: 1, img: '/_blob/815ba165d43ef54e1ded7d6eef3d1541', tint: '#E2DED8' },
+      { name: 'Cappuccino', detail: 'Leite integral', price: 'R$ 13,90', qty: 1, img: '/_blob/f948181057416973aa88312d166233b0', tint: '#EFE4C9' },
+      { name: 'Fermentação natural', detail: 'Inteiro, fatiado', price: 'R$ 28,00', qty: 1, img: '/_blob/98cbb1f4f6b7f3edec9da5925073bf50', tint: '#EFE4C9' }
+    ] : [
+      { name: 'Cheddar Bacon', detail: 'Ao ponto, bacon extra', price: 'R$ 39,90', qty: 1, img: '', tint: t.img },
+      { name: 'Batata média', detail: '', price: 'R$ 16,90', qty: 1, img: '', tint: t.img },
+      { name: 'Refrigerante lata', detail: 'Guaraná', price: 'R$ 7,00', qty: 1, img: '', tint: t.img }
+    ];
+    const lines = raw.map((l, i) => ({
+      ...l,
+      hasDetail: !!l.detail,
+      hasImg: !!l.img,
+      noImg: !l.img,
+      rowStyle: 'display: flex; gap: 20px; padding: 22px 0;' + (i > 0 ? ' border-top: 1px solid ' + t.line + ';' : ''),
+      thumbStyle: 'width: 88px; height: 88px; flex-shrink: 0; border-radius: 16px; overflow: hidden; background: ' + l.tint + '; color: ' + t.imgFg + '; display: flex; align-items: center; justify-content: center;'
+    }));
+    return { ...t, lines, total: bakery ? 'R$ 82,80' : 'R$ 63,80' };
+  }
+}
+</script>
+</body>
+</html>

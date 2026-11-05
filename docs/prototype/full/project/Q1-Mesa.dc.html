@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Mesa 12 · Boas-vindas</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button{font:inherit;color:inherit;cursor:pointer}
+main{scrollbar-width:none}main::-webkit-scrollbar{display:none}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F3EFE8; color: #2B211C; font-family: Manrope, system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <main style="flex-grow: 1; min-height: 0; overflow-y: auto">
+    <section style="position: relative; height: 400px; overflow: hidden; background: #2A1C16; color: #FAF6F0">
+      <img src="/_blob/7f143db5ef7defceb99e17affc3fe934" alt="Balcão da padaria com pães e doces" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block">
+      <div style="position: absolute; inset: 0; background: linear-gradient(to top, rgba(42,28,22,0.96) 0%, rgba(42,28,22,0.6) 42%, rgba(42,28,22,0.1) 100%)"></div>
+
+      <div style="position: absolute; top: 20px; left: 20px; right: 20px; display: flex; justify-content: space-between; align-items: center; gap: 12px">
+        <div style="font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 500; font-size: 20px; line-height: 1.2">Padaria Café e Trigo</div>
+        <div role="group" aria-label="Idioma" style="display: flex; gap: 2px; padding: 4px; border-radius: 22px; background: rgba(42,28,22,0.65); flex-shrink: 0">
+          <button type="button" aria-pressed="{{ptPressed}}" onClick="{{setPt}}" style="{{ptStyle}}">PT</button>
+          <button type="button" aria-pressed="{{enPressed}}" onClick="{{setEn}}" style="{{enStyle}}">EN</button>
+        </div>
+      </div>
+
+      <div style="position: absolute; left: 24px; right: 24px; bottom: 30px; display: flex; flex-direction: column; gap: 4px">
+        <div style="font-size: 15px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #E6DACB">{{welcome}}</div>
+        <h1 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 60px; line-height: 1; letter-spacing: -0.02em">{{table}}</h1>
+      </div>
+    </section>
+
+    <section style="padding: 28px 20px 24px; display: flex; flex-direction: column; gap: 14px">
+      <a href="Q2-Cardapio.dc.html" style="height: 64px; border-radius: 32px; background: #4E3426; color: #FAF6F0; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700">{{menu}}</a>
+      <a href="Q7-Conta.dc.html" style="height: 56px; border-radius: 28px; border: 2px solid #2B211C; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700">{{bill}}</a>
+      <button type="button" aria-pressed="{{waiterPressed}}" onClick="{{callWaiter}}" style="{{waiterStyle}}">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
+        <span>{{waiterLabel}}</span>
+      </button>
+      <p style="margin: 10px 8px 0; font-size: 15px; line-height: 1.5; color: #625750; text-align: center">{{note}}</p>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { lang: 'pt', waiter: false };
+  }
+  renderVals() {
+    const TXT = {
+      pt: { welcome: 'Bem-vindo', table: 'Mesa 12', menu: 'Ver cardápio e pedir', bill: 'Ver a conta da mesa', call: 'Chamar o garçom', called: 'Garçom avisado', note: 'Seu pedido vai para a conta da mesa. Você paga no fim.' },
+      en: { welcome: 'Welcome', table: 'Table 12', menu: 'See menu and order', bill: 'View table bill', call: 'Call the waiter', called: 'Waiter notified', note: 'Your order goes to the table bill. You pay at the end.' }
+    };
+    const lang = this.state.lang;
+    const t = TXT[lang];
+    const seg = (on) => 'height: 40px; min-width: 52px; padding: 0 12px; border-radius: 18px; border: 0; font-size: 15px; font-weight: 800; ' +
+      (on ? 'background: #FAF6F0; color: #2B211C;' : 'background: transparent; color: #FAF6F0;');
+    const waiterOn = this.state.waiter;
+    return {
+      ...t,
+      ptPressed: lang === 'pt' ? 'true' : 'false',
+      enPressed: lang === 'en' ? 'true' : 'false',
+      ptStyle: seg(lang === 'pt'),
+      enStyle: seg(lang === 'en'),
+      setPt: () => this.setState({ lang: 'pt' }),
+      setEn: () => this.setState({ lang: 'en' }),
+      waiterPressed: waiterOn ? 'true' : 'false',
+      waiterLabel: waiterOn ? t.called : t.call,
+      waiterStyle: 'height: 56px; border-radius: 28px; border: 0; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 17px; font-weight: 700; ' +
+        (waiterOn ? 'background: #DCDFD2; color: #4F6B45;' : 'background: #EFE4C9; color: #2B211C;'),
+      callWaiter: () => this.setState({ waiter: !waiterOn })
+    };
+  }
+}
+</script>
+</body>
+</html>

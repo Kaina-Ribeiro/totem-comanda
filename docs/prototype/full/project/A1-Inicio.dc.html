@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Back office · Início</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+:root{--paper:#F3EFE8;--surface:#FFFFFF;--ink:#2B211C;--muted:#625750;--line:#E5DDD2;--espresso:#4E3426;--night:#2A1C16;--crema:#B07A3A;--cremaText:#8A5A2B;--cremaBg:#EFE4C9;--leaf:#4F6B45;--leafBg:#DCDFD2;--danger:#A3472F;--dangerBg:#F4E1DB;--hover:#EFE9E1}
+body{margin:0;background:var(--paper)}
+*{box-sizing:border-box}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--crema);outline-offset:2px}
+.app{min-height:100vh;background:var(--paper);color:var(--ink);font-family:Manrope,system-ui,sans-serif;font-feature-settings:"tnum" 1;display:flex;flex-wrap:wrap;align-items:stretch;-webkit-font-smoothing:antialiased}
+.tap{transition:transform .12s ease,background-color .15s ease,border-color .15s ease,color .15s ease}
+.tap:active{transform:scale(.98)}
+.side{flex:1 1 236px;max-width:236px;background:var(--surface);border-right:1px solid var(--line);padding:20px 12px;display:flex;flex-direction:column;gap:16px}
+.brand{padding:0 10px;display:flex;flex-direction:column;gap:1px}
+.brand b{font-family:Fraunces,Georgia,serif;font-style:italic;font-weight:500;font-size:22px;letter-spacing:-0.01em}
+.brand span{font-size:12.5px;font-weight:600;color:var(--muted)}
+.navgroups{display:flex;flex-direction:column;gap:14px;scrollbar-width:none}.navgroups::-webkit-scrollbar{display:none}
+.navgroup{display:flex;flex-direction:column;gap:1px}
+.navhead{padding:0 10px 4px;font-size:12px;font-weight:600;color:var(--muted)}
+.nav-link{height:36px;padding:0 10px;border-radius: 9px;display:flex;align-items:center;gap:10px;white-space:nowrap;font-size:14px;font-weight:600;color:#4A3F38}
+.nav-link svg{width:18px;height:18px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;opacity:.75}
+.nav-link:hover{background:var(--hover);color:var(--ink)}
+.nav-link[aria-current=page]{background:var(--espresso);color:#FAF6F0;font-weight:700}
+.nav-link[aria-current=page] svg{opacity:1}
+.sair{margin-top:auto;padding:0 10px;font-size:13.5px;font-weight:700;color:var(--muted)}
+.main{flex:999 1 560px;min-width:0;max-width:1160px;padding:28px 36px 48px;display:flex;flex-direction:column;gap:18px}
+.card{border-radius: 14px;background:var(--surface);border:1px solid var(--line);padding:18px 20px;display:flex;flex-direction:column;gap:10px}
+.cardhead{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:28px}
+h1{margin:0;font-weight:700;font-size:28px;letter-spacing:-0.02em;line-height:1.15}
+h2{margin:0;font-weight:700;font-size:16px;letter-spacing:-0.01em}
+.sub{margin:0;font-size:14px;font-weight:500;color:var(--muted)}
+.link{font-size:13.5px;font-weight:700;color:var(--cremaText);white-space:nowrap}
+.link:hover{color:var(--espresso)}
+.btn{height:40px;padding:0 16px;border-radius: 10px;border:1px solid var(--line);background:var(--surface);display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:700;white-space:nowrap}
+.btn:hover{border-color:#D9CFC3;background:var(--hover)}
+.btn.sm{height:34px;padding:0 12px;font-size:13px}
+.list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column}
+.list>li{border-top:1px solid var(--line)}
+.list>li:first-child{border-top:0}
+.chip{height:24px;padding:0 10px;border-radius: 999px;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.band{border-radius: 16px;background:var(--night);color:#FAF6F0;padding:20px 22px;display:flex;flex-wrap:wrap;align-items:center;gap:18px 32px}
+.band .k{font-size:13px;font-weight:600;color:#CDBFB2;display:flex;align-items:center;gap:8px}
+.band .t{font-weight:700;font-size:26px;letter-spacing:-0.02em;line-height:1.15}
+.band .s{font-size:14px;font-weight:500;color:#CDBFB2;line-height:1.45}
+.pace{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:4px;border-radius: 12px;background:rgba(250,246,240,.08)}
+.pace button{min-height:52px;border-radius: 9px;border:0;background:transparent;color:#E9DFD4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.pace button:hover{background:rgba(250,246,240,.06)}
+.pace b{font-size:14.5px;font-weight:700}
+.pace small{font-size:12px;font-weight:600;opacity:.7}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius: 14px;overflow:hidden}
+.kpi{background:var(--surface);padding:16px 20px;display:flex;flex-direction:column;gap:4px}
+.kpi:hover{background:#FBF8F3}
+.kpi .l{font-size:13px;font-weight:600;color:var(--muted)}
+.kpi .v{font-weight:800;font-size:clamp(24px,2.3vw,30px);letter-spacing:-0.03em;white-space:nowrap;line-height:1.2}
+.counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line);border-radius: 12px}
+.cnt{padding:10px 14px;display:flex;flex-direction:column;border-left:1px solid var(--line)}
+.cnt:first-of-type{border-left:0}
+.alert{margin:0;padding:10px 12px;border-radius: 10px;background:var(--cremaBg);color:#8A5A2B;font-size:13.5px;font-weight:700;display:flex;align-items:center;gap:8px}
+.alert svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.row:hover{background:#FBF8F3}
+.datebox{width:44px;height:44px;flex-shrink:0;border-radius: 10px;border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+.datebox b{font-size:16px;font-weight:800}
+.datebox span{font-size:11px;font-weight:700;color:var(--muted);margin-top:2px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:14px}
+@media (max-width: 820px){.side{min-width:0;max-width:none;flex-basis:100%;border-right:0;border-bottom:1px solid var(--line);padding:12px 16px;gap:10px;flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:space-between}.side>.chip{order:2}.navgroups{order:3;flex-basis:100%;flex-direction:row;overflow-x:auto;gap:2px;margin:0 -16px;padding:0 16px}.navgroup{flex-direction:row}.navhead{display:none}.sair{display:none}.main{padding:20px 16px 40px}h1{font-size:24px}}
+@media (max-width: 520px){.pace{grid-template-columns:1fr}.band{padding:18px}}
+@media (prefers-reduced-motion: reduce){.tap{transition:none}.tap:active{transform:none}}
+</style>
+</helmet>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><b>Comanda</b><span>Padaria Café e Trigo</span></div>
+    <span class="chip" style="{{sidePillStyle}}"><span class="dot" style="{{sideDotStyle}}"></span>{{sidePill}}</span>
+    <nav aria-label="Back office" class="navgroups">
+      <sc-for list="{{nav}}" as="g" hint-placeholder-count="4">
+        <div class="navgroup">
+          <sc-if value="{{g.hasTitle}}" hint-placeholder-val="{{true}}"><span class="navhead">{{g.title}}</span></sc-if>
+          <sc-for list="{{g.items}}" as="n" hint-placeholder-count="3"><a href="{{n.href}}" class="nav-link tap" aria-current="{{n.current}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="{{n.icon}}"/></svg>{{n.label}}</a></sc-for>
+        </div>
+      </sc-for>
+    </nav>
+    <a href="#sair" class="sair">Sair</a>
+  </aside>
+
+  <main class="main">
+    <header style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 16px">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <h1>Boa tarde</h1>
+        <p class="sub">Quarta, 4 de novembro. Atualizado às 10:42</p>
+      </div>
+      <a href="A2-Pedidos.dc.html" class="btn tap">Ver pedidos de hoje</a>
+    </header>
+
+    <section aria-label="Totem e ritmo da cozinha" class="band">
+      <div style="flex: 1 1 300px; display: flex; flex-direction: column; gap: 6px">
+        <span class="k"><span class="dot" style="{{statusDotStyle}}"></span>{{statusKicker}}</span>
+        <span class="t">{{statusTitle}}</span>
+        <span class="s">{{statusText}}</span>
+      </div>
+      <div style="flex: 1 1 420px; display: flex; flex-direction: column; gap: 8px">
+        <span class="k" id="ritmo">Ritmo da cozinha</span>
+        <div role="radiogroup" aria-labelledby="ritmo" class="pace">
+          <sc-for list="{{paces}}" as="p" hint-placeholder-count="3">
+            <button type="button" role="radio" aria-checked="{{p.checked}}" onClick="{{p.pick}}" class="tap" style="{{p.style}}"><b>{{p.label}}</b><small>{{p.hint}}</small></button>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+
+    <section aria-label="Hoje" class="kpis">
+      <sc-for list="{{kpis}}" as="k" hint-placeholder-count="3">
+        <a href="A9-Relatorio.dc.html" class="kpi tap">
+          <span class="l">{{k.label}}</span>
+          <span class="v">{{k.value}}</span>
+          <span style="{{k.deltaStyle}}">{{k.delta}}</span>
+        </a>
+      </sc-for>
+    </section>
+
+    <div class="grid2">
+      <section aria-labelledby="agora" class="card">
+        <div class="cardhead"><h2 id="agora">Cozinha agora</h2><a href="K1-Pedidos.dc.html" class="link">Abrir a tela da cozinha</a></div>
+        <div class="counts">
+          <sc-for list="{{kitchen}}" as="c" hint-placeholder-count="3">
+            <div class="cnt"><span style="font-size: 26px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15">{{c.n}}</span><span style="font-size: 12.5px; font-weight: 600; color: #625750">{{c.label}}</span></div>
+          </sc-for>
+        </div>
+        <p class="alert"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Pedido 41 esperando há 12 min</p>
+        <ul class="list">
+          <sc-for list="{{devices}}" as="d" hint-placeholder-count="3">
+            <li style="display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 42px; font-size: 14px">
+              <span style="display: flex; align-items: center; gap: 10px; font-weight: 700"><span class="dot" style="{{d.dotStyle}}"></span>{{d.name}}</span>
+              <span style="font-weight: 500; color: #625750">{{d.state}}</span>
+            </li>
+          </sc-for>
+        </ul>
+      </section>
+
+      <section aria-labelledby="pronto" class="card">
+        <div class="cardhead">
+          <h2 id="pronto">Pronto para vender?</h2>
+          <span style="display: flex; gap: 6px"><span class="chip" style="background: #F4E1DB; color: #A3472F">2 erros</span><span class="chip" style="background: #EFE4C9; color: #8A5A2B">3 avisos</span></span>
+        </div>
+        <ul class="list">
+          <sc-for list="{{health}}" as="h" hint-placeholder-count="5">
+            <li class="row" style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 4px">
+              <span class="dot" style="{{h.dotStyle}}"></span>
+              <span style="flex-grow: 1; font-size: 14px; font-weight: 500; line-height: 1.45"><b style="font-weight: 700">{{h.sev}}.</b> {{h.text}}</span>
+              <a href="A6-Item.dc.html" class="link">Resolver</a>
+            </li>
+          </sc-for>
+        </ul>
+      </section>
+    </div>
+
+    <div class="grid2">
+      <section aria-labelledby="esg" class="card">
+        <div class="cardhead"><h2 id="esg">Esgotados hoje</h2><a href="A4-Esgotados.dc.html" class="link">Ver todos</a></div>
+        <ul class="list">
+          <sc-for list="{{soldOut}}" as="s" hint-placeholder-count="3">
+            <li style="display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 56px">
+              <span style="display: flex; flex-direction: column; gap: 1px; min-width: 0"><span style="font-size: 14px; font-weight: 700">{{s.name}}</span><span style="font-size: 13px; font-weight: 500; color: #625750">{{s.until}}</span></span>
+              <button type="button" class="btn sm tap">Liberar</button>
+            </li>
+          </sc-for>
+        </ul>
+      </section>
+      <section aria-labelledby="datas" class="card">
+        <div class="cardhead"><h2 id="datas">Próximas datas especiais</h2><a href="A5-Datas.dc.html" class="link">Gerenciar</a></div>
+        <ul class="list">
+          <sc-for list="{{dates}}" as="d" hint-placeholder-count="3">
+            <li style="display: flex; align-items: center; gap: 14px; min-height: 60px">
+              <span class="datebox"><span style="font-size: 17px; font-weight: 800">{{d.dayNum}}</span><span style="font-size: 11px; font-weight: 700; color: #625750; margin-top: 2px">{{d.month}}</span></span>
+              <span style="flex-grow: 1; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 14px; font-weight: 700">{{d.name}}</span><span style="font-size: 13px; font-weight: 500; color: #625750">{{d.weekday}}</span></span>
+              <span class="chip" style="{{d.chipStyle}}">{{d.hours}}</span>
+            </li>
+          </sc-for>
+        </ul>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { pace: 'normal' };
+  }
+  renderVals() {
+    const ACTIVE = 'inicio';
+    const ICON = {
+      inicio: 'M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z',
+      pedidos: 'M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3',
+      esgotados: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM5.6 5.6l12.8 12.8',
+      relatorio: 'M4 20h16M7 16v-5M12 16V7M17 16v-8',
+      cardapios: 'M5 4h12a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2zM9 8h6M9 12h4',
+      categorias: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+      itens: 'M3 12V4h8l10 10-8 8zM7.5 7.5h.01',
+      selos: 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z',
+      cupons: 'M3 7h18v3a2 2 0 0 0 0 4v3H3v-3a2 2 0 0 0 0-4zM14 7v10',
+      horarios: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 7v5l3 2',
+      tela: 'M7 2h10a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zM10 18h4',
+      aparelhos: 'M4 5h16v11H4zM9 20h6M12 16v4',
+      loja: 'M4 9l1.5-5h13L20 9M4 9h16v11H4zM10 20v-6h4v6'
+    };
+    const NAV = [
+      { title: '', items: [['Início', 'A1-Inicio.dc.html', 'inicio']] },
+      { title: 'Operação', items: [['Pedidos', 'A2-Pedidos.dc.html', 'pedidos'], ['Esgotados', 'A4-Esgotados.dc.html', 'esgotados'], ['Relatório', 'A9-Relatorio.dc.html', 'relatorio']] },
+      { title: 'Cardápio', items: [['Cardápios', 'A10-Cardapios.dc.html', 'cardapios'], ['Categorias', 'A11-Categorias.dc.html', 'categorias'], ['Itens', 'A6-Item.dc.html', 'itens'], ['Selos e sugestões', 'A12-Selos.dc.html', 'selos'], ['Cupons', 'A8-Cupom.dc.html', 'cupons']] },
+      { title: 'Loja', items: [['Horários', 'A5-Datas.dc.html', 'horarios'], ['Tela do totem', 'A7-TelaTotem.dc.html', 'tela'], ['Aparelhos', 'A13-Aparelhos.dc.html', 'aparelhos'], ['Loja e conta', 'A14-Loja.dc.html', 'loja']] }
+    ];
+    const nav = NAV.map((g) => ({ title: g.title, hasTitle: !!g.title, items: g.items.map(([label, href, id]) => ({ label, href, icon: ICON[id], current: id === ACTIVE ? 'page' : 'false' })) }));
+
+    const pace = this.state.pace;
+    const PACES = [
+      { id: 'normal', label: 'Normal', hint: '~8 min' },
+      { id: 'busy', label: 'Movimentado', hint: '~15 min' },
+      { id: 'paused', label: 'Pausar', hint: 'por 15 min' }
+    ];
+    const paces = PACES.map((p) => ({
+      label: p.label, hint: p.hint, checked: p.id === pace ? 'true' : 'false',
+      style: p.id === pace ? 'background: #FAF6F0; color: #2B211C;' : 'background: transparent; color: #E9DFD4;',
+      pick: () => this.setState({ pace: p.id })
+    }));
+    const paused = pace === 'paused';
+    const busy = pace === 'busy';
+    const statusKicker = paused ? 'Totem pausado' : busy ? 'Totem aberto, cozinha movimentada' : 'Totem aberto';
+    const statusDotStyle = 'background: ' + (paused ? '#D8B98A' : '#8FBF8A') + ';';
+    const statusTitle = paused ? 'Pausado até 10:57' : 'Cardápio da manhã até 11:00';
+    const statusText = paused ? 'O totem mostra “Estamos com muitos pedidos” e indica o balcão. Volta sozinho no horário.' : 'Amanhã abre às 06:00 com o Cardápio da manhã.';
+    const sidePill = paused ? 'Totem pausado' : busy ? 'Aberto, movimentado' : 'Totem aberto';
+    const sidePillStyle = 'margin: 0 6px; align-self: flex-start; height: 28px; background: ' + (paused ? '#EFE4C9' : '#DCDFD2') + '; color: ' + (paused ? '#8A5A2B' : '#4F6B45') + ';';
+    const sideDotStyle = 'background: ' + (paused ? '#B07A3A' : '#4F6B45') + ';';
+
+    const up = 'font-size: 12.5px; font-weight: 700; color: #4F6B45;';
+    const flat = 'font-size: 12.5px; font-weight: 600; color: #625750;';
+    const kpis = [
+      { label: 'Faturamento hoje', value: 'R$ 1.284,60', delta: '+12% que na quarta passada', deltaStyle: up },
+      { label: 'Pedidos', value: '47', delta: '6 na cozinha agora', deltaStyle: flat },
+      { label: 'Ticket médio', value: 'R$ 27,33', delta: 'R$ 1,10 a menos que na quarta passada', deltaStyle: flat }
+    ];
+    const kitchen = [{ n: '2', label: 'novos' }, { n: '2', label: 'preparando' }, { n: '2', label: 'prontos' }];
+    const dot = (c) => 'background: ' + c + ';';
+    const devices = [
+      { name: 'Totem do salão', state: 'online, sinal há 12 s', dotStyle: dot('#4F6B45') },
+      { name: 'Tablet da cozinha', state: 'online, sinal há 3 s', dotStyle: dot('#4F6B45') },
+      { name: 'Último pedido', state: 'há 2 min', dotStyle: dot('#B07A3A') }
+    ];
+    const ERR = 'margin-top: 6px; background: #A3472F;';
+    const WARN = 'margin-top: 6px; background: #D8B98A;';
+    const health = [
+      { sev: 'Erro', dotStyle: ERR, text: 'Croque monsieur: o grupo “Pão” pede 1 escolha e só 1 de 3 pães está disponível.' },
+      { sev: 'Erro', dotStyle: ERR, text: 'Tarte de limão está sem preço no Cardápio da tarde.' },
+      { sev: 'Aviso', dotStyle: WARN, text: 'Croissant de amêndoas está sem foto.' },
+      { sev: 'Aviso', dotStyle: WARN, text: 'A categoria Salgados está vazia no Cardápio da manhã.' },
+      { sev: 'Aviso', dotStyle: WARN, text: 'Suco verde está sem nome em inglês.' }
+    ];
+    const soldOut = [
+      { name: 'Croissant de amêndoas', until: 'Volta amanhã às 06:00' },
+      { name: 'Leite de aveia (opção)', until: 'Em Cappuccino e Latte, volta amanhã' },
+      { name: 'Centeio com sementes', until: 'Até sexta, 6 de novembro' }
+    ];
+    const chip = (bg, fg) => 'background: ' + bg + '; color: ' + fg + ';';
+    const dates = [
+      { dayNum: '24', month: 'dez', weekday: 'Quinta-feira', name: 'Véspera de Natal', hours: '06:00 – 14:00', chipStyle: chip('#EFE4C9', '#8A5A2B') },
+      { dayNum: '25', month: 'dez', weekday: 'Sexta-feira', name: 'Natal', hours: 'Fechado', chipStyle: chip('#E2DED8', '#4A3F38') },
+      { dayNum: '1', month: 'jan', weekday: 'Sexta-feira', name: 'Ano-novo', hours: 'Fechado', chipStyle: chip('#E2DED8', '#4A3F38') }
+    ];
+    return { nav, paces, statusKicker, statusDotStyle, statusTitle, statusText, sidePill, sidePillStyle, sideDotStyle, kpis, kitchen, devices, health, soldOut, dates };
+  }
+}
+</script>
+</body>
+</html>

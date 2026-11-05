@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Cozinha · Pedidos</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button{font:inherit;color:inherit;cursor:pointer}
+.tap{transition:transform .12s ease,background-color .15s ease,box-shadow .15s ease}
+.tap:active{transform:scale(.97)}
+.lift{transition:box-shadow .15s ease}
+.lift:hover{box-shadow:0 0 0 2px #D8B98A}
+</style>
+</helmet>
+<div style="width: 1280px; height: 800px; box-sizing: border-box; background: #F3EFE8; color: #2B211C; font-family: Manrope, system-ui, sans-serif; display: flex; flex-direction: column; position: relative; overflow: hidden">
+  <header style="height: 76px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 24px">
+    <div style="display: flex; align-items: center; gap: 14px">
+      <span style="font-family: Manrope, system-ui, sans-serif; font-weight: 700; font-size: 22px; letter-spacing: -0.02em">Cozinha</span>
+      <span role="status" style="display: flex; align-items: center; gap: 7px; height: 28px; padding: 0 12px; border-radius: 14px; background: #DCDFD2; font-size: 13px; font-weight: 800"><span style="width: 8px; height: 8px; border-radius: 4px; background: #4F6B45"></span>Ao vivo</span>
+    </div>
+    <nav aria-label="Telas da cozinha" style="display: flex; gap: 4px; padding: 4px; border-radius: 16px; background: #E6DED2">
+      <a href="K1-Pedidos.dc.html" aria-current="page" class="tap" style="height: 44px; padding: 0 10px 0 18px; border-radius: 14px; background: #4E3426; color: #FAF6F0; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 800">Pedidos <span style="min-width: 26px; height: 26px; padding: 0 7px; box-sizing: border-box; border-radius: 13px; background: #D8B98A; color: #2B211C; display: flex; align-items: center; justify-content: center; font-size: 13px">6</span></a>
+      <a href="K3-Producao.dc.html" class="tap" style="height: 44px; padding: 0 18px; border-radius: 14px; display: flex; align-items: center; font-size: 15px; font-weight: 800; color: #625750">Produção</a>
+      <a href="#retirados" class="tap" style="height: 44px; padding: 0 10px 0 18px; border-radius: 14px; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 800; color: #625750">Retirados <span style="min-width: 26px; height: 26px; padding: 0 7px; box-sizing: border-box; border-radius: 13px; background: #F3EFE8; display: flex; align-items: center; justify-content: center; font-size: 13px">38</span></a>
+    </nav>
+    <div style="display: flex; align-items: center; gap: 10px">
+      <a href="K4-Ritmo.dc.html" class="tap" style="height: 44px; padding: 0 16px; border-radius: 14px; background: #FFFFFF; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 800">
+        <span style="width: 10px; height: 10px; border-radius: 5px; background: #4F6B45"></span>Ritmo normal <span style="font-weight: 600; color: #625750">~8 min</span>
+      </a>
+      <a href="K5-Som.dc.html" aria-label="Som dos pedidos novos: ligado" class="tap" style="width: 44px; height: 44px; border-radius: 14px; background: #FFFFFF; display: flex; align-items: center; justify-content: center">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5z"></path><path d="M15.5 8.5a5 5 0 010 7"></path><path d="M18.5 5.5a9 9 0 010 13"></path></svg>
+      </a>
+      <span style="font-family: Manrope, system-ui, sans-serif; font-weight: 700; font-size: 20px; min-width: 64px; text-align: right; letter-spacing: -0.02em">10:42</span>
+    </div>
+  </header>
+
+  <div role="alert" style="margin: 0 24px; height: 56px; flex-shrink: 0; border-radius: 12px; background: #4E3426; color: #FAF6F0; display: flex; align-items: center; justify-content: space-between; padding: 0 8px 0 20px">
+    <div style="display: flex; align-items: center; gap: 12px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#D8B98A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.7 21a2 2 0 01-3.4 0"></path></svg>
+      <span style="font-size: 17px; font-weight: 800">2 pedidos novos</span>
+      <span style="font-size: 15px; font-weight: 600; color: #D9C8B8">44 e 45 · o som para quando alguém tocar na tela</span>
+    </div>
+    <button type="button" class="tap" style="height: 40px; padding: 0 20px; border-radius: 12px; border: 0; background: #FAF6F0; color: #4E3426; font-size: 15px; font-weight: 800">Ok, vi</button>
+  </div>
+
+  <div style="flex-grow: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding: 16px 24px 24px">
+    <sc-for list="{{cols}}" as="col" hint-placeholder-count="3">
+      <section aria-label="{{col.title}}" style="min-height: 0; display: flex; flex-direction: column; gap: 12px; padding: 12px; border-radius: 16px; background: #EAE3D8; overflow: hidden">
+        <h2 style="margin: 0; padding: 2px 6px 0; display: flex; align-items: center; justify-content: space-between; font-size: 17px; font-weight: 800">{{col.title}} <span style="min-width: 28px; height: 28px; padding: 0 8px; box-sizing: border-box; border-radius: 14px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #625750">{{col.count}}</span></h2>
+        <sc-for list="{{col.cards}}" as="c" hint-placeholder-count="2">
+          <article class="lift" style="{{c.cardStyle}}">
+            <a href="K2-Detalhe.dc.html" aria-label="Abrir pedido {{c.num}}" style="display: flex; flex-direction: column; gap: 10px">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+                <div style="display: flex; align-items: center; gap: 10px">
+                  <span style="font-family: Manrope, system-ui, sans-serif; font-weight: 800; font-size: 38px; letter-spacing: -0.02em; line-height: 1">{{c.num}}</span>
+                  <sc-if value="{{c.isNew}}" hint-placeholder-val="{{false}}">
+                    <span style="height: 24px; padding: 0 9px; border-radius: 12px; background: #EAD9C6; display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600;"><span style="width: 6px; height: 6px; border-radius: 3px; background: #B07A3A"></span>Novo</span>
+                  </sc-if>
+                  <span style="{{c.typeStyle}}">{{c.type}}</span>
+                </div>
+                <span style="{{c.timeStyle}}">{{c.time}}</span>
+              </div>
+              <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 7px">
+                <sc-for list="{{c.lines}}" as="l" hint-placeholder-count="2">
+                  <li style="display: flex; flex-direction: column; gap: 1px">
+                    <span style="font-size: 17px; font-weight: 700">{{l.name}}</span>
+                    <sc-if value="{{l.hasOpts}}" hint-placeholder-val="{{true}}">
+                      <span style="font-size: 14px; font-weight: 600; color: #625750">{{l.opts}}</span>
+                    </sc-if>
+                  </li>
+                </sc-for>
+              </ul>
+            </a>
+            <button type="button" class="tap" style="{{c.btnStyle}}">{{c.btn}}</button>
+          </article>
+        </sc-for>
+      </section>
+    </sc-for>
+  </div>
+
+  <div role="status" style="position: absolute; left: 440px; bottom: 18px; width: 400px; height: 56px; box-sizing: border-box; border-radius: 16px; background: #2B211C; color: #FAF6F0; display: flex; align-items: center; justify-content: space-between; padding: 0 8px 0 22px; box-shadow: 0 8px 24px rgba(28,28,26,.20)">
+    <span style="font-size: 15px; font-weight: 700">Pedido 38 retirado</span>
+    <button type="button" class="tap" style="height: 40px; padding: 0 16px; border-radius: 12px; border: 0; background: #3D312A; color: #D8B98A; font-size: 15px; font-weight: 800">Desfazer · 4 s</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const chip = 'height: 26px; padding: 0 10px; border-radius: 13px; display: flex; align-items: center; font-size: 13px; font-weight: 800; white-space: nowrap; ';
+    const TIME = {
+      ok: chip + 'background: #DCDFD2; color: #2B211C;',
+      warn: chip + 'background: #EFE4C9; color: #8A5A2B;',
+      late: chip + 'background: #A3472F; color: #FFFFFF;'
+    };
+    const TYPE = {
+      'Para viagem': chip + 'background: #EFE4C9; color: #2B211C;',
+      'Comer aqui': chip + 'background: #E2DED8; color: #2B211C;'
+    };
+    const BTN = {
+      'Começar': 'background: #4E3426; color: #FAF6F0;',
+      'Pronto': 'background: #4E3426; color: #FAF6F0;',
+      'Retirado': 'background: #F3EFE8; color: #2B211C;'
+    };
+    const card = (c) => ({
+      ...c,
+      isNew: !!c.isNew,
+      lines: c.lines.map((l) => ({ name: l.name, opts: l.opts || '', hasOpts: !!l.opts })),
+      typeStyle: TYPE[c.type],
+      timeStyle: TIME[c.state || 'ok'],
+      cardStyle: 'display: flex; flex-direction: column; gap: 12px; padding: 14px 16px 16px; border-radius: 12px; background: #FFFFFF; flex-shrink: 0; ' +
+        (c.isNew ? 'box-shadow: 0 0 0 3px #D8B98A;' : c.state === 'late' ? 'box-shadow: 0 0 0 2px #A3472F;' : 'box-shadow: 0 1px 2px rgba(28,28,26,.08);'),
+      btnStyle: 'height: 52px; border-radius: 16px; border: 0; font-size: 17px; font-weight: 800; ' + BTN[c.btn]
+    });
+    const cols = [
+      { title: 'Novos', cards: [
+        { num: '44', isNew: true, type: 'Comer aqui', time: '1 min', lines: [{ name: '2× Pão na chapa', opts: 'Manteiga' }, { name: '1× Café coado' }], btn: 'Começar' },
+        { num: '45', isNew: true, type: 'Para viagem', time: 'agora', lines: [{ name: '1× Croque monsieur', opts: 'Brioche · Ovo pochê' }, { name: '1× Cappuccino', opts: 'Leite integral' }], btn: 'Começar' }
+      ] },
+      { title: 'Preparando', cards: [
+        { num: '41', type: 'Comer aqui', time: '12 min', state: 'late', lines: [{ name: '2× Croissant' }, { name: '1× Latte', opts: 'Leite de aveia' }], btn: 'Pronto' },
+        { num: '42', type: 'Para viagem', time: '7 min', state: 'warn', lines: [{ name: '1× Sanduíche de peru', opts: 'Ciabatta' }, { name: '1× Suco de laranja', opts: '300 ml' }], btn: 'Pronto' }
+      ] },
+      { title: 'Prontos', cards: [
+        { num: '39', type: 'Comer aqui', time: 'pronto há 2 min', lines: [{ name: '1× Cookie de chocolate' }, { name: '1× Cappuccino', opts: 'Leite integral' }], btn: 'Retirado' },
+        { num: '40', type: 'Para viagem', time: 'pronto há 1 min', lines: [{ name: '3× Pão de queijo' }], btn: 'Retirado' }
+      ] }
+    ].map((col) => ({ title: col.title, count: col.cards.length, cards: col.cards.map(card) }));
+    return { cols };
+  }
+}
+</script>
+</body>
+</html>

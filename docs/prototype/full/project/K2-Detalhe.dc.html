@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Cozinha · Detalhe do pedido</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button{font:inherit;color:inherit;cursor:pointer}
+.tap{transition:transform .12s ease,background-color .15s ease}
+.tap:active{transform:scale(.97)}
+</style>
+</helmet>
+<div style="width: 1280px; height: 800px; box-sizing: border-box; background: #F3EFE8; color: #2B211C; font-family: Manrope, system-ui, sans-serif; position: relative; overflow: hidden">
+  <div aria-hidden="true" style="position: absolute; inset: 0; display: flex; flex-direction: column">
+    <div style="height: 76px; display: flex; align-items: center; justify-content: space-between; padding: 0 24px">
+      <span style="font-family: Manrope, system-ui, sans-serif; font-weight: 700; font-size: 22px; letter-spacing: -0.02em">Cozinha</span>
+      <span style="width: 360px; height: 52px; border-radius: 16px; background: #E6DED2"></span>
+      <span style="width: 280px; height: 44px; border-radius: 14px; background: #FFFFFF"></span>
+    </div>
+    <div style="flex-grow: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding: 16px 24px 24px">
+      <sc-for list="{{ghostCols}}" as="g" hint-placeholder-count="3">
+        <div style="border-radius: 16px; background: #EAE3D8; padding: 12px; display: flex; flex-direction: column; gap: 12px">
+          <div style="height: 28px"></div>
+          <div style="height: 228px; border-radius: 12px; background: #FFFFFF"></div>
+          <div style="height: 228px; border-radius: 12px; background: #FFFFFF"></div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  <div style="position: absolute; inset: 0; background: rgba(28,28,26,.45)"></div>
+
+  <aside role="dialog" aria-modal="true" aria-label="Pedido 41" style="position: absolute; top: 0; right: 0; bottom: 0; width: 540px; box-sizing: border-box; background: #FFFFFF; display: flex; flex-direction: column; box-shadow: -12px 0 32px rgba(28,28,26,.18)">
+    <div style="padding: 20px 28px 0; display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; justify-content: space-between; align-items: center">
+        <span style="font-size: 13px; font-weight: 600; color: #625750">Pedido</span>
+        <a href="K1-Pedidos.dc.html" aria-label="Fechar" class="tap" style="width: 48px; height: 48px; border-radius: 16px; background: #F3EFE8; display: flex; align-items: center; justify-content: center">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+        </a>
+      </div>
+      <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap">
+        <span style="font-family: Manrope, system-ui, sans-serif; font-weight: 800; font-size: 72px; letter-spacing: -0.03em; line-height: 0.9">41</span>
+        <span style="height: 30px; padding: 0 12px; border-radius: 15px; background: #EAD9C6; display: flex; align-items: center; font-size: 14px; font-weight: 800">Preparando</span>
+        <span style="height: 30px; padding: 0 12px; border-radius: 15px; background: #E2DED8; display: flex; align-items: center; font-size: 14px; font-weight: 800">Comer aqui</span>
+        <span style="height: 30px; padding: 0 12px; border-radius: 15px; background: #A3472F; color: #FFFFFF; display: flex; align-items: center; font-size: 14px; font-weight: 800">12 min</span>
+      </div>
+      <p style="margin: 0; font-size: 15px; font-weight: 600; color: #625750">Pago no totem às 10:30 · começou às 10:33</p>
+    </div>
+
+    <div style="flex-grow: 1; min-height: 0; overflow: hidden; padding: 22px 28px 0; display: flex; flex-direction: column; gap: 22px">
+      <section style="display: flex; flex-direction: column; gap: 4px">
+        <h3 style="margin: 0 0 6px; font-family: Manrope, system-ui, sans-serif; font-weight: 700; font-size: 18px; letter-spacing: -0.02em">Itens</h3>
+        <div style="display: flex; align-items: center; justify-content: space-between; min-height: 56px; border-bottom: 1px solid #E5DDD2">
+          <span style="font-size: 19px; font-weight: 700">2× Croissant</span>
+          <button type="button" class="tap" style="height: 44px; padding: 0 18px; border-radius: 14px; border: 1.5px solid #E5DDD2; background: #FFFFFF; color: #A3472F; font-size: 15px; font-weight: 800">Acabou</button>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; min-height: 56px">
+          <span style="font-size: 19px; font-weight: 700">1× Latte</span>
+          <button type="button" class="tap" style="height: 44px; padding: 0 18px; border-radius: 14px; border: 1.5px solid #E5DDD2; background: #FFFFFF; color: #A3472F; font-size: 15px; font-weight: 800">Acabou</button>
+        </div>
+        <div style="margin-left: 18px; border-radius: 16px; background: #EFE4C9; padding: 14px 14px 14px 18px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; flex-direction: column; gap: 3px">
+            <span style="font-size: 16px; font-weight: 800">Leite de aveia acabou?</span>
+            <span style="font-size: 14px; font-weight: 600; color: #625750; line-height: 1.4">Sai do totem até o fim do dia. Latte e Cappuccino continuam com os outros leites.</span>
+          </div>
+          <div style="display: flex; justify-content: flex-end; gap: 8px">
+            <button type="button" class="tap" style="height: 44px; padding: 0 18px; border-radius: 14px; border: 0; background: transparent; font-size: 15px; font-weight: 800">Cancelar</button>
+            <button type="button" class="tap" style="height: 44px; padding: 0 20px; border-radius: 14px; border: 0; background: #A3472F; color: #FFFFFF; font-size: 15px; font-weight: 800">Acabou</button>
+          </div>
+        </div>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 10px">
+        <h3 style="margin: 0; font-family: Manrope, system-ui, sans-serif; font-weight: 700; font-size: 18px; letter-spacing: -0.02em">Histórico</h3>
+        <ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column">
+          <sc-for list="{{history}}" as="h" hint-placeholder-count="3">
+            <li style="display: flex; gap: 14px; min-height: 38px">
+              <span style="width: 14px; display: flex; flex-direction: column; align-items: center">
+                <span style="{{h.dotStyle}}"></span>
+                <sc-if value="{{h.hasLine}}" hint-placeholder-val="{{true}}"><span style="flex-grow: 1; width: 2px; background: #E5DDD2"></span></sc-if>
+              </span>
+              <span style="font-size: 15px; font-weight: 600; color: #625750"><span style="{{h.timeStyle}}">{{h.time}}</span> · {{h.label}}</span>
+            </li>
+          </sc-for>
+        </ol>
+      </section>
+    </div>
+
+    <div style="padding: 18px 28px 26px; border-top: 1px solid #E5DDD2; display: flex; gap: 12px">
+      <button type="button" class="tap" style="flex: 1 1 0; height: 64px; border-radius: 16px; border: 0; background: #F3EFE8; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 17px; font-weight: 800">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5"></path><path d="M4 9h10.5a5.5 5.5 0 010 11H11"></path></svg>
+        Voltar para Novos
+      </button>
+      <a href="K1-Pedidos.dc.html" class="tap" style="flex: 1.3 1 0; height: 64px; border-radius: 16px; background: #4E3426; color: #FAF6F0; display: flex; align-items: center; justify-content: center; font-size: 19px; font-weight: 800">Pronto</a>
+    </div>
+  </aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const rows = [
+      { time: '10:30', label: 'Pago no totem', tone: 'done' },
+      { time: '10:33', label: 'Começou na cozinha', tone: 'done' },
+      { time: 'Agora', label: '12 min esperando, passou do tempo', tone: 'late' }
+    ];
+    const history = rows.map((r, i) => ({
+      ...r,
+      hasLine: i < rows.length - 1,
+      dotStyle: 'width: 12px; height: 12px; border-radius: 6px; margin-top: 4px; flex-shrink: 0; background: ' + (r.tone === 'late' ? '#A3472F' : '#4E3426') + ';',
+      timeStyle: 'font-weight: 800; color: ' + (r.tone === 'late' ? '#A3472F' : '#2B211C') + ';'
+    }));
+    return { ghostCols: [1, 2, 3], history };
+  }
+}
+</script>
+</body>
+</html>

@@ -8,6 +8,35 @@ Interactive version (for people, not agents): https://claude.ai/artifact/FRBZKfu
 
 Canvas size: 720 × 1280. Real screen: 1080 × 1920, so **× 1.5** on every size.
 
+## Full canvas: every screen in one place (5 Nov 2026)
+
+"Comanda · protótipo completo": https://claude.ai/artifact/TgppHzaABZnDLkyEVFsocF (shared by link).
+Sources in `full/project/` (70 artboards + `canvas.json`), the same files the canvas serves. It holds:
+
+| Row | Artboards | Size | Status |
+|:--|:--|:--|:--|
+| Kiosk | 01–12 (`Main` … `Idle`) | 720 × 1280 | ✅ approved (30 Oct) |
+| Kiosk, new | T1–T4 | 720 × 1280 | proposal |
+| Kitchen | K1–K5 | 1280 × 800 | proposal |
+| Back office, desktop | A1–A14 | page, 1440 wide | proposal |
+| Back office, phone | M1–M14 + M0 (Mais, the phone menu) | 390 × 844 | proposal |
+| Waiter app | G1–G8 (login, tables, table check, add items, item, send, close check, paid) | 390 × 844 | proposal, outside the MVP |
+| Guest app by table QR code | Q1–Q9 (table, menu, item, combo, order, tracking, check, Pix, paid) | 390 × 844 | proposal, outside the MVP |
+
+- A desktop screen and its phone version share the number: `A2-Pedidos` ↔ `M2-Pedidos`.
+- A10–A14 / M10–M14 are the menu entries that had no drawing: Cardápios, Categorias, Selos e
+  sugestões, Aparelhos, Loja e conta.
+- The waiter and guest apps follow the POS integration models (`MODELS.md` from the partner side):
+  one open check per table (`openCheck`), orders as `DINEIN` rounds, paying the check at the table
+  (`PAY_AT_TABLE`), optional 10% service charge, sizes, removable ingredients (`INGR`), combos and
+  swap-sell upgrades. Both use the same Mesa 12 data (R$ 95,60 + 10% = R$ 105,16). Split bill and
+  tips stay out, as in the MVP scope.
+- Still open and marked on the screens: waiter login (G1) and device pairing (A13/M13).
+- `kioskNew`, kitchen and back office rows are copies of `ops/project/` with the image ids remapped;
+  the kiosk row is `source/` with the image ids remapped. Images are uploads of that canvas
+  (`/_blob/<id>`); the same photos are in `assets/`.
+- Like `source/`, these files need the design tool's runtime: read them as reference, do not run them.
+
 ## Colour tokens
 
 Only the `padaria` theme in the sources is current. `tomate`, `verde` and `acafrao` are old
@@ -84,13 +113,13 @@ already built in `apps/web` still uses Fraunces headings and must be brought in 
 
 ## Screens not drawn yet
 
-The kitchen screen and back office now have the proposal above. Still without a drawing (built in
-code from these tokens):
-- Language selector (PT/EN) on the attract screen.
+The kitchen screen, the whole back office (desktop and phone) and the two table apps are in the
+full canvas above. Still without a drawing (built in code from these tokens):
+- Language selector (PT/EN) on the kiosk attract screen (the guest QR app has one on Q1).
 - Coupon entry and the "replace current coupon?" warning (SCR-DISC-05).
-- Lane Closed ("Fechado agora, voltamos às 06:00") from `closedMessage` and `nextOpeningAt`.
+- Lane Closed ("Fechado agora, voltamos às 06:00") from `closedMessage` and `nextOpeningAt`
+  (T4 covers only the special-date variant).
 - "Temporarily offline" screen.
-- Kitchen screen and back office (these are not kiosk screens: landscape, mouse or tablet).
 
 ## Photos
 

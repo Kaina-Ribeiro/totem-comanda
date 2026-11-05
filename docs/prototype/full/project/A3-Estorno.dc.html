@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Back office · Estornar pedido</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0;font-feature-settings:"tnum" 1;-webkit-font-smoothing:antialiased;background:#F3EFE8}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+.tap{transition:transform .12s ease,background-color .15s ease}
+.tap:active{transform:scale(.98)}
+</style>
+</helmet>
+<div style="min-height: 100vh; box-sizing: border-box; background: #F3EFE8; color: #2B211C; font-family: Manrope, system-ui, sans-serif; position: relative; display: flex; flex-wrap: wrap">
+  <div aria-hidden="true" style="flex: 1 1 248px; max-width: 248px; background: #FFFFFF; border-right: 1px solid #E5DDD2; padding: 22px 24px; box-sizing: border-box">
+    <span style="font-family: Fraunces, Georgia, serif; font-style: italic; font-size: 24px">Comanda</span>
+  </div>
+  <div aria-hidden="true" style="flex: 999 1 560px; padding: 32px 40px; display: flex; flex-direction: column; gap: 18px; box-sizing: border-box">
+    <span style="font-family: Manrope, system-ui, sans-serif; font-weight: 700; font-size: 28px; letter-spacing: -0.02em">Pedidos</span>
+    <div style="display: flex; gap: 16px; flex-wrap: wrap">
+      <div style="flex: 3 1 520px; height: 760px; border-radius: 14px; background: #FFFFFF"></div>
+      <div style="flex: 2 1 340px; height: 760px; border-radius: 14px; background: #FFFFFF"></div>
+    </div>
+  </div>
+  <div style="position: absolute; inset: 0; background: rgba(28,28,26,.45)"></div>
+
+  <div style="position: absolute; inset: 0; display: flex; justify-content: center; align-items: flex-start; padding: 72px 16px; box-sizing: border-box">
+    <div role="dialog" aria-modal="true" aria-labelledby="est-title" style="width: 100%; max-width: 580px; box-sizing: border-box; border-radius: 16px; background: #FFFFFF; padding: 28px 30px; display: flex; flex-direction: column; gap: 18px; box-shadow: 0 24px 60px rgba(28,28,26,.25)">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px">
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <h2 id="est-title" style="margin: 0; font-family: Manrope, system-ui, sans-serif; font-weight: 700; font-size: 24px; letter-spacing: -0.02em">Estornar pedido 38</h2>
+          <span style="font-size: 14px; font-weight: 600; color: #625750">Pago R$ 78,66 no crédito · já estornado R$ 0,00</span>
+        </div>
+        <a href="A2-Pedidos.dc.html" aria-label="Fechar" class="tap" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 14px; background: #F3EFE8; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></a>
+      </div>
+
+      <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px">
+        <legend style="padding: 0 0 8px; font-size: 14px; font-weight: 800">Quanto?</legend>
+        <div role="radiogroup" aria-label="Quanto estornar" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+          <sc-for list="{{kinds}}" as="k" hint-placeholder-count="2">
+            <button type="button" role="radio" aria-checked="{{k.checked}}" onClick="{{k.pick}}" class="tap" style="{{k.style}}"><span style="font-size: 15px; font-weight: 800">{{k.label}}</span><span style="font-size: 13px; font-weight: 600; color: #625750">{{k.hint}}</span></button>
+          </sc-for>
+        </div>
+        <label style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px">
+          <span style="font-size: 13px; font-weight: 700; color: #625750">Valor do estorno</span>
+          <span style="{{amountBoxStyle}}"><span style="font-weight: 700; color: #625750">R$</span><input type="text" inputmode="decimal" value="{{amount}}" disabled="{{amountDisabled}}" aria-describedby="est-max" style="flex-grow: 1; min-width: 0; border: 0; outline: none; background: transparent; font-size: 17px; font-weight: 800"></span>
+          <span id="est-max" style="font-size: 12px; font-weight: 600; color: #625750">Máximo R$ 78,66 (pago menos o que já foi estornado).</span>
+        </label>
+      </fieldset>
+
+      <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px">
+        <legend style="padding: 0 0 8px; font-size: 14px; font-weight: 800">Motivo</legend>
+        <div role="radiogroup" aria-label="Motivo do estorno" style="display: flex; flex-direction: column; gap: 6px">
+          <sc-for list="{{reasons}}" as="r" hint-placeholder-count="3">
+            <button type="button" role="radio" aria-checked="{{r.checked}}" onClick="{{r.pick}}" class="tap" style="{{r.style}}"><span style="{{r.ringStyle}}"><span style="{{r.dotStyle}}"></span></span>{{r.label}}</button>
+          </sc-for>
+        </div>
+      </fieldset>
+
+      <p style="margin: 0; padding: 14px 16px; border-radius: 16px; background: #EFE4C9; font-size: 14px; font-weight: 700; line-height: 1.45">{{confirmText}}</p>
+
+      <div style="display: flex; gap: 10px">
+        <a href="A2-Pedidos.dc.html" class="tap" style="flex: 1 1 0; height: 52px; border-radius: 16px; background: #F3EFE8; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 800">Voltar</a>
+        <a href="A2-Pedidos.dc.html" class="tap" style="flex: 1.4 1 0; height: 52px; border-radius: 16px; background: #A3472F; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 800">{{confirmLabel}}</a>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1080}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { kind: 'full', reason: 'cancel' };
+  }
+  renderVals() {
+    const kind = this.state.kind;
+    const full = kind === 'full';
+    const KINDS = [{ id: 'full', label: 'Tudo', hint: 'R$ 78,66' }, { id: 'part', label: 'Parte do valor', hint: 'Até R$ 78,66' }];
+    const kinds = KINDS.map((k) => {
+      const on = k.id === kind;
+      return {
+        label: k.label, hint: k.hint, checked: on ? 'true' : 'false',
+        pick: () => this.setState({ kind: k.id }),
+        style: 'min-height: 64px; border-radius: 12px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; padding: 0 16px; ' + (on ? 'border: 2px solid #4E3426; background: #FBF8F3;' : 'border: 1.5px solid #E5DDD2; background: #FFFFFF;')
+      };
+    });
+    const R = [{ id: 'soldout', label: 'Item esgotado' }, { id: 'cancel', label: 'Cancelamento do cliente' }, { id: 'complaint', label: 'Reclamação do cliente' }];
+    const reasons = R.map((r) => {
+      const on = r.id === this.state.reason;
+      return {
+        label: r.label, checked: on ? 'true' : 'false',
+        pick: () => this.setState({ reason: r.id }),
+        style: 'min-height: 48px; padding: 0 14px; border-radius: 14px; border: 0; background: ' + (on ? '#F3EFE8' : 'transparent') + '; display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 700; text-align: left;',
+        ringStyle: 'width: 22px; height: 22px; flex-shrink: 0; box-sizing: border-box; border-radius: 11px; border: 2px solid ' + (on ? '#4E3426' : '#B5ADA3') + '; display: flex; align-items: center; justify-content: center;',
+        dotStyle: 'width: 10px; height: 10px; border-radius: 5px; background: ' + (on ? '#4E3426' : 'transparent') + ';'
+      };
+    });
+    const amount = full ? '78,66' : '13,90';
+    return {
+      kinds, reasons, amount,
+      amountDisabled: full,
+      amountBoxStyle: 'height: 48px; padding: 0 14px; border-radius: 14px; border: 1.5px solid ' + (full ? '#E5DDD2' : '#4E3426') + '; background: ' + (full ? '#F3EFE8' : '#FFFFFF') + '; display: flex; align-items: center; gap: 8px;',
+      confirmText: 'Estornar R$ ' + amount + ' do pedido 38? O dinheiro volta para o cartão do cliente e isso não dá para desfazer.',
+      confirmLabel: 'Estornar R$ ' + amount
+    };
+  }
+}
+</script>
+</body>
+</html>
