@@ -252,7 +252,7 @@ export function CheckoutFlow({
     /** True when the payment was cancelled and the expired screen is up. */
     const expire = async () => {
       setStep((s) => (s.kind === "authorising" ? { ...s, cancelling: true } : s));
-      const result = await cancelPayment(polling);
+      const result = await settle(cancelPayment(polling));
       if (!live) return true;
       if (result.ok) {
         setStep({ kind: "expired", method: result.data.method });
@@ -264,7 +264,8 @@ export function CheckoutFlow({
     };
 
     const tick = async () => {
-      const result = await pollPayment(polling);
+      // A rejected call (kiosk offline) is no answer: keep polling (COM-136).
+      const result = await settle(pollPayment(polling));
       if (!live) return;
       if (result.ok) {
         const payment = result.data;
@@ -297,7 +298,7 @@ export function CheckoutFlow({
   async function cancel() {
     if (step.kind !== "authorising") return;
     setStep({ ...step, cancelling: true });
-    const result = await cancelPayment(step.payment.id);
+    const result = await settle(cancelPayment(step.payment.id));
     if (result.ok) return setStep({ kind: "method" });
     // Already final: the poll reports how it ended. Any other failure brings the button back.
     if (result.code !== "PAYMENT_NOT_CANCELLABLE") {

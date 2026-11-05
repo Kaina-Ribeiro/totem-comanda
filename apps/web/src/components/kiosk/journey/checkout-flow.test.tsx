@@ -216,10 +216,52 @@ describe("CheckoutFlow", () => {
     expect(on.onPlaced).toHaveBeenCalledWith(placed);
   });
 
-  // Suspected bug: a poll that rejects (kiosk offline, the Server Action throws) is not
-  // wrapped in `settle`. The tick throws before its next setTimeout, so polling stops and
-  // the terminal screen never moves on. checkout-flow.tsx:267 (and :255, :300 for cancel).
-  it.todo("keeps polling when a poll rejects instead of stalling on the terminal screen");
+  // COM-136: a Server Action that never reached the BFF (the kiosk lost its network)
+  // rejects. Polling and cancelling must treat that as "no answer", never stop.
+  const offline = () => Promise.reject(new TypeError("Failed to fetch"));
+
+  it("keeps polling when a poll rejects instead of stalling on the terminal screen", async () => {
+    actions.pollPayment
+      .mockImplementationOnce(offline)
+      .mockResolvedValue({ ok: true, data: payment("AUTHORISED") });
+    const on = renderCheckout();
+    await user().click(choose(/Crédito/));
+    await pollOnce();
+    expect(actions.placeOrder).not.toHaveBeenCalled();
+
+    await flush(1_000);
+    expect(actions.pollPayment).toHaveBeenCalledTimes(2);
+    expect(on.onPlaced).toHaveBeenCalledWith(placed);
+  });
+
+  it("brings the cancel button back when the cancel call rejects", async () => {
+    actions.cancelPayment.mockImplementationOnce(offline);
+    renderCheckout();
+    await user().click(choose(/Crédito/));
+    await flush();
+    await user().click(await screen.findByRole("button", { name: strings["pay.cancel"] }));
+    await flush();
+
+    expect(screen.getByRole("button", { name: strings["pay.cancel"] })).toBeTruthy();
+    expect(screen.queryByText(strings["pay.cancelling"])).toBeNull();
+  });
+
+  it("tries the terminal timeout's cancel again when it rejects", async () => {
+    actions.cancelPayment
+      .mockImplementationOnce(offline)
+      .mockResolvedValue({ ok: true, data: payment("CANCELLED") });
+    renderCheckout();
+    await user().click(choose(/Crédito/));
+    await pollOnce();
+
+    await flush(120_000); // the terminal's time runs out: the first cancel rejects
+    expect(actions.cancelPayment).toHaveBeenCalledOnce();
+    expect(screen.queryByText(strings["pay.expiredTag"])).toBeNull();
+
+    await flush(10_000); // polling went on, and the next try cancels it
+    expect(actions.cancelPayment).toHaveBeenCalledTimes(2);
+    expect(screen.getByText(strings["pay.expiredTag"])).toBeTruthy();
+  });
 
   it("a paid order that cannot be placed asks for a team member, never another payment", async () => {
     actions.pollPayment.mockResolvedValue({ ok: true, data: payment("AUTHORISED") });
