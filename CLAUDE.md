@@ -118,6 +118,8 @@ language.
 # Stateful mock Core API (apps/web/mock) behind Prism, which validates every call against the
 # contract. Front end and BFF are built against it until the Go API exists. In apps/web:
 npm run mock        # CORE_API_URL=http://localhost:4010, MOCK_CONTROL_URL=http://localhost:4020/__mock
+npm run mock:orders -- 3                # with the mock running: 3 paid kiosk orders now
+npm run mock:orders -- 3 --days-ago 7   # ...on the same weekday last week (Início, Relatório)
 # Extend apps/web/mock with the operations each story needs; Prism flags any drift from the contract.
 
 # Regenerate API types after any contract change

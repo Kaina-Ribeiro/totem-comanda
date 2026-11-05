@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  dayIsOver,
   greeting,
   kioskState,
   localNow,
   nextOpening,
   signalLabel,
+  totalVersusLastWeek,
   versusLastWeek,
   weekBefore,
   whenLabel,
@@ -43,6 +45,37 @@ describe("back office home", () => {
     expect(versusLastWeek(90, 100, 6)).toBe("-10% que no sábado passado");
     expect(versusLastWeek(100, 100, 3)).toBe("Igual à quarta passada");
     expect(versusLastWeek(100, 0, 3)).toBeNull();
+  });
+
+  describe("a running total against last week (COM-127)", () => {
+    const brl = (cents: number) => `R$ ${cents / 100}`;
+
+    it("does not compare the morning with last week's whole day", () => {
+      // 09:00: R$ 50 so far against R$ 1.000 for all of last Wednesday.
+      expect(totalVersusLastWeek(5_000, 100_000, 3, false, brl)).toBe(
+        "A quarta passada fechou em R$ 1000",
+      );
+      expect(totalVersusLastWeek(3, 40, 6, false, String)).toBe("O sábado passado fechou em 40");
+    });
+
+    it("compares once the day is over", () => {
+      expect(totalVersusLastWeek(112_000, 100_000, 3, true, brl)).toBe(
+        "+12% que na quarta passada",
+      );
+    });
+
+    it("says nothing when last week sold nothing", () => {
+      expect(totalVersusLastWeek(5_000, 0, 3, false, brl)).toBeNull();
+    });
+
+    it("knows the day is over only when nothing opens again today", () => {
+      const tomorrow = { menu: "Manhã", inDays: 1, time: "06:00" };
+      const later = { menu: "Tarde", inDays: 0, time: "15:00" };
+      expect(dayIsOver({ open: true, next: tomorrow })).toBe(false);
+      expect(dayIsOver({ open: false, next: later })).toBe(false);
+      expect(dayIsOver({ open: false, next: tomorrow })).toBe(true);
+      expect(dayIsOver({ open: false, next: null })).toBe(true);
+    });
   });
 
   it("finds when the live window ends, overnight windows included", () => {
