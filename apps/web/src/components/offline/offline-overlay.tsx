@@ -1,7 +1,9 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useOffline } from "next/offline";
 
+import { offlineArea } from "./offline-copy";
 import { OfflineScreen } from "./offline-screen";
 
 /**
@@ -11,10 +13,11 @@ import { OfflineScreen } from "./offline-screen";
  */
 export function OfflineOverlay() {
   const offline = useOffline();
+  const pathname = usePathname();
   if (!offline) return null;
   return (
     <div role="status" className="fixed inset-0 z-50 flex flex-col">
-      <OfflineScreen />
+      <OfflineScreen area={offlineArea(pathname)} />
     </div>
   );
 }

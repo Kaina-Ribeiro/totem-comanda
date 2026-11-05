@@ -1,5 +1,4 @@
-import { OfflineScreen } from "@/components/offline/offline-screen";
-
+import { OfflineForUrl } from "./offline-for-url";
 import { ReloadWhenOnline } from "./reload-when-online";
 
 // Precached by the service worker and shown when a page load cannot reach the
@@ -7,7 +6,7 @@ import { ReloadWhenOnline } from "./reload-when-online";
 export default function OfflinePage() {
   return (
     <>
-      <OfflineScreen />
+      <OfflineForUrl />
       <ReloadWhenOnline />
     </>
   );
