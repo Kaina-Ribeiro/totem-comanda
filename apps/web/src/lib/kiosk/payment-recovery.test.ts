@@ -3,7 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 import type { components } from "@/lib/core-api";
 
 import type { Result } from "./core";
-import { clearLostPayment, type PaymentCalls } from "./payment-recovery";
+import {
+  abandonLostPayments,
+  clearLostPayment,
+  lostFor,
+  type PaymentCalls,
+} from "./payment-recovery";
 
 type Payment = components["schemas"]["Payment"];
 type Status = Payment["paymentStatus"];
@@ -98,5 +103,45 @@ describe("clearLostPayment", () => {
     const c = calls({});
     expect(await clearLostPayment("ord-1", [], c)).toEqual({ outcome: "free", settled: [] });
     expect(c.startPayment).not.toHaveBeenCalled();
+  });
+});
+
+describe("lostFor", () => {
+  it("returns the attempts only for the order they belong to", () => {
+    const kept = { orderId: "ord-1", attempts: lost };
+    expect(lostFor(kept, "ord-1")).toBe(lost);
+    expect(lostFor(kept, "ord-2")).toEqual([]);
+    expect(lostFor({ orderId: null, attempts: [] }, "ord-1")).toEqual([]);
+  });
+});
+
+describe("abandonLostPayments", () => {
+  it("does nothing when no attempt is lost", async () => {
+    const c = calls({});
+    expect(await abandonLostPayments({ orderId: "ord-1", attempts: [] }, c)).toBeNull();
+    expect(await abandonLostPayments({ orderId: null, attempts: lost }, c)).toBeNull();
+    expect(c.startPayment).not.toHaveBeenCalled();
+  });
+
+  it("cancels the payment a guest left running when the journey ends", async () => {
+    const c = calls({});
+    expect(await abandonLostPayments({ orderId: "ord-1", attempts: lost }, c)).toBe("free");
+    expect(c.startPayment).toHaveBeenCalledWith("ord-1", "CREDIT", "k1");
+    expect(c.cancelPayment).toHaveBeenCalledWith("pay-1");
+  });
+
+  it("reports a lost payment that went through, so it is never silent", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const c = calls({ pollPayment: vi.fn(async () => ok(payment("pay-1", "AUTHORISED"))) });
+    expect(await abandonLostPayments({ orderId: "ord-1", attempts: lost }, c)).toBe("paid");
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("ord-1"));
+    warn.mockRestore();
+  });
+
+  it("never throws, even when a call rejects", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const c = calls({ startPayment: vi.fn(async () => Promise.reject(new Error("offline"))) });
+    expect(await abandonLostPayments({ orderId: "ord-1", attempts: lost }, c)).toBe("unknown");
+    warn.mockRestore();
   });
 });

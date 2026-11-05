@@ -61,6 +61,40 @@ export async function clearLostPayment(
   return { outcome: "free", settled };
 }
 
+/**
+ * The unknown attempts of the order being paid. The journey keeps them, not
+ * the checkout screen, so they survive the guest going back to the basket and
+ * are cleared when the order can no longer be paid (COM-110).
+ */
+export type LostPayments = { orderId: string | null; attempts: UnknownAttempt[] };
+
+export const noLostPayments = (): LostPayments => ({ orderId: null, attempts: [] });
+
+/** The lost attempts of `orderId`; none when they belong to another order. */
+export const lostFor = (lost: LostPayments, orderId: string): UnknownAttempt[] =>
+  lost.orderId === orderId ? lost.attempts : [];
+
+/**
+ * Clears the lost payments of an order the guest left: the journey ended
+ * (cancel, idle, reset) or the basket became a new order. A payment Go still
+ * runs is cancelled, so it cannot complete on a card later. Best effort and
+ * never throws: the kiosk is already on its way to the next guest. Null when
+ * nothing was lost.
+ */
+export async function abandonLostPayments(
+  lost: LostPayments,
+  calls: PaymentCalls,
+): Promise<Recovery["outcome"] | null> {
+  if (!lost.orderId || lost.attempts.length === 0) return null;
+  const { outcome } = await clearLostPayment(lost.orderId, lost.attempts, calls).catch(
+    (): Recovery => ({ outcome: "unknown", settled: [] }),
+  );
+  // Nobody is at the screen any more: say so, since the payment cannot be shown.
+  if (outcome === "paid") console.warn(`Abandoned order ${lost.orderId} has a paid payment`);
+  if (outcome === "unknown") console.warn(`Abandoned order ${lost.orderId}: payment unknown`);
+  return outcome;
+}
+
 /** Cancels a payment that is still running; reports whether it ended paid. */
 async function finish(
   paymentId: string,

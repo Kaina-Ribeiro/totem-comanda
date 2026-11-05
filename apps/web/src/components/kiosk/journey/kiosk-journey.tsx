@@ -1,16 +1,17 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { type ReactNode, useEffect, useReducer, useState, useTransition } from "react";
+import { type ReactNode, useEffect, useReducer, useRef, useState, useTransition } from "react";
 
 import { beginJourney, quoteBasket, recordJourneyEvent, switchLanguage } from "@/app/kiosk/actions";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { basketDisplayTotal, basketUnits, findItem } from "@/lib/kiosk/menu-view";
+import { abandonLostPayments, noLostPayments } from "@/lib/kiosk/payment-recovery";
 import { BUNDLED, type Language } from "@/lib/kiosk/strings";
 
 import { Globe } from "../icons";
 import { BasketScreen, CancelDialog } from "./basket-screen";
-import { CheckoutFlow } from "./checkout-flow";
+import { CheckoutFlow, paymentCalls } from "./checkout-flow";
 import { CouponRow, CouponSheet } from "./coupon-sheet";
 import { CrossSellSheet } from "./cross-sell-sheet";
 import { IdleGuard } from "./idle-guard";
@@ -74,6 +75,8 @@ export function KioskJourney({
   );
   // True while the checkout waits on the terminal or the Core API (no idle reset there).
   const [paying, setPaying] = useState(false);
+  // Payment attempts Go never answered, kept past the checkout screen (COM-110).
+  const lostRef = useRef(noLostPayments());
   const [quoteAttempt, setQuoteAttempt] = useState(0);
   const key = quoteKey(journey);
   const needsQuote = phase === "basket" && journey.basket.length > 0;
@@ -120,7 +123,18 @@ export function KioskJourney({
     });
   }
 
+  /**
+   * The order these attempts belong to can no longer be paid: cancel any
+   * payment Go still runs for it, without holding the next guest (COM-110).
+   */
+  function releaseLostPayments() {
+    const abandoned = lostRef.current;
+    lostRef.current = noLostPayments();
+    void abandonLostPayments(abandoned, paymentCalls);
+  }
+
   function reset() {
+    releaseLostPayments();
     setConfirmCancel(false);
     setPaying(false);
     setTaxIdOpen(false);
@@ -380,11 +394,20 @@ export function KioskJourney({
           <CheckoutFlow
             journey={journey}
             strings={strings}
-            onOrderCreated={(order) => dispatch({ type: "orderCreated", order })}
-            onPlaced={(placed) => dispatch({ type: "placed", placed })}
+            onOrderCreated={(order) => {
+              // A changed basket made a new order: the old one cannot be paid any more.
+              if (lostRef.current.orderId !== order.id) releaseLostPayments();
+              dispatch({ type: "orderCreated", order });
+            }}
+            onPlaced={(placed) => {
+              // Paid and placed: nothing of this order is left to clear.
+              lostRef.current = noLostPayments();
+              dispatch({ type: "placed", placed });
+            }}
             onBack={() => dispatch({ type: "openBasket" })}
             onCancelOrder={askCancel}
             onBusy={setPaying}
+            lostRef={lostRef}
           />
         );
       case "success":
