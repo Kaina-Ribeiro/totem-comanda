@@ -25,7 +25,7 @@ export async function provisionDevice(_: SetupState, form: FormData): Promise<Se
   let kind;
   try {
     const { accessToken } = await authenticateDevice({ deviceId, deviceSecret });
-    const config = await coreApi().GET("/v1/devices/me/config", {
+    const config = await coreApi().GET("/v2/devices/me/config", {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (!config.data) throw new DeviceAuthError("CORE_UNAVAILABLE");

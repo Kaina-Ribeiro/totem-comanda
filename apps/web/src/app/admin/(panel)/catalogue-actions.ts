@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { attemptCatalogue } from "@/lib/admin/catalogue";
 import { type FormState, text } from "@/lib/admin/form";
 import { asOwner } from "@/lib/admin/session";
-import { coreApiV2 } from "@/lib/core/client-v2";
+import { coreApi } from "@/lib/core/client";
 
 /** Every back-office page shows the catalogue somewhere: refresh them all after a save. */
 export async function refreshAdmin() {
@@ -15,23 +15,23 @@ export async function refreshAdmin() {
 
 const DELETE = {
   section: (id: string) =>
-    asOwner((headers) => coreApiV2().DELETE("/v2/admin/sections/{sectionId}", { headers, params: { path: { sectionId: id } } })),
+    asOwner((headers) => coreApi().DELETE("/v2/admin/sections/{sectionId}", { headers, params: { path: { sectionId: id } } })),
   item: (id: string) =>
-    asOwner((headers) => coreApiV2().DELETE("/v2/admin/items/{itemId}", { headers, params: { path: { itemId: id } } })),
+    asOwner((headers) => coreApi().DELETE("/v2/admin/items/{itemId}", { headers, params: { path: { itemId: id } } })),
   group: (id: string) =>
     asOwner((headers) =>
-      coreApiV2().DELETE("/v2/admin/modifier-groups/{modifierGroupId}", { headers, params: { path: { modifierGroupId: id } } }),
+      coreApi().DELETE("/v2/admin/modifier-groups/{modifierGroupId}", { headers, params: { path: { modifierGroupId: id } } }),
     ),
   swapSell: (id: string) =>
-    asOwner((headers) => coreApiV2().DELETE("/v2/admin/swap-sells/{swapSellId}", { headers, params: { path: { swapSellId: id } } })),
+    asOwner((headers) => coreApi().DELETE("/v2/admin/swap-sells/{swapSellId}", { headers, params: { path: { swapSellId: id } } })),
   badge: (id: string) =>
-    asOwner((headers) => coreApiV2().DELETE("/v2/admin/badges/{badgeId}", { headers, params: { path: { badgeId: id } } })),
+    asOwner((headers) => coreApi().DELETE("/v2/admin/badges/{badgeId}", { headers, params: { path: { badgeId: id } } })),
   coupon: (id: string) =>
     asOwner((headers) =>
-      coreApiV2().DELETE("/v2/admin/discount-rules/{discountRuleId}", { headers, params: { path: { discountRuleId: id } } }),
+      coreApi().DELETE("/v2/admin/discount-rules/{discountRuleId}", { headers, params: { path: { discountRuleId: id } } }),
     ),
   menu: (id: string) =>
-    asOwner((headers) => coreApiV2().DELETE("/v2/admin/menus/{menuId}", { headers, params: { path: { menuId: id } } })),
+    asOwner((headers) => coreApi().DELETE("/v2/admin/menus/{menuId}", { headers, params: { path: { menuId: id } } })),
 } as const;
 
 /**

@@ -14,17 +14,17 @@ import {
 import { type Badge, readBadge, readSwapSell, type SwapSell } from "@/lib/admin/catalogue-form";
 import { type FormState, load, text } from "@/lib/admin/form";
 import { asOwner } from "@/lib/admin/session";
-import { coreApiV2 } from "@/lib/core/client-v2";
+import { coreApi } from "@/lib/core/client";
 
 async function saveBadge(_: FormState, form: FormData): Promise<FormState> {
   "use server";
   const badgeId = text(form, "badgeId");
   return attemptCatalogue(async () => {
-    const badges = await asOwner((headers) => coreApiV2().GET("/v2/admin/badges", { headers }));
+    const badges = await asOwner((headers) => coreApi().GET("/v2/admin/badges", { headers }));
     const current = badgeId ? (badges.find((b) => b.id === badgeId) ?? null) : null;
     const body = readBadge(form, current);
     await asOwner((headers) =>
-      coreApiV2().PUT("/v2/admin/badges/{badgeId}", { headers, params: { path: { badgeId: body.id } }, body }),
+      coreApi().PUT("/v2/admin/badges/{badgeId}", { headers, params: { path: { badgeId: body.id } }, body }),
     );
     await refreshAdmin();
     return current ? "Selo salvo." : "Selo criado. Marque nos itens que devem mostrar ele.";
@@ -35,7 +35,7 @@ async function saveSwapSell(_: FormState, form: FormData): Promise<FormState> {
   "use server";
   const swapSellId = text(form, "swapSellId");
   return attemptCatalogue(async () => {
-    const swaps = await asOwner((headers) => coreApiV2().GET("/v2/admin/swap-sells", { headers }));
+    const swaps = await asOwner((headers) => coreApi().GET("/v2/admin/swap-sells", { headers }));
     const current = swapSellId ? (swaps.find((s) => s.id === swapSellId) ?? null) : null;
     await putSwapSell(readSwapSell(form, current));
     await refreshAdmin();

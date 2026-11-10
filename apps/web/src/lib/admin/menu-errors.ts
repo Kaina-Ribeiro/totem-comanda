@@ -1,4 +1,4 @@
-import type { components } from "@/lib/core-api-v2";
+import type { components } from "@/lib/core-api";
 
 /** One entry of a `422 MENU_INVALID` problem (contract: MenuInvalid). */
 export type MenuProblem = NonNullable<components["schemas"]["Problem"]["errors"]>[number];

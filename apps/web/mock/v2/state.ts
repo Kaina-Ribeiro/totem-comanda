@@ -1,9 +1,9 @@
-// In-memory state of the v2 mock. Devices, tokens, the clock, media and the
-// store pace are shared with v1 (../state.ts, ../pace.ts); everything else here
-// is v2-only. It reseeds whenever v1 switched scenario (v1 replaces its `state`
-// object), so both versions always reset together.
+// In-memory catalogue, menus, baskets, payments and orders of the mock.
+// Devices, tokens, the clock and media are in ../state.ts, the store pace in
+// ../pace.ts. It reseeds whenever ../state.ts switched scenario (which replaces
+// its `state` object), so both always reset together.
 
-import { state as v1 } from "../state.ts";
+import { state as base } from "../state.ts";
 import type { Entity, S } from "./http.ts";
 import { key } from "./http.ts";
 import {
@@ -74,11 +74,11 @@ export type V2State = ReturnType<typeof seed>;
 let current: V2State | null = null;
 let boundTo: object | null = null;
 
-/** The v2 state, reseeded when the v1 state was replaced (scenario switch). */
+/** The state, reseeded when the base state was replaced (scenario switch). */
 export function v2(): V2State {
-  if (!current || boundTo !== v1) {
+  if (!current || boundTo !== base) {
     current = seed();
-    boundTo = v1;
+    boundTo = base;
   }
   return current;
 }
@@ -86,6 +86,6 @@ export function v2(): V2State {
 export function paymentTerminalId(deviceId: string): string | null {
   const s = v2();
   if (s.terminals.has(deviceId)) return s.terminals.get(deviceId) ?? null;
-  const device = v1.devices.find((d) => d.id === deviceId);
+  const device = base.devices.find((d) => d.id === deviceId);
   return device?.kind === "KIOSK" ? "MOCK-POINT-001" : null;
 }

@@ -2,7 +2,7 @@ import Image from "next/image";
 import { type ReactNode, useState } from "react";
 
 import { formatMoney } from "@/lib/format/money";
-import type { BasketLine } from "@/lib/kiosk/basket-v2";
+import type { BasketLine } from "@/lib/kiosk/basket";
 import {
   canAdd,
   type Draft,

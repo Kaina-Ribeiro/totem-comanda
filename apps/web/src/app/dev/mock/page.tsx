@@ -4,16 +4,16 @@ import { Suspense } from "react";
 
 import {
   CORE_DOWN_COOKIE,
+  decideMockPayment,
   isCoreDownSimulated,
+  PAYMENT_OUTCOMES,
+  type PaymentOutcome,
+  pendingPayment,
   readMockState,
   setMockScenario,
 } from "@/lib/core/mock-scenarios";
 import { forgetDeviceTokens } from "@/lib/device/session";
-import {
-  SIMULATED_OUTCOME_COOKIE,
-  SIMULATED_OUTCOMES,
-  simulatedOutcome,
-} from "@/lib/kiosk/simulated-payment";
+import { formatMoney } from "@/lib/format/money";
 
 // Development only: switch the stateful mock's scenario (apps/web/mock) and
 // simulate the Core API being down.
@@ -34,20 +34,22 @@ async function toggleCoreDown() {
   else jar.set(CORE_DOWN_COOKIE, "1", { httpOnly: true, path: "/" });
 }
 
-async function choosePayment(form: FormData) {
+/** Decides the waiting Mercado Pago session (run the mock with MOCK_PAYMENT_OUTCOME=NONE to keep it waiting). */
+async function decidePayment(form: FormData) {
   "use server";
   if (process.env.NODE_ENV !== "development") return;
+  const paymentId = form.get("paymentId");
   const outcome = form.get("outcome");
-  if (typeof outcome === "string" && (SIMULATED_OUTCOMES as readonly string[]).includes(outcome)) {
-    (await cookies()).set(SIMULATED_OUTCOME_COOKIE, outcome, { httpOnly: true, path: "/" });
+  if (typeof paymentId === "string" && PAYMENT_OUTCOMES.includes(outcome as PaymentOutcome)) {
+    await decideMockPayment(paymentId, outcome as PaymentOutcome);
   }
 }
 
-const PAYMENT_LABELS = {
-  AUTHORISED: "Pagamento simulado: aprova",
-  FAILED: "Pagamento simulado: recusa",
-  MANUAL: "Pagamento simulado: maquininha não responde",
-} as const;
+const PAYMENT_LABELS: Record<PaymentOutcome, string> = {
+  APPROVED: "Mercado Pago: aprova",
+  DECLINED: "Mercado Pago: recusa",
+  EXPIRED: "Mercado Pago: expira",
+};
 
 const buttonClass = (active: boolean) =>
   `h-[96px] rounded-card-sm px-8 text-left text-[28px] font-semibold ${
@@ -68,11 +70,8 @@ export default function MockScenarioPage() {
 }
 
 async function Controls() {
-  const [mock, coreDown, payment] = await Promise.all([
-    readMockState(),
-    isCoreDownSimulated(),
-    simulatedOutcome(),
-  ]);
+  const [mock, coreDown] = await Promise.all([readMockState(), isCoreDownSimulated()]);
+  const payment = mock && pendingPayment(mock);
   return (
     <>
       {mock ? (
@@ -93,18 +92,24 @@ async function Controls() {
           Mock fora do ar ou MOCK_CONTROL_URL vazio. Rode `npm run mock` em apps/web.
         </p>
       )}
-      <form action={choosePayment} className="flex flex-col gap-4">
-        {SIMULATED_OUTCOMES.map((outcome) => (
-          <button
-            key={outcome}
-            name="outcome"
-            value={outcome}
-            className={buttonClass(outcome === payment)}
-          >
-            {PAYMENT_LABELS[outcome]}
-          </button>
-        ))}
-      </form>
+      {payment ? (
+        <form action={decidePayment} className="flex flex-col gap-4">
+          <p className="text-[26px]">
+            Pagamento esperando: {payment.method === "PIX" ? "Pix" : "cartão"} de {formatMoney(payment.amount)}
+          </p>
+          <input type="hidden" name="paymentId" value={payment.id} />
+          {PAYMENT_OUTCOMES.map((outcome) => (
+            <button key={outcome} name="outcome" value={outcome} className={buttonClass(false)}>
+              {PAYMENT_LABELS[outcome]}
+            </button>
+          ))}
+        </form>
+      ) : (
+        <p className="text-[26px] text-muted">
+          Nenhum pagamento esperando. Com MOCK_PAYMENT_OUTCOME=NONE o Pix ou o cartão espera aqui até
+          você decidir.
+        </p>
+      )}
       <form action={toggleCoreDown}>
         <button className={buttonClass(coreDown)}>
           {coreDown ? "Core API fora do ar (ligado)" : "Simular Core API fora do ar"}

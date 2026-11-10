@@ -22,11 +22,11 @@ export class DeviceAuthError extends Error {
   }
 }
 
-/** Exchanges the device id and secret for a short-lived token (`POST /v1/devices/auth`). */
+/** Exchanges the device id and secret for a short-lived token (`POST /v2/devices/auth`). */
 export async function authenticateDevice(credentials: DeviceCredentials): Promise<IssuedToken> {
   let result;
   try {
-    result = await coreApi().POST("/v1/devices/auth", { body: credentials });
+    result = await coreApi().POST("/v2/devices/auth", { body: credentials });
   } catch {
     throw new DeviceAuthError("CORE_UNAVAILABLE");
   }

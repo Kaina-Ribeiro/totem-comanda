@@ -6,7 +6,7 @@ import { DeviceReporter } from "@/components/device-reporter";
 import { gateState } from "@/lib/device/gate";
 import { DeviceAuthError } from "@/lib/device/session";
 import { formatNextOpening } from "@/lib/format/next-opening";
-import { getKioskConfig, type KioskConfig } from "@/lib/kiosk/core-v2";
+import { getKioskConfig, type KioskConfig } from "@/lib/kiosk/core";
 
 import { AttractScreen } from "./attract-screen";
 import { KioskJourney, type KioskSettings } from "./journey/kiosk-journey";
@@ -20,9 +20,9 @@ const GATE_RECHECK_MS = 45_000;
 const gateOf = (config: KioskConfig) => gateState({ ...config, pace: config.store.pace });
 
 /**
- * `/kiosk` on Core v2 (pilot, COM-146): signs this browser in as its device
- * (shared device session) and reads `GET /v2/devices/me/config`. Same rules as
- * the shared DeviceGate, which the kitchen keeps on v1 until COM-148:
+ * `/kiosk` (pilot, COM-146): signs this browser in as its device (shared
+ * device session) and reads `GET /v2/devices/me/config`. Same rules as the
+ * shared DeviceGate the kitchen uses:
  * unprovisioned or rejected credentials go to /setup, a kitchen device goes to
  * /kitchen, a disabled kiosk gets its own screen, an unreachable Core shows the
  * preparing screen and retries. Reads cookies, so render it inside <Suspense>.

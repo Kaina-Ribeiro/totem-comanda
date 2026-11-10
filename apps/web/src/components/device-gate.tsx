@@ -58,7 +58,7 @@ export async function DeviceGate({
   return (
     <>
       {children(config)}
-      <DeviceReporter state={gateState(config)} />
+      <DeviceReporter state={gateState({ ...config, pace: config.store.pace })} />
     </>
   );
 }

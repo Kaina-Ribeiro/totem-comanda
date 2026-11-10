@@ -1,4 +1,4 @@
-// Multipart upload parsing and image size sniffing for POST /v1/admin/media.
+// Multipart upload parsing and image size sniffing for POST /v2/admin/media.
 
 export type UploadedFile = { filename: string; type: string; bytes: Buffer };
 
@@ -46,3 +46,24 @@ export function imageSize(bytes: Buffer): { width: number; height: number } {
   }
   return { width: 0, height: 0 };
 }
+
+/**
+ * Media files the mock serves under /media, mapped to the prototype's photos
+ * (docs/prototype/assets). The Go API will serve uploads the same way.
+ */
+export const SEED_MEDIA: Record<string, string> = {
+  "fermentacao-natural.jpg": "sourdough.jpg",
+  "baguete.jpg": "baguette.jpg",
+  "brioche.jpg": "brioche.jpg",
+  "centeio.jpg": "rye.jpg",
+  "pao-de-forma.jpg": "forma.jpg",
+  "croissant.jpg": "croissant.jpg",
+  "pain-au-chocolat.jpg": "choco.jpg",
+  "cookie.jpg": "cookie.jpg",
+  "cupcake.jpg": "cupcake.jpg",
+  "donut.jpg": "donut.jpg",
+  "croque-monsieur.jpg": "sandwich.jpg",
+  "misto-quente.jpg": "bread.jpg",
+  "cappuccino.jpg": "cappuccino.jpg",
+  "latte.jpg": "latte.jpg",
+};

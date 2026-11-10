@@ -1,6 +1,6 @@
 // Fixtures for the kiosk journey's component tests (not a test file itself).
 import type { PaymentSession, SubmitOrderResponse, TotalsResponse } from "@/app/kiosk/actions";
-import type { BasketLine } from "@/lib/kiosk/basket-v2";
+import type { BasketLine } from "@/lib/kiosk/basket";
 import { readMenu } from "@/lib/kiosk/menu-graph";
 import { BUNDLED } from "@/lib/kiosk/strings";
 

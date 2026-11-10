@@ -23,7 +23,7 @@ export async function getDeviceConfig(): Promise<DeviceConfig> {
   try {
     config = await asDevice(async (headers, deviceId) => {
       const etag = configs.ifNoneMatch(deviceId);
-      const result = await coreApi().GET("/v1/devices/me/config", {
+      const result = await coreApi().GET("/v2/devices/me/config", {
         headers,
         params: { header: etag ? { "If-None-Match": etag } : {} },
       });

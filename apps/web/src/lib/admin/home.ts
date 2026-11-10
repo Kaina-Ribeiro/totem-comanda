@@ -1,7 +1,28 @@
 import type { components } from "@/lib/core-api";
 
-type Weekday = components["schemas"]["Weekday"];
-type Schedule = components["schemas"]["MenuSchedule"];
+type Weekday = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
+/** One opening window as the home reasons about it (local store time). */
+export type Schedule = { weekday: Weekday; timeStart: string; timeEnd: string };
+type SectionHours = components["schemas"]["PosEntitySectionHours"];
+
+/**
+ * A menu window (`MONDAY`, `open`, `close` as "HH:MM[:SS]") as a home
+ * schedule in "HH:MM", for display; past midnight stays as is.
+ */
+export function fromSectionHours(window: SectionHours): Schedule {
+  return {
+    weekday: window.dayOfWeek.slice(0, 3) as Weekday,
+    timeStart: window.open.slice(0, 5),
+    timeEnd: window.close.slice(0, 5),
+  };
+}
+
+/** Items turned off in Disponibilidade (on/off until changed, SPEC 6), by name. */
+export function unavailable<T extends { name: string; available?: boolean }>(items: T[]): T[] {
+  return items
+    .filter((item) => item.available === false)
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+}
 
 // Display helpers for the back office home (plan G-A1, prototype A1). Which
 // menu is live is Go's answer (`AdminMenu.isActive`); these only describe it.

@@ -1,4 +1,4 @@
-import type { components } from "@/lib/core-api-v2";
+import type { components } from "@/lib/core-api";
 
 import { ALL_ALLERGENS, type Allergen } from "./allergens";
 import { checked, priceField, text } from "./form";

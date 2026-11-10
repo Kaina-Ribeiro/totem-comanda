@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { useState } from "react";
 
-import type { BasketLine } from "@/lib/kiosk/basket-v2";
+import type { BasketLine } from "@/lib/kiosk/basket";
 import { canAdd, draftToLine, initialDraft } from "@/lib/kiosk/builder";
 import { findProduct, type KioskMenu, type Product } from "@/lib/kiosk/menu-graph";
 import type { Strings } from "@/lib/kiosk/strings";

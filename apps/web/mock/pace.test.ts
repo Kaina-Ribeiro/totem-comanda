@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { Request } from "./http.ts";
-import { currentPace, paceRoutes } from "./pace.ts";
+import { currentPace, kitchenPaceRoutes } from "./pace.ts";
 import { applyScenario, state } from "./state.ts";
-import { addKitchenListener } from "./stream.ts";
+import { addKitchenListener } from "./v2/orders.ts";
 
-/** Calls the kitchen's PUT /v1/kitchen/pace as a signed-in kitchen tablet. */
+/** Calls the kitchen's PUT /v2/kitchen/pace as a signed-in kitchen tablet. */
 function putKitchenPace(body: object) {
-  const [, , handler] = paceRoutes.find(([m, p]) => m === "PUT" && p.test("/v1/kitchen/pace"))!;
+  const [, , handler] = kitchenPaceRoutes.find(([m, p]) => m === "PUT" && p.test("/v2/kitchen/pace"))!;
   const req = {
     method: "PUT",
-    path: "/v1/kitchen/pace",
+    path: "/v2/kitchen/pace",
     headers: { authorization: "Bearer test-kitchen" },
     body,
   } as unknown as Request;

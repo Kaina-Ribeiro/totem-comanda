@@ -1,4 +1,4 @@
-import type { components } from "@/lib/core-api-v2";
+import type { components } from "@/lib/core-api";
 
 export type Allergen = components["schemas"]["Allergen"];
 

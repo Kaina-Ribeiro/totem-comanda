@@ -1,7 +1,7 @@
 import { useState, useTransition } from "react";
 
 import { applyCoupon, type OrderItem } from "@/app/kiosk/actions";
-import type { ResultCode } from "@/lib/kiosk/core-v2";
+import type { ResultCode } from "@/lib/kiosk/core";
 import { format, type Language, type Strings } from "@/lib/kiosk/strings";
 
 const ROWS = ["1234567890", "QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"];

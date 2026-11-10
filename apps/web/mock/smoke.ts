@@ -1,13 +1,13 @@
-// Walks every v2 operation through Prism (contract/openapi.v2.yaml) with the
+// Walks every v2 operation through Prism (contract/openapi.yaml) with the
 // mock running (`npm run mock`), and fails on any status it did not expect.
 // Prism runs with --errors, so a response that breaks the contract comes back
 // as an error instead of the mock's answer: a clean run proves the shapes match.
 //
-//   npm run mock:smoke:v2      (CORE_API_V2_URL and MOCK_CONTROL_URL override the ports)
+//   npm run mock:smoke         (CORE_API_URL and MOCK_CONTROL_URL override the ports)
 
 import { randomUUID } from "node:crypto";
 
-const API = process.env.CORE_API_V2_URL ?? "http://localhost:4011";
+const API = process.env.CORE_API_URL ?? "http://localhost:4010";
 const CONTROL = process.env.MOCK_CONTROL_URL ?? "http://localhost:4020/__mock";
 
 // The smoke reads loose JSON; the contract, not this script, owns the shapes.

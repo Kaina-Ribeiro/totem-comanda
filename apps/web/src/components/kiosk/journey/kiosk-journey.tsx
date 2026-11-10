@@ -5,7 +5,7 @@ import { type ReactNode, useEffect, useReducer, useState, useTransition } from "
 
 import { beginJourney, priceBasket, recordJourneyEvent, removeCoupon, switchLanguage } from "@/app/kiosk/actions";
 import { AutoRefresh } from "@/components/auto-refresh";
-import { basketUnits, toOrderItems } from "@/lib/kiosk/basket-v2";
+import { basketUnits, toOrderItems } from "@/lib/kiosk/basket";
 import { swapTo } from "@/lib/kiosk/builder";
 import { findProduct, readMenu } from "@/lib/kiosk/menu-graph";
 import { BUNDLED, type Language } from "@/lib/kiosk/strings";

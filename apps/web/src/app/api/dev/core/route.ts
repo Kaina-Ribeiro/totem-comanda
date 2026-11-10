@@ -21,7 +21,7 @@ export async function GET() {
   }
 
   const core = coreApi();
-  const auth = await core.POST("/v1/devices/auth", { body: { deviceId, deviceSecret } });
+  const auth = await core.POST("/v2/devices/auth", { body: { deviceId, deviceSecret } });
   if (!auth.data) {
     return Response.json(
       { step: "auth", status: auth.response.status, code: problemCode(auth.error) },
@@ -31,8 +31,8 @@ export async function GET() {
   const headers = { Authorization: `Bearer ${auth.data.accessToken}` };
 
   const [config, menu] = await Promise.all([
-    core.GET("/v1/devices/me/config", { headers }),
-    core.GET("/v1/menus/active", {
+    core.GET("/v2/devices/me/config", { headers }),
+    core.GET("/v2/menus/active", {
       headers,
       params: { query: { language: "pt-BR" } },
     }),
@@ -49,18 +49,22 @@ export async function GET() {
     );
   }
 
-  const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+  // Sections in display order, each with its products (MODELS 5.1: one flat list, linked by id).
+  const byId = new Map(menu.data.entities.map((e) => [`${e.type}:${e.id}`, e]));
   return Response.json({
     device: config.data.kioskID,
     isOpen: config.data.isOpen,
     configEtag: config.response.headers.get("ETag"),
-    menu: menu.data.name,
-    categories: menu.data.entities.map((category) => ({
-      name: category.name,
-      items: category.childEntities.map((item) => ({
-        name: item.name,
-        price: item.price === undefined ? null : brl.format(item.price / 100),
-      })),
-    })),
+    menu: menu.data.menuId,
+    sections: menu.data.root.map((link) => {
+      const section = byId.get(`${link.type}:${link.id}`);
+      return {
+        name: section?.name ?? link.id,
+        items: (section?.links ?? [])
+          .map((l) => byId.get(`${l.type}:${l.id}`))
+          .filter((e) => e && e.type !== "IMAGE")
+          .map((e) => e!.name),
+      };
+    }),
   });
 }

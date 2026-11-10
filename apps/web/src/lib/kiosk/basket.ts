@@ -1,4 +1,4 @@
-import type { components } from "@/lib/core-api-v2";
+import type { components } from "@/lib/core-api";
 
 import type { KioskMenu, MenuGroup, Product } from "./menu-graph";
 

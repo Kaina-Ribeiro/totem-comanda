@@ -1,4 +1,4 @@
-import type { components } from "@/lib/core-api-v2";
+import type { components } from "@/lib/core-api";
 
 // Reads the v2 menu graph (MODELS 5: flat `entities`, `links` between them,
 // `root` in display order) into the tree the kiosk screens walk. Pure and

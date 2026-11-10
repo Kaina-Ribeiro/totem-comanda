@@ -38,6 +38,12 @@ describe("asDevice", () => {
     expect(call).toHaveBeenCalledWith({ Authorization: "Bearer t1" }, "KIOSK-TBT-001");
   });
 
+  it("signs in on the v2 contract", async () => {
+    authAnswers(token("t1"));
+    await asDevice(async () => ({ response: new Response(null, { status: 200 }) }));
+    expect(post).toHaveBeenCalledWith("/v2/devices/auth", { body: credentials });
+  });
+
   it("re-authenticates and repeats the call once after a 401", async () => {
     authAnswers(token("t1"), token("t2"));
     const call = vi

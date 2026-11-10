@@ -2,7 +2,7 @@ import Image from "next/image";
 import type { ReactNode } from "react";
 
 import { formatMoney } from "@/lib/format/money";
-import { type BasketLine, type CheckItem, lineUnits, pickNames } from "@/lib/kiosk/basket-v2";
+import { type BasketLine, type CheckItem, lineUnits, pickNames } from "@/lib/kiosk/basket";
 import { findProduct, type KioskMenu, nameOf } from "@/lib/kiosk/menu-graph";
 import { format, type Strings } from "@/lib/kiosk/strings";
 

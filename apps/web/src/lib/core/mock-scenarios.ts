@@ -17,11 +17,35 @@ export type MockDevice = {
   status: "ACTIVE" | "DISABLED";
 };
 
+/** A Mercado Pago session as GET /__mock lists it (the contract's PaymentSession). */
+export type MockPayment = { id: string; status: string; method: string; amount: number; createdAt: string };
+
 export type MockState = {
   scenario: string;
   scenarios: Record<string, string>;
   devices: MockDevice[];
+  v2?: { payments: MockPayment[] };
 };
+
+export const PAYMENT_OUTCOMES = ["APPROVED", "DECLINED", "EXPIRED"] as const;
+export type PaymentOutcome = (typeof PAYMENT_OUTCOMES)[number];
+
+/** The newest session still waiting for the guest, which /dev/mock can decide; null if none. */
+export function pendingPayment(state: Pick<MockState, "v2">): MockPayment | null {
+  const pending = (state.v2?.payments ?? []).filter((p) => p.status === "PENDING");
+  return pending.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0] ?? null;
+}
+
+/** Decides a Mercado Pago session on the mock (POST /__mock/payments/{id}). */
+export async function decideMockPayment(paymentId: string, outcome: PaymentOutcome): Promise<void> {
+  const url = controlUrl();
+  if (!isDev() || !url) return;
+  await fetch(`${url}/payments/${encodeURIComponent(paymentId)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ outcome }),
+  });
+}
 
 const isDev = () => process.env.NODE_ENV === "development";
 const controlUrl = () => process.env.MOCK_CONTROL_URL;

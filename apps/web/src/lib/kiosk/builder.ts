@@ -1,4 +1,4 @@
-import type { BasketLine, Pick } from "./basket-v2";
+import type { BasketLine, Pick } from "./basket";
 import type { MenuGroup, MenuOption, Product } from "./menu-graph";
 
 // The item builder's state (SPEC 5.3) as pure functions over the v2 groups:

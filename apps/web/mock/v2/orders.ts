@@ -18,12 +18,12 @@ const basketMissing = () => problem(404, "NOT_FOUND", "Basket not found");
 type Listener = { write: (chunk: string) => unknown };
 const listeners = new Set<Listener>();
 
-export function addKitchenListenerV2(listener: Listener): () => void {
+export function addKitchenListener(listener: Listener): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
 
-export function broadcastV2(event: string, data: unknown): void {
+export function broadcastKitchenEvent(event: string, data: unknown): void {
   const frame = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const listener of listeners) listener.write(frame);
 }
@@ -194,7 +194,7 @@ export function submitOrder(
     const rule = v2().discountRules.find((r) => r.code === basket.couponCode);
     if (rule) rule.usesCount = (rule.usesCount ?? 0) + 1;
   }
-  broadcastV2("order.paid", publicOrder(order));
+  broadcastKitchenEvent("order.paid", publicOrder(order));
   return ok(publicOrder(order), 201);
 }
 
@@ -212,7 +212,7 @@ function change(order: StoredOrder, status: S["OrderStatus"], by: S["OrderStatus
   order.status = status;
   order.version += 1;
   order.history.push({ status, at: at.toISOString(), by });
-  broadcastV2("order.status_changed", publicOrder(order));
+  broadcastKitchenEvent("order.status_changed", publicOrder(order));
 }
 
 export function openOrders(): S["SubmitOrderResponse"][] {

@@ -13,8 +13,8 @@ import {
   type TotalsResponse,
 } from "@/app/kiosk/actions";
 import { formatMoney } from "@/lib/format/money";
-import { toOrderItems } from "@/lib/kiosk/basket-v2";
-import type { Result } from "@/lib/kiosk/core-v2";
+import { toOrderItems } from "@/lib/kiosk/basket";
+import type { Result } from "@/lib/kiosk/core";
 import { nameOf } from "@/lib/kiosk/menu-graph";
 import { format, type Strings } from "@/lib/kiosk/strings";
 

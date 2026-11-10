@@ -1,18 +1,18 @@
-// v2 back-office routes. Catalogue saves are PUT upserts with the id in the
-// path, validated as a whole catalogue (422 MENU_INVALID). Login, devices and
-// the store pace are v1's state, re-shaped for v2.
+// Back-office routes. Catalogue saves are PUT upserts with the id in the
+// path, validated as a whole catalogue (422 MENU_INVALID). Owner login and
+// devices are in ./routes-devices.ts, the store pace in ../pace.ts.
 
 import { randomBytes } from "node:crypto";
 
 import { authOwner, ok, type Reply, type Request, type Route } from "../http.ts";
 import { firstFile, imageSize } from "../media.ts";
-import { adminRoutes as v1AdminRoutes } from "../routes-admin.ts";
+import { adminPaceRoutes } from "../pace.ts";
 import { schedulesOverlap } from "../schedule.ts";
 import { now, state } from "../state.ts";
 import { key, notFound, problem, type Entity, type EntityType, type S } from "./http.ts";
 import { activeMenuV2, toWindows, validateCatalogue, type MenuError } from "./menu.ts";
 import { cancelOrder, dailyReport, setAvailability } from "./orders.ts";
-import { paceVia } from "./routes-kitchen.ts";
+import { deviceAdminRoutes } from "./routes-devices.ts";
 import { storeNow } from "./routes-guest.ts";
 import { v2, type MockMenuV2 } from "./state.ts";
 
@@ -22,7 +22,6 @@ const owner =
   (handler: (req: Request, params: string[]) => Reply) => (req: Request, params: string[]) =>
     authOwner(req) ?? handler(req, params.map(decodeURIComponent));
 
-const v1Admin = (method: string, path: string) => v1AdminRoutes.find(([m, p]) => m === method && p.test(path))![2];
 const invalid = (detail: string) => problem(422, "VALIDATION_FAILED", "Validation failed", detail);
 const menuInvalid = (errors: MenuError[]) =>
   problem(422, "MENU_INVALID", "The menu would be broken", undefined, { errors });
@@ -110,26 +109,8 @@ function storeProblem(s: Partial<S["StoreConfigurationResponse"]> | null): strin
   return null;
 }
 
-/** v1 device bodies plus the Point terminal, which only v2 knows. */
-function withTerminal(device: S["AdminDevice"] | Omit<S["AdminDevice"], "paymentTerminalId">): S["AdminDevice"] {
-  const s = v2();
-  const terminal = s.terminals.has(device.id) ? (s.terminals.get(device.id) ?? null) : device.kind === "KIOSK" ? "MOCK-POINT-001" : null;
-  return { ...device, paymentTerminalId: terminal };
-}
-
-function viaV1Device(req: Request, method: string, path: string, params: string[]): Reply {
-  const body = req.body as Partial<S["DeviceInput"]> | null;
-  const { paymentTerminalId, ...v1Body } = body ?? {};
-  const reply = v1Admin(method, path)({ ...req, body: body ? v1Body : null }, params);
-  if (reply.status >= 300) return reply;
-  const out = reply.body as { device?: S["AdminDevice"] } & S["AdminDevice"];
-  const id = out.device?.id ?? out.id;
-  if (body && "paymentTerminalId" in body) v2().terminals.set(id, paymentTerminalId ?? null);
-  return out.device ? ok({ ...out, device: withTerminal(out.device) }, reply.status) : ok(withTerminal(out), reply.status);
-}
-
-export const adminRoutesV2: Route[] = [
-  ["POST", /^\/v2\/admin\/auth\/login$/, (req) => v1Admin("POST", "/v1/admin/auth/login")(req, [])],
+export const adminRoutes: Route[] = [
+  ...deviceAdminRoutes,
   ["GET", /^\/v2\/admin\/store$/, owner(() => ok(storeNow()))],
   [
     "PUT",
@@ -170,10 +151,6 @@ export const adminRoutesV2: Route[] = [
       ),
     ),
   ],
-  ["GET", /^\/v2\/admin\/devices$/, owner((req) => ok((v1Admin("GET", "/v1/admin/devices")(req, []).body as S["AdminDevice"][]).map(withTerminal)))],
-  ["POST", /^\/v2\/admin\/devices$/, owner((req) => viaV1Device(req, "POST", "/v1/admin/devices", []))],
-  ["PUT", /^\/v2\/admin\/devices\/([^/]+)$/, owner((req, p) => viaV1Device(req, "PUT", "/v1/admin/devices/x", p))],
-  ["POST", /^\/v2\/admin\/devices\/([^/]+)\/secret$/, owner((req, p) => viaV1Device(req, "POST", "/v1/admin/devices/x/secret", p))],
 
   ["GET", /^\/v2\/admin\/menus$/, owner(() => ok(v2().menus.map(adminMenu)))],
   [
@@ -327,9 +304,7 @@ export const adminRoutesV2: Route[] = [
       return cancelOrder(number);
     }),
   ],
-  ["GET", /^\/v2\/admin\/pace$/, (req) => paceVia("GET", "/v1/admin/pace", req)],
-  ["PUT", /^\/v2\/admin\/pace$/, (req) => paceVia("PUT", "/v1/admin/pace", req)],
-  ["PUT", /^\/v2\/admin\/pace\/wait-minutes$/, (req) => paceVia("PUT", "/v1/admin/pace/wait-minutes", req)],
+  ...adminPaceRoutes,
   [
     "GET",
     /^\/v2\/admin\/reports\/daily$/,

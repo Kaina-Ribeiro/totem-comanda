@@ -1,7 +1,7 @@
 import "server-only";
 
-import { coreApiV2 } from "@/lib/core/client-v2";
-import type { components } from "@/lib/core-api-v2";
+import { coreApi } from "@/lib/core/client";
+import type { components } from "@/lib/core-api";
 
 import type { AdminItem, Badge, Group, Item, Section, SwapSell } from "./catalogue-form";
 import { attempt, type FormState } from "./form";
@@ -22,12 +22,12 @@ export type Catalogue = {
 
 export async function loadCatalogue(): Promise<Catalogue> {
   const [sections, items, groups, swapSells, images, badges] = await Promise.all([
-    asOwner((headers) => coreApiV2().GET("/v2/admin/sections", { headers })),
-    asOwner((headers) => coreApiV2().GET("/v2/admin/items", { headers })),
-    asOwner((headers) => coreApiV2().GET("/v2/admin/modifier-groups", { headers })),
-    asOwner((headers) => coreApiV2().GET("/v2/admin/swap-sells", { headers })),
-    asOwner((headers) => coreApiV2().GET("/v2/admin/images", { headers })),
-    asOwner((headers) => coreApiV2().GET("/v2/admin/badges", { headers })),
+    asOwner((headers) => coreApi().GET("/v2/admin/sections", { headers })),
+    asOwner((headers) => coreApi().GET("/v2/admin/items", { headers })),
+    asOwner((headers) => coreApi().GET("/v2/admin/modifier-groups", { headers })),
+    asOwner((headers) => coreApi().GET("/v2/admin/swap-sells", { headers })),
+    asOwner((headers) => coreApi().GET("/v2/admin/images", { headers })),
+    asOwner((headers) => coreApi().GET("/v2/admin/badges", { headers })),
   ]);
   return { sections, items, groups, swapSells, images, badges };
 }
@@ -45,18 +45,18 @@ export const byId = <T extends { id: string }>(list: T[]) => new Map(list.map((e
 
 export const putSection = (body: Section) =>
   asOwner((headers) =>
-    coreApiV2().PUT("/v2/admin/sections/{sectionId}", { headers, params: { path: { sectionId: body.id } }, body }),
+    coreApi().PUT("/v2/admin/sections/{sectionId}", { headers, params: { path: { sectionId: body.id } }, body }),
   );
 
 export const putItem = (body: AdminItem) =>
-  asOwner((headers) => coreApiV2().PUT("/v2/admin/items/{itemId}", { headers, params: { path: { itemId: body.id } }, body }));
+  asOwner((headers) => coreApi().PUT("/v2/admin/items/{itemId}", { headers, params: { path: { itemId: body.id } }, body }));
 
 export const deleteItem = (itemId: string) =>
-  asOwner((headers) => coreApiV2().DELETE("/v2/admin/items/{itemId}", { headers, params: { path: { itemId } } }));
+  asOwner((headers) => coreApi().DELETE("/v2/admin/items/{itemId}", { headers, params: { path: { itemId } } }));
 
 export const putGroup = (body: Group) =>
   asOwner((headers) =>
-    coreApiV2().PUT("/v2/admin/modifier-groups/{modifierGroupId}", {
+    coreApi().PUT("/v2/admin/modifier-groups/{modifierGroupId}", {
       headers,
       params: { path: { modifierGroupId: body.id } },
       body,
@@ -65,7 +65,7 @@ export const putGroup = (body: Group) =>
 
 export const putSwapSell = (body: SwapSell) =>
   asOwner((headers) =>
-    coreApiV2().PUT("/v2/admin/swap-sells/{swapSellId}", { headers, params: { path: { swapSellId: body.id } }, body }),
+    coreApi().PUT("/v2/admin/swap-sells/{swapSellId}", { headers, params: { path: { swapSellId: body.id } }, body }),
   );
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);

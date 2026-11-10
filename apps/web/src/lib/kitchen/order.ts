@@ -1,4 +1,4 @@
-import type { components } from "@/lib/core-api-v2";
+import type { components } from "@/lib/core-api";
 
 // The kitchen's order on contract v2 (pilot, COM-148): Go's SubmitOrderResponse.
 // `number` is the key, `customerCheckNumber` the short number people call out,

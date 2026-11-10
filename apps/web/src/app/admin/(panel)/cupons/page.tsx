@@ -6,7 +6,7 @@ import { Badge, Card, Checkbox, Field, inputClass, LoadError, PageHeader } from 
 import { type DiscountRule, readDiscountRule } from "@/lib/admin/catalogue-form";
 import { attempt, type FormState, load, text } from "@/lib/admin/form";
 import { asOwner } from "@/lib/admin/session";
-import { coreApiV2 } from "@/lib/core/client-v2";
+import { coreApi } from "@/lib/core/client";
 import { formatMoney } from "@/lib/format/money";
 
 const reais = (value: number | null | undefined) => (value == null ? "" : value.toFixed(2).replace(".", ","));
@@ -15,11 +15,11 @@ async function saveCoupon(_: FormState, form: FormData): Promise<FormState> {
   "use server";
   const ruleId = text(form, "ruleId");
   return attempt(async () => {
-    const rules = await asOwner((headers) => coreApiV2().GET("/v2/admin/discount-rules", { headers }));
+    const rules = await asOwner((headers) => coreApi().GET("/v2/admin/discount-rules", { headers }));
     const current = ruleId ? (rules.find((r) => r.id === ruleId) ?? null) : null;
     const body = readDiscountRule(form, current);
     await asOwner((headers) =>
-      coreApiV2().PUT("/v2/admin/discount-rules/{discountRuleId}", {
+      coreApi().PUT("/v2/admin/discount-rules/{discountRuleId}", {
         headers,
         params: { path: { discountRuleId: body.id } },
         body,
@@ -59,7 +59,7 @@ export default function CouponsPage() {
 }
 
 async function CouponList() {
-  const loaded = await load(() => asOwner((headers) => coreApiV2().GET("/v2/admin/discount-rules", { headers })));
+  const loaded = await load(() => asOwner((headers) => coreApi().GET("/v2/admin/discount-rules", { headers })));
   if ("error" in loaded) return <LoadError message={loaded.error} />;
   const rules = [...loaded.data].sort((a, b) => a.code.localeCompare(b.code));
   return (

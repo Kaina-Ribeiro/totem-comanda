@@ -1,6 +1,7 @@
 import type { components } from "@/lib/core-api";
 
 type DeviceConfig = components["schemas"]["DeviceConfig"];
+type StorePace = components["schemas"]["StorePace"];
 type DeviceStatusReport = components["schemas"]["DeviceStatusReport"];
 
 export const GATE_STATES = ["open", "maintenance", "at-capacity", "paused", "closed"] as const;
@@ -20,7 +21,7 @@ export function isGateState(value: unknown): value is GateState {
  */
 export function gateState(
   config: Pick<DeviceConfig, "maintenanceMode" | "atCapacityMode" | "isOpen"> & {
-    pace?: Pick<DeviceConfig["pace"], "pace">;
+    pace?: Pick<StorePace, "pace">;
   },
 ): GateState {
   if (config.maintenanceMode) return "maintenance";
