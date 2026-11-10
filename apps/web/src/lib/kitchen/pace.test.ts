@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { components } from "@/lib/core-api";
+import type { components } from "@/lib/core-api-v2";
 
 import { newerPace } from "./pace";
 

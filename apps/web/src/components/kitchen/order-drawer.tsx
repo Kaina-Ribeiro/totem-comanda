@@ -2,11 +2,9 @@
 
 import { Fragment, useEffect, useRef, type ReactNode } from "react";
 
-import type { components } from "@/lib/core-api";
 import { waitingMinutes, waitLabel, waitState } from "@/lib/kitchen/board";
 import { historyRows, timesLine } from "@/lib/kitchen/detail";
-
-type KitchenOrder = components["schemas"]["KitchenOrder"];
+import { kitchenLines, type KitchenLine, type KitchenOrder, readyAt } from "@/lib/kitchen/order";
 
 const STATUS_CHIP = {
   PAID: { label: "Novo", className: "bg-butter" },
@@ -31,7 +29,7 @@ const chip =
 
 /**
  * The order detail (prototype K2): a drawer over the board with every line and
- * option, the type, the times, the status history and the order's actions.
+ * option, the times, the status history and the order's actions.
  * `lineAction` and `secondary` are slots for "Acabou" and "Voltar uma etapa".
  */
 export function OrderDrawer({
@@ -53,18 +51,19 @@ export function OrderDrawer({
   /** Left footer button, next to the main one. */
   secondary?: ReactNode;
   /** Button at the end of each item line. */
-  lineAction?: (line: KitchenOrder["lines"][number], index: number) => ReactNode;
+  lineAction?: (line: KitchenLine, index: number) => ReactNode;
   /** A panel under a line (the "Acabou" confirmation). */
-  lineExtra?: (line: KitchenOrder["lines"][number], index: number) => ReactNode;
+  lineExtra?: (line: KitchenLine, index: number) => ReactNode;
   /** Under the history: the rare actions ("Cancelar pedido"). */
   footnote?: ReactNode;
 }) {
   const close = useRef<HTMLButtonElement>(null);
   const column = order.status as keyof typeof STATUS_CHIP;
   const ready = column === "READY";
-  const minutes = waitingMinutes(ready ? (order.readyAt ?? order.placedAt) : order.placedAt, now);
+  const minutes = waitingMinutes(ready ? (readyAt(order) ?? order.placedAt) : order.placedAt, now);
   const state = ready ? "ok" : waitState(minutes);
   const history = historyRows(order, now);
+  const lines = kitchenLines(order);
 
   // Focus the close button on open and give focus back to the card on close.
   useEffect(() => {
@@ -91,7 +90,7 @@ export function OrderDrawer({
       <aside
         role="dialog"
         aria-modal="true"
-        aria-label={`Pedido ${order.posCheckNumber}`}
+        aria-label={`Pedido ${order.customerCheckNumber}`}
         className="absolute inset-y-0 right-0 flex w-[540px] max-w-full animate-drawer-in flex-col bg-surface shadow-[-12px_0_32px_rgba(28,28,26,.18)]"
       >
         <div className="flex flex-col gap-2.5 px-7 pt-5">
@@ -119,16 +118,13 @@ export function OrderDrawer({
           </div>
           <div className="flex flex-wrap items-center gap-3.5">
             <span className="text-[72px] leading-[0.9] font-extrabold tracking-[-0.03em]">
-              {order.posCheckNumber}
+              {order.customerCheckNumber}
             </span>
             {STATUS_CHIP[column] && (
               <span className={`${chip} ${STATUS_CHIP[column].className}`}>
                 {STATUS_CHIP[column].label}
               </span>
             )}
-            <span className={`${chip} ${order.orderType === "TAKE_OUT" ? "bg-butter" : "bg-oat"}`}>
-              {order.orderType === "TAKE_OUT" ? "Para viagem" : "Comer aqui"}
-            </span>
             <span className={`${chip} ${WAIT_CHIP[state]}`}>
               {ready ? `pronto há ${minutes} min` : waitLabel(minutes)}
             </span>
@@ -139,11 +135,11 @@ export function OrderDrawer({
         <div className="flex min-h-0 flex-1 flex-col gap-[22px] overflow-y-auto px-7 pt-[22px] pb-4">
           <section className="flex flex-col gap-1">
             <h3 className="mb-1.5 text-lg font-bold tracking-[-0.02em]">Itens</h3>
-            {order.lines.map((line, i) => (
-              <Fragment key={i}>
+            {lines.map((line, i) => (
+              <Fragment key={line.key}>
                 <div
                   className={`flex min-h-14 items-center justify-between gap-4 py-2 ${
-                    i < order.lines.length - 1 ? "border-b border-line" : ""
+                    i < lines.length - 1 ? "border-b border-line" : ""
                   }`}
                 >
                   <span className="flex flex-col gap-0.5">
@@ -154,6 +150,9 @@ export function OrderDrawer({
                       <span className="text-[15px] font-semibold text-muted">
                         {line.options.join(" · ")}
                       </span>
+                    )}
+                    {line.note && (
+                      <span className="text-[15px] font-bold text-detail-text">Obs.: {line.note}</span>
                     )}
                   </span>
                   {lineAction?.(line, i)}

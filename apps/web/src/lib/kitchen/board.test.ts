@@ -12,22 +12,22 @@ import {
 
 const order = (id: string, status: string, placedAt: string) =>
   ({
-    id,
+    number: id,
+    customerCheckNumber: id,
     status,
     placedAt,
-    posCheckNumber: id,
-    orderType: "TAKE_OUT",
-    readyAt: null,
-    lines: [],
+    orderType: "DINEIN",
+    history: [],
+    orderItems: [],
   }) as never;
 
 describe("kitchen board", () => {
   it("adds new orders oldest first and moves them between columns", () => {
     let board = applyOrder([], order("43", "PAID", "2026-10-30T12:05:00Z"));
     board = applyOrder(board, order("42", "PAID", "2026-10-30T12:04:00Z"));
-    expect(board.map((o) => o.id)).toEqual(["42", "43"]);
+    expect(board.map((o) => o.number)).toEqual(["42", "43"]);
     board = applyOrder(board, order("42", "READY", "2026-10-30T12:04:00Z"));
-    expect(board.find((o) => o.id === "42")?.status).toBe("READY");
+    expect(board.find((o) => o.number === "42")?.status).toBe("READY");
   });
 
   it("drops collected orders", () => {
@@ -98,6 +98,6 @@ describe("stale-event guard (G-K3)", () => {
     ]);
     const current = [v("43", "PAID", 1), v("44", "READY", 2)];
     const board = mergeSnapshot(current, [], seen, 10, 30);
-    expect(board.map((o) => o.id)).toEqual(["43"]);
+    expect(board.map((o) => o.number)).toEqual(["43"]);
   });
 });

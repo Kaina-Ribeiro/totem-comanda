@@ -4,7 +4,7 @@ import { asDevice } from "@/lib/device/session";
 import { kitchenStreamUrl } from "@/lib/kitchen/core";
 
 /**
- * Relays the Core API's kitchen events (GET /v1/kitchen/stream) to the
+ * Relays the Core API's kitchen events (GET /v2/kitchen/stream) to the
  * kitchen browser, which never holds the device token. Closes with the
  * browser's request; any failure is a non-200 the client answers by polling.
  */

@@ -260,13 +260,13 @@ kitchen in ≤ 2 s and goes through every status; report in decimal; owner cance
 
 ### Task 4.1: Kitchen board on v2 order lines
 
-**Status:** ⏳ pending
+**Status:** ✅ done (COM-148, plan `pilot-v2-phase-4.md`) — board, Produção, Retirados, undo, "Acabou" (`available`), pace, close the day and owner cancel on `/v2`; a v2 kiosk order shows in < 0.1 s on the mock.
 **Produces:** board reads `SubmitOrderResponse.orderItems` (`CheckItem` + nested `modifiers`);
 statuses, undo, pace, close the day, "Acabou" → `available: false`; SSE + polling unchanged.
 
 ### Task 4.2: Store, devices, orders, report on v2
 
-**Status:** ⏳ pending
+**Status:** ✅ done (COM-148) — Loja (cutoff, invoice notice; CNPJ, order-number digits and receipt footer removed: no v2 field), Aparelhos (+ Point), Relatório and Início KPIs in decimal BRL; `npm run mock:orders` places v2 orders. Owner cancel stays in the kitchen (the v2 contract has no admin order list).
 **Produces:** store form (no dine-in/take-out toggles; `invoiceNotice`, `businessDayCutoff`);
 devices with `paymentTerminalId`; owner cancel; daily report in decimal BRL.
 

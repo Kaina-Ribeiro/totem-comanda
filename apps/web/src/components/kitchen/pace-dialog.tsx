@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import type { components } from "@/lib/core-api";
+import type { components } from "@/lib/core-api-v2";
 
 type StorePace = components["schemas"]["StorePace"];
 type Pace = StorePace["pace"];

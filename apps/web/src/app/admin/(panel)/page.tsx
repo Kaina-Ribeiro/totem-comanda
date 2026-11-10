@@ -8,6 +8,7 @@ import { HomeSkeleton, Streamed } from "@/components/admin/skeleton";
 import { LoadError } from "@/components/admin/ui";
 import { attempt, type FormState, load, text } from "@/lib/admin/form";
 import {
+  businessDate,
   dayIsOver,
   greeting,
   kioskState,
@@ -21,8 +22,9 @@ import {
 import { asOwner } from "@/lib/admin/session";
 import { loadStoreStatus, type StoreStatus } from "@/lib/admin/store-status";
 import { coreApi } from "@/lib/core/client";
+import { coreApiV2 } from "@/lib/core/client-v2";
 import type { components } from "@/lib/core-api";
-import { formatBRL } from "@/lib/format/money";
+import { formatMoney } from "@/lib/format/money";
 
 type Schemas = components["schemas"];
 
@@ -50,7 +52,7 @@ async function setPace(_: FormState, form: FormData): Promise<FormState> {
   }
   return attempt(async () => {
     await asOwner((headers) =>
-      coreApi().PUT("/v1/admin/pace", {
+      coreApiV2().PUT("/v2/admin/pace", {
         headers,
         body: pace === "PAUSED" ? { pace, pauseMinutes: 15 } : { pace },
       }),
@@ -74,34 +76,33 @@ async function Home() {
   await connection();
   const now = new Date();
   const loaded = await load(async () => {
-    const restaurant = await asOwner((headers) =>
-      coreApi().GET("/v1/admin/restaurant", { headers }),
-    );
-    const today = localNow(now, restaurant.timezone).date;
+    const store = await asOwner((headers) => coreApiV2().GET("/v2/admin/store", { headers }));
+    // Today's report is the business day's (cutoff 04:00): at 01:30 it is still yesterday's.
+    const today = businessDate(now, store.timezone, store.businessDayCutoff);
     const report = (date: string) =>
       asOwner((headers) =>
-        coreApi().GET("/v1/admin/reports/daily", { headers, params: { query: { date } } }),
+        coreApiV2().GET("/v2/admin/reports/daily", { headers, params: { query: { date } } }),
       );
-    const devices = await asOwner((headers) => coreApi().GET("/v1/admin/devices", { headers }));
+    const devices = await asOwner((headers) => coreApiV2().GET("/v2/admin/devices", { headers }));
     const [status, todayReport, lastWeek, items] = await Promise.all([
-      loadStoreStatus(now, { restaurant, devices }),
+      loadStoreStatus(now, { store, devices }),
       report(today),
       report(weekBefore(today)),
       asOwner((headers) => coreApi().GET("/v1/admin/items", { headers })),
     ]);
-    return { restaurant, status, todayReport, lastWeek, devices, items, today };
+    return { store, status, todayReport, lastWeek, devices, items, today };
   });
   if ("error" in loaded) return <LoadError message={loaded.error} />;
-  const { restaurant, status, todayReport, lastWeek, devices, items, today } = loaded.data;
-  const clock = localNow(now, restaurant.timezone);
+  const { store, status, todayReport, lastWeek, devices, items, today } = loaded.data;
+  const clock = localNow(now, store.timezone);
   const dateLabel = new Intl.DateTimeFormat("pt-BR", {
-    timeZone: restaurant.timezone,
+    timeZone: store.timezone,
     weekday: "long",
     day: "numeric",
     month: "long",
   }).format(now);
   const timeLabel = new Intl.DateTimeFormat("pt-BR", {
-    timeZone: restaurant.timezone,
+    timeZone: store.timezone,
     hour: "2-digit",
     minute: "2-digit",
   }).format(now);
@@ -132,13 +133,13 @@ async function Home() {
       >
         <Kpi
           label="Faturamento hoje"
-          value={formatBRL(todayReport.revenue)}
+          value={formatMoney(todayReport.revenue)}
           delta={totalVersusLastWeek(
             todayReport.revenue,
             lastWeek.revenue,
             clock.day,
             final,
-            formatBRL,
+            formatMoney,
           )}
         />
         <Kpi
@@ -155,7 +156,7 @@ async function Home() {
         {/* A ratio, so a partial day compares fairly with a whole one. */}
         <Kpi
           label="Ticket médio"
-          value={formatBRL(todayReport.averageTicket)}
+          value={formatMoney(todayReport.averageTicket)}
           delta={versusLastWeek(todayReport.averageTicket, lastWeek.averageTicket, clock.day)}
         />
       </section>
@@ -196,7 +197,7 @@ async function Home() {
                     ? "desativado"
                     : device.maintenanceMode
                       ? "em manutenção"
-                      : signalLabel(device.online, device.lastSeenAt, now, restaurant.timezone)}
+                      : signalLabel(device.online, device.lastSeenAt, now, store.timezone)}
                 </span>
               </li>
             ))}

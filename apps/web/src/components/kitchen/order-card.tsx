@@ -1,7 +1,5 @@
-import type { components } from "@/lib/core-api";
 import { waitLabel, waitState, waitingMinutes } from "@/lib/kitchen/board";
-
-type KitchenOrder = components["schemas"]["KitchenOrder"];
+import { kitchenLines, type KitchenOrder, readyAt } from "@/lib/kitchen/order";
 
 const BUTTON_LABEL = { PAID: "Começar", PREPARING: "Pronto", READY: "Retirado" } as const;
 
@@ -21,7 +19,7 @@ const CARD_RING = {
 
 const chip = "flex h-[26px] items-center rounded-[13px] px-2.5 text-[13px] font-extrabold whitespace-nowrap";
 
-/** One order on the board: number, type, waiting time, lines and the next step. */
+/** One order on the board: number, waiting time, lines and the next step. */
 export function OrderCard({
   order,
   now,
@@ -42,7 +40,7 @@ export function OrderCard({
   const column = order.status as keyof typeof BUTTON_LABEL;
   const ready = column === "READY";
   // Ready orders count from readyAt and no longer age: the guest is the one waiting.
-  const minutes = waitingMinutes(ready ? (order.readyAt ?? order.placedAt) : order.placedAt, now);
+  const minutes = waitingMinutes(ready ? (readyAt(order) ?? order.placedAt) : order.placedAt, now);
   const state = ready ? "ok" : waitState(minutes);
   return (
     <article
@@ -52,13 +50,13 @@ export function OrderCard({
     >
       <button
         onClick={onOpen}
-        aria-label={`Abrir pedido ${order.posCheckNumber}`}
+        aria-label={`Abrir pedido ${order.customerCheckNumber}`}
         className="-mx-2 -mt-1.5 flex flex-col gap-3 rounded-lg px-2 pt-1.5 text-left transition-colors active:bg-hover"
       >
         <span className="flex w-full items-center justify-between gap-2">
           <span className="flex items-center gap-2.5">
             <span className="text-[38px] leading-none font-extrabold tracking-[-0.02em]">
-              {order.posCheckNumber}
+              {order.customerCheckNumber}
             </span>
             {isNew && (
               <span className="flex h-6 items-center gap-[5px] rounded-xl bg-wheat px-[9px] text-xs font-semibold">
@@ -66,9 +64,6 @@ export function OrderCard({
                 Novo
               </span>
             )}
-            <span className={`${chip} ${order.orderType === "TAKE_OUT" ? "bg-butter" : "bg-oat"}`}>
-              {order.orderType === "TAKE_OUT" ? "Para viagem" : "Comer aqui"}
-            </span>
           </span>
           <span className={`${chip} ${WAIT_CHIP[state]}`}>
             {ready ? `pronto há ${minutes} min` : waitLabel(minutes)}
@@ -76,13 +71,16 @@ export function OrderCard({
           </span>
         </span>
         <span className="flex flex-col gap-[7px]">
-          {order.lines.map((line, i) => (
-            <span key={i} className="flex flex-col gap-px">
+          {kitchenLines(order).map((line) => (
+            <span key={line.key} className="flex flex-col gap-px">
               <span className="text-[17px] font-bold">
                 {line.quantity}× {line.name}
               </span>
               {line.options.length > 0 && (
                 <span className="text-sm font-semibold text-muted">{line.options.join(" · ")}</span>
+              )}
+              {line.note && (
+                <span className="text-sm font-bold text-detail-text">Obs.: {line.note}</span>
               )}
             </span>
           ))}

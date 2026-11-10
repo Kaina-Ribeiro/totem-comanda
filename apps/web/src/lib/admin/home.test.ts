@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  businessDate,
   dayIsOver,
   greeting,
   kioskState,
@@ -117,5 +118,18 @@ describe("kioskState (decision 14)", () => {
     [live, "open"],
   ])("%o is %s", (status, expected) => {
     expect(kioskState(status)).toBe(expected);
+  });
+});
+
+describe("businessDate", () => {
+  it("counts the hours before the cutoff as the day before (cutoff 04:00)", () => {
+    // 01:30 in São Paulo is 04:30 UTC.
+    expect(businessDate(new Date("2026-11-10T04:30:00Z"), "America/Sao_Paulo", "04:00")).toBe("2026-11-09");
+    // 04:30 in São Paulo.
+    expect(businessDate(new Date("2026-11-10T07:30:00Z"), "America/Sao_Paulo", "04:00")).toBe("2026-11-10");
+  });
+
+  it("is the calendar date with a 00:00 cutoff", () => {
+    expect(businessDate(new Date("2026-11-10T04:30:00Z"), "America/Sao_Paulo", "00:00")).toBe("2026-11-10");
   });
 });

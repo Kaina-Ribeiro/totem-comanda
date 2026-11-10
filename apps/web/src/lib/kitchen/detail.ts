@@ -1,9 +1,5 @@
-import type { components } from "@/lib/core-api";
-
 import { waitingMinutes, waitState } from "./board";
-
-type KitchenOrder = components["schemas"]["KitchenOrder"];
-type Change = components["schemas"]["KitchenStatusChange"];
+import type { KitchenOrder, KitchenStatusChange as Change } from "./order";
 
 const time = new Intl.DateTimeFormat("pt-BR", {
   hour: "2-digit",

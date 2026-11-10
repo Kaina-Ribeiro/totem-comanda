@@ -1,10 +1,10 @@
-
 import { ReportSkeleton, Streamed } from "@/components/admin/skeleton";
 import { Card, inputClass, LoadError, PageHeader } from "@/components/admin/ui";
 import { load } from "@/lib/admin/form";
+import { businessDate } from "@/lib/admin/home";
 import { asOwner } from "@/lib/admin/session";
-import { coreApi } from "@/lib/core/client";
-import { formatBRL } from "@/lib/format/money";
+import { coreApiV2 } from "@/lib/core/client-v2";
+import { formatMoney } from "@/lib/format/money";
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -22,6 +22,8 @@ export default function ReportPage({ searchParams }: PageProps<"/admin/relatorio
   );
 }
 
+const pedidos = (n: number) => (n === 1 ? "1 pedido" : `${n} pedidos`);
+
 async function Report({
   searchParams,
 }: {
@@ -29,23 +31,18 @@ async function Report({
 }) {
   const { date: asked } = await searchParams;
   const loaded = await load(async () => {
-    const restaurant = await asOwner((headers) =>
-      coreApi().GET("/v1/admin/restaurant", { headers }),
-    );
-    // The business date in the store's timezone, unless the owner picked another day.
-    const today = new Intl.DateTimeFormat("en-CA", { timeZone: restaurant.timezone }).format(
-      new Date(),
-    );
+    const store = await asOwner((headers) => coreApiV2().GET("/v2/admin/store", { headers }));
+    // The business day in the store's timezone (it starts at the cutoff),
+    // unless the owner picked another day.
+    const today = businessDate(new Date(), store.timezone, store.businessDayCutoff);
     const date = typeof asked === "string" && DATE.test(asked) ? asked : today;
     const report = await asOwner((headers) =>
-      coreApi().GET("/v1/admin/reports/daily", { headers, params: { query: { date } } }),
+      coreApiV2().GET("/v2/admin/reports/daily", { headers, params: { query: { date } } }),
     );
-    return { report, today };
+    return { report, today, cutoff: store.businessDayCutoff };
   });
   if ("error" in loaded) return <LoadError message={loaded.error} />;
-  const { report, today } = loaded.data;
-  const share = (n: number) =>
-    report.ordersCount ? Math.round((n / report.ordersCount) * 100) : 0;
+  const { report, today, cutoff } = loaded.data;
 
   return (
     <>
@@ -63,41 +60,34 @@ async function Report({
         <button className="h-10 rounded-[10px] bg-accent px-4 text-sm font-bold text-on-accent transition-transform active:scale-[.98]">
           Ver
         </button>
+        <span className="pb-2.5 text-[13px] font-medium text-muted">
+          O dia começa às {cutoff}.
+        </span>
       </form>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Stat label="Pedidos" value={String(report.ordersCount)} />
-        <Stat label="Faturamento" value={formatBRL(report.revenue)} />
-        <Stat label="Ticket médio" value={formatBRL(report.averageTicket)} />
+        <Stat label="Faturamento" value={formatMoney(report.revenue)} />
+        <Stat label="Ticket médio" value={formatMoney(report.averageTicket)} />
       </div>
 
-      <Card className="flex flex-col gap-3">
-        <h2 className="text-lg font-bold tracking-[-0.01em]">Comer aqui × para viagem</h2>
-        {(
-          [
-            ["DINEIN", "Comer aqui"],
-            ["TAKE_OUT", "Para viagem"],
-          ] as const
-        ).map(([type, label]) => {
-          const totals = report.byOrderType[type];
-          return (
-            <div key={type} className="flex flex-col gap-1">
-              <div className="flex justify-between text-sm">
-                <span className="font-semibold">{label}</span>
-                <span className="text-muted">
-                  {totals.orders === 1 ? "1 pedido" : `${totals.orders} pedidos`} ·{" "}
-                  {formatBRL(totals.revenue)}
-                </span>
-              </div>
-              <div className="h-2.5 overflow-hidden rounded-full bg-ground">
-                <div
-                  className="h-full rounded-full bg-detail"
-                  style={{ width: `${share(totals.orders)}%` }}
-                />
-              </div>
-            </div>
-          );
-        })}
+      {/* Cancelled orders never count in revenue (contract DailyReport). */}
+      <Card className="grid gap-x-6 gap-y-3 sm:grid-cols-3">
+        <Line
+          label="Descontos de cupom"
+          value={formatMoney(report.discountTotal)}
+          hint="Já descontados do faturamento."
+        />
+        <Line
+          label="Cancelados"
+          value={pedidos(report.cancelledCount)}
+          hint="Estorno no painel do Mercado Pago."
+        />
+        <Line
+          label="Não retirados"
+          value={pedidos(report.notCollectedCount)}
+          hint="Abertos quando a cozinha encerrou o dia."
+        />
       </Card>
 
       <Card className="p-0">
@@ -115,10 +105,12 @@ async function Report({
             </thead>
             <tbody>
               {report.bestSellers.map((seller) => (
-                <tr key={seller.itemId} className="border-t border-line">
+                <tr key={seller.id} className="border-t border-line">
                   <td className="px-5 py-2 font-semibold">{seller.name}</td>
                   <td className="px-5 py-2 text-right">{seller.quantity}</td>
-                  <td className="px-5 py-2 text-right text-price">{formatBRL(seller.revenue)}</td>
+                  <td className="px-5 py-2 text-right whitespace-nowrap text-price">
+                    {formatMoney(seller.revenue)}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -135,5 +127,15 @@ function Stat({ label, value }: { label: string; value: string }) {
       <span className="text-sm font-semibold text-muted">{label}</span>
       <span className="text-3xl font-extrabold tracking-[-0.03em]">{value}</span>
     </Card>
+  );
+}
+
+function Line({ label, value, hint }: { label: string; value: string; hint: string }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-sm font-semibold text-muted">{label}</span>
+      <span className="text-lg font-bold">{value}</span>
+      <span className="text-xs text-muted">{hint}</span>
+    </div>
   );
 }

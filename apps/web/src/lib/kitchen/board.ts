@@ -1,6 +1,6 @@
-import type { components } from "@/lib/core-api";
+import type { components } from "@/lib/core-api-v2";
 
-type KitchenOrder = components["schemas"]["KitchenOrder"];
+import type { KitchenOrder } from "./order";
 
 /** Statuses the board shows, in column order. COLLECTED leaves the board. */
 export const COLUMNS = ["PAID", "PREPARING", "READY"] as const;
@@ -10,7 +10,7 @@ const byPlacedAt = (a: KitchenOrder, b: KitchenOrder) =>
 
 /** The board after an event or a status answer: upsert, drop collected, oldest first. */
 export function applyOrder(orders: KitchenOrder[], order: KitchenOrder): KitchenOrder[] {
-  const rest = orders.filter((o) => o.id !== order.id);
+  const rest = orders.filter((o) => o.number !== order.number);
   if (!(COLUMNS as readonly string[]).includes(order.status)) return rest;
   return [...rest, order].sort(byPlacedAt);
 }
@@ -27,9 +27,9 @@ export type Seen = Map<string, { version: number; at: number }>;
  * moved back by it would show a status Go no longer has.
  */
 export function accept(seen: Seen, order: KitchenOrder, at: number): boolean {
-  const known = seen.get(order.id);
+  const known = seen.get(order.number);
   if (known && order.version < known.version) return false;
-  if (!known || order.version > known.version) seen.set(order.id, { version: order.version, at });
+  if (!known || order.version > known.version) seen.set(order.number, { version: order.version, at });
   return true;
 }
 
@@ -49,15 +49,15 @@ export function mergeSnapshot(
   at: number,
   apply: (list: KitchenOrder[], order: KitchenOrder) => KitchenOrder[] = applyOrder,
 ): KitchenOrder[] {
-  const byId = new Map(current.map((o) => [o.id, o]));
-  const listed = new Set(snapshot.map((o) => o.id));
+  const byId = new Map(current.map((o) => [o.number, o]));
+  const listed = new Set(snapshot.map((o) => o.number));
   let board: KitchenOrder[] = [];
   for (const order of snapshot) {
     if (accept(seen, order, at)) board = apply(board, order);
-    else if (byId.has(order.id)) board = apply(board, byId.get(order.id)!);
+    else if (byId.has(order.number)) board = apply(board, byId.get(order.number)!);
   }
   for (const order of current) {
-    if (!listed.has(order.id) && (seen.get(order.id)?.at ?? 0) > startedAt) {
+    if (!listed.has(order.number) && (seen.get(order.number)?.at ?? 0) > startedAt) {
       board = apply(board, order);
     }
   }
@@ -76,8 +76,8 @@ export const PREVIOUS_STATUS = { READY: "PREPARING", COLLECTED: "READY" } as con
 
 /** Toast after a move that can be undone (prototype K1): "Pedido 38 retirado". */
 export function movedLabel(order: KitchenOrder): string | null {
-  if (order.status === "READY") return `Pedido ${order.posCheckNumber} pronto`;
-  if (order.status === "COLLECTED") return `Pedido ${order.posCheckNumber} retirado`;
+  if (order.status === "READY") return `Pedido ${order.customerCheckNumber} pronto`;
+  if (order.status === "COLLECTED") return `Pedido ${order.customerCheckNumber} retirado`;
   return null;
 }
 
@@ -114,7 +114,7 @@ const STEP_LABEL = { PREPARING: "Preparando", READY: "Pronto", COLLECTED: "Retir
  * there is nothing to retry. Anything else is worth one more tap.
  */
 export function moveErrorMessage(error: MoveError): { text: string; retry: boolean } {
-  const number = error.order.posCheckNumber;
+  const number = error.order.customerCheckNumber;
   if (
     error.code === "INVALID_STATUS_TRANSITION" ||
     error.code === "STALE_ORDER_VERSION" ||
