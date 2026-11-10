@@ -4,6 +4,13 @@ Comanda is a self-service ordering kiosk ("totem") for a single bakery, the firs
 Guests order on a vertical touch screen, pay, and pick up at the counter. There is also a
 kitchen screen and a back office for the owner.
 
+**The pilot** (`docs/pilot-v2/SPEC.md`, decided by Kai and the partner 5–6 Nov 2026) is a basic
+dine-in kiosk on the v2 data models of `docs/v2-research/MODELS.md`: see the menu, choose, pay with
+Pix or card (Mercado Pago Pix + Point, called only by Go), and the order reaches the kitchen after
+payment. Every order is `DINEIN`. No NFC-e: the success screen shows the invoice notice ("Se quiser
+nota fiscal, dirija-se ao caixa."). No tax. Availability is plain on/off. The waiter app, tables,
+open checks and the table QR menu come **after the pilot**.
+
 Two people build it:
 - **Kai** (you work with him): the Next.js app — kiosk, kitchen and back-office screens, and the BFF.
 - **Partner**: the Go Core API and the PostgreSQL database. Do not write Go unless Kai asks.
@@ -12,7 +19,8 @@ Talk to Kai in Brazilian Portuguese, casual and direct. Code, comments, commits 
 
 ## Read first, in this order
 
-1. `docs/plan.md` — MVP scope, architecture, phases, decisions, risks.
+1. `docs/pilot-v2/SPEC.md` — the pilot: scope, decisions, what changed from the original plan.
+   `docs/plan.md` — original MVP scope, architecture, phases, decisions, risks (the SPEC wins).
 2. `contract/openapi.yaml` and `contract/README.md` — the API contract with the Go side.
 3. `docs/data-model-and-api.md` — entities, business rules, open questions.
 4. `docs/prototype/README.md` and `docs/prototype/screens/*.png` — the approved visual design.
@@ -20,7 +28,7 @@ Talk to Kai in Brazilian Portuguese, casual and direct. Code, comments, commits 
    IDs: `F-` features, `FR-` requirements, `BR-` business rules, `SCR-` screens,
    `ENT-` entities, `OP-` backend operations.
 
-When sources disagree: **contract > plan > prototype > specs.** The specs describe a Windows +
+When sources disagree: **contract > pilot SPEC > plan > prototype > specs.** The specs describe a Windows +
 Electron kiosk with a local service; the plan replaces that with a thin client (below) and cuts
 scope. Use the specs for screen behaviour, rules and field names, not for architecture.
 
@@ -31,7 +39,7 @@ Kiosk (Orange Pi, Debian, Chromium --kiosk, 1080x1920 portrait)
    │ HTTPS
    ▼
 Next.js app (server)  ── BFF: Route Handlers, Server Actions, Server Components
-   │ REST/JSON /v1, generated client from contract/openapi.yaml
+   │ REST/JSON /v2, generated client from contract/openapi.yaml
    ▼
 Go Core API (partner) ── PostgreSQL        all in Docker on one server
 ```
@@ -80,17 +88,20 @@ Everything that is hardware is phase 4, last: the kiosk board itself, the paymen
 printers (Kai, 30 Oct 2026; this overrides `docs/plan.md`, which had the board in phase 0). Until
 then the kiosk is developed and tested in a regular desktop browser at 1080x1920; the board setup
 kit waits in `infra/kiosk/`.
-Until then: simulated payment (`POST /v1/payments/{id}/simulate`) and the order number on screen only.
+Payment in the pilot is Mercado Pago Pix + Point through Go (`POST /v2/payments`); the mock
+simulates Mercado Pago (`POST /v2/payments/{id}/simulate` and `/__mock/payments/{id}`).
 
 The `x-phase` field on each contract operation says which phase needs it.
 
 ## Contract rules (short version; full list in `contract/README.md`)
 
-- Money is integer cents in BRL. Format for display with
-  `new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })`.
-- The kiosk sends item and option ids, never prices.
+- One contract, `contract/openapi.yaml` (v2 models); every path is under `/v2`. There is no v1.
+- Money is a JSON number in decimal BRL (`9.50` = R$ 9,50), never cents. Display it with
+  `formatMoney()` (`src/lib/format/money.ts`); Go computes every amount.
+- The kiosk sends entity ids, never prices; Go prices the basket (`POST /v2/totals`).
 - Errors are `application/problem+json`; switch on `code`, never on `title`.
-- `POST /v1/orders`, `/payments` and `/place` need an `Idempotency-Key` (UUID per attempt).
+- `POST /v2/payments` and `POST /v2/orders` need an `Idempotency-Key` (UUID per attempt).
+- Dine-in only: `orderType` is always `DINEIN`; no take-out screen or report split.
 - Config and menu return an `ETag`; send `If-None-Match`.
 - Guest endpoints take `language` (`pt-BR` or `en`) and return resolved text.
 
@@ -116,7 +127,7 @@ language.
 Every other screen (new kiosk states, kitchen, back office on desktop and phone, and the waiter and
 table QR code apps) is in one canvas, sources in `docs/prototype/full/project/`; the README's "Full
 canvas" section lists them. Only the 12 kiosk screens are approved: the rest is a proposal, and
-the waiter and QR apps are outside the MVP. A desktop screen and its phone version share the number
+the waiter and QR apps come after the pilot. A desktop screen and its phone version share the number
 (`A2-Pedidos` ↔ `M2-Pedidos`).
 
 ## Commands
@@ -124,33 +135,29 @@ the waiter and QR apps are outside the MVP. A desktop screen and its phone versi
 ```bash
 # Stateful mock Core API (apps/web/mock) behind Prism, which validates every call against the
 # contract. Front end and BFF are built against it until the Go API exists. In apps/web:
-npm run mock        # CORE_API_URL=http://localhost:4010, CORE_API_V2_URL=http://localhost:4011 (contract v2,
-                    # src/lib/core/client-v2.ts), MOCK_CONTROL_URL=http://localhost:4020/__mock
-npm run mock:orders -- 3                # with the mock running: 3 paid v2 kiosk orders now (kitchen, report)
+npm run mock        # one Prism on :4010 (contract/openapi.yaml): CORE_API_URL=http://localhost:4010,
+                    # MOCK_CONTROL_URL=http://localhost:4020/__mock; routes live in mock/v2
+npm run mock:orders -- 3                # with the mock running: 3 paid kiosk orders now (kitchen, report)
 npm run mock:orders -- 3 --days-ago 7   # ...on the same weekday last week (Início, Relatório)
 # A browser is one device and opens only its area (a kiosk browser sent to /kitchen lands on
 # /kiosk). In dev with the mock, "Totem" and "Cozinha" on / pair this browser as the mock's
 # device of that kind first.
 # Extend apps/web/mock with the operations each story needs; Prism flags any drift from the contract.
-# Pilot v2 (COM-145): the same `npm run mock` also starts a second Prism on :4011 for
-# contract/openapi.v2.yaml (CORE_API_V2_URL=http://localhost:4011); v2 routes live in mock/v2.
 # Mercado Pago is simulated: MOCK_PAYMENT_OUTCOME=APPROVED|DECLINED|EXPIRED|NONE (default APPROVED)
 # after MOCK_PAYMENT_DELAY_MS (3000); POST /__mock/payments/{id} {"outcome": …} decides one session.
-npm run mock:smoke:v2                   # with the mock running: every v2 operation through Prism
-# The kiosk (COM-146), the kitchen and the back office's Início, Relatório, Loja and Aparelhos
-# (COM-148) run on /v2 and need CORE_API_V2_URL; the menu pages stay on /v1 until COM-147. The
-# kitchen reads order lines through src/lib/kitchen/order.ts (one line per unit merged). The kiosk never adds prices: Go prices the basket (POST /v2/totals) after
-# every change. To see a Pix or card outcome, run the mock with MOCK_PAYMENT_OUTCOME=NONE and decide
-# the session with POST /__mock/payments/{id}; /dev/mock's payment buttons only affect v1.
-# Ports taken by another worktree? MOCK_PORT, PRISM_PORT and PRISM_V2_PORT move the mock.
+# To see a Pix or card outcome, run the mock with MOCK_PAYMENT_OUTCOME=NONE and decide the waiting
+# session from /dev/mock (or POST /__mock/payments/{id}).
+npm run mock:smoke                      # with the mock running: every operation through Prism
+# The kitchen reads order lines through src/lib/kitchen/order.ts (one line per unit merged). The
+# kiosk never adds prices: Go prices the basket (POST /v2/totals) after every change.
+# Ports taken by another worktree? MOCK_PORT and PRISM_PORT move the mock (then set CORE_API_URL
+# and MOCK_CONTROL_URL to match).
 
-# Regenerate API types after any contract change
-npx openapi-typescript contract/openapi.yaml -o apps/web/src/lib/core-api.d.ts
-npm run gen:api:v2   # in apps/web: contract/openapi.v2.yaml → src/lib/core-api-v2.d.ts
+# Regenerate API types after any contract change (in apps/web)
+npm run gen:api        # contract/openapi.yaml → src/lib/core-api.d.ts
 
 # Lint the contract
 npx @redocly/cli lint contract/openapi.yaml
-npx @redocly/cli lint contract/openapi.v2.yaml
 ```
 
 ## Working agreements
@@ -159,13 +166,13 @@ npx @redocly/cli lint contract/openapi.v2.yaml
   partner's approval.
 - Never edit generated files.
 - Back office forms (`apps/web/src/lib/admin/form.ts`): read prices with `readPrice()` / `priceField()`
-  (decimal BRL, contract v2), which refuse what is not a price and never guess. A form saved through
+  (decimal BRL), which refuse what is not a price and never guess. A form saved through
   two Core calls uses `saveBoth()`: the part that can be read back and undone goes first, and it is
   put back if the second call fails. The contract has no atomic save.
-- Back office v2 menu editor (COM-147): every form is read by a pure reader in
+- Back office menu editor (COM-147): every form is read by a pure reader in
   `src/lib/admin/catalogue-form.ts` (FormData + current entity → v2 body; fields the form does not
   show are kept), tested on its own and by `reference-menu.test.ts`, which builds the MODELS 5.20
-  menu through those readers (`MOCK_V2_URL=http://localhost:4011` runs it through Prism). Catalogue
+  menu through those readers (`MOCK_API_URL=http://localhost:4010` runs it through Prism). Catalogue
   saves go through `attemptCatalogue()` (`src/lib/admin/catalogue.ts`), which lists each
   `MENU_INVALID` rule by entity name.
 - Back office loading (COM-140, COM-141): a page part that loads data goes in
@@ -178,8 +185,10 @@ npx @redocly/cli lint contract/openapi.v2.yaml
 - Open questions in `docs/data-model-and-api.md` (price changed mid-order, `waitTime`, order
   number reset, offline, fiscal fields, device pairing and secret storage) are not decided.
   Do not guess an answer into the code; ask Kai, or isolate it behind one clearly named function.
-- Out of scope for the MVP: loyalty, Scan-and-Go and staff age approval, split bill, guest walks
-  away, accessibility mode, tips, other payment methods, digital receipts, multi-brand.
+- Out of scope for the pilot (SPEC D-7, D-10, D-13, D-14): take-out, NFC-e, tax, the waiter app,
+  tables and the table QR menu (after the pilot), loyalty, Scan-and-Go and staff age approval,
+  split bill, guest walks away, accessibility mode, tips, other payment methods, digital receipts,
+  multi-brand.
 - Keep changes small and phase by phase. After each step, say what changed and how to check it.
 
 ## Task tracking
