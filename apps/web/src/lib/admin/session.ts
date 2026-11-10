@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 
 import { coreApi, problemCode, type ProblemCode } from "@/lib/core/client";
+import type { ProblemCodeV2, ProblemV2 } from "@/lib/core/client-v2";
 import { sealValue, unsealValue } from "@/lib/device/seal";
 
 // Kept in sync with src/proxy.ts (the proxy stays free of server-only modules).
@@ -83,11 +84,15 @@ export async function signOut(): Promise<void> {
 
 export type OwnerHeaders = { Authorization: string };
 
+/** One field error of a problem answer (v2 `MENU_INVALID` adds `rule` and `entity`). */
+export type ProblemFieldError = NonNullable<ProblemV2["errors"]>[number];
+
 /** Thrown for an answer the back office cannot use, with the Core API's `code`. */
 export class AdminApiError extends Error {
   constructor(
-    readonly code: ProblemCode | "CORE_UNAVAILABLE",
+    readonly code: ProblemCode | ProblemCodeV2 | "CORE_UNAVAILABLE",
     readonly detail?: string,
+    readonly errors?: ProblemFieldError[],
   ) {
     super(`Core API: ${code}`);
     this.name = "AdminApiError";
@@ -115,10 +120,8 @@ export async function asOwner<T>(
   if (result.response.status === 401) redirect(`${ADMIN_LOGIN}?expired=1`);
   if (!result.response.ok) {
     const code = problemCode(result.error);
-    throw new AdminApiError(
-      code ?? "CORE_UNAVAILABLE",
-      (result.error as { detail?: string } | undefined)?.detail,
-    );
+    const problem = result.error as { detail?: string; errors?: ProblemFieldError[] } | undefined;
+    throw new AdminApiError(code ?? "CORE_UNAVAILABLE", problem?.detail, problem?.errors);
   }
   // 204 answers carry no data.
   return result.data as T;

@@ -4,6 +4,7 @@ import { unstable_rethrow } from "next/navigation";
 
 import type { components } from "@/lib/core-api";
 
+import { describeMenuErrors, type NameOf } from "./menu-errors";
 import { AdminApiError } from "./session";
 
 /** What a back-office form action returns to its form. */
@@ -12,6 +13,8 @@ export type FormState = {
   saved?: string;
   /** Something shown once and never again, like a new device secret. */
   reveal?: { label: string; value: string };
+  /** One line per broken rule of a `MENU_INVALID` save (Review Focus 3). */
+  problems?: string[];
 };
 
 const MESSAGES: Partial<Record<AdminApiError["code"], string>> = {
@@ -21,6 +24,7 @@ const MESSAGES: Partial<Record<AdminApiError["code"], string>> = {
   SCHEDULE_OVERLAP:
     "Esse horário bate com o de outro cardápio. Só um cardápio pode estar ativo por vez.",
   DISCOUNT_CODE_TAKEN: "Já existe um desconto com esse código.",
+  MENU_INVALID: "O cardápio ficaria quebrado. Corrija e salve de novo.",
 };
 
 /** A save that left its first part saved: it could not be put back (COM-129). */
@@ -49,9 +53,14 @@ export function errorMessage(error: unknown): string {
   return MESSAGES.CORE_UNAVAILABLE!;
 }
 
-/** Runs a form action's Core API work; failures become a message, redirects pass through. */
+/**
+ * Runs a form action's Core API work; failures become a message, redirects
+ * pass through. A `MENU_INVALID` answer also lists each broken rule, naming
+ * entities with `nameOf` (the id when it does not know them).
+ */
 export async function attempt(
   work: () => Promise<string | void | FormState>,
+  nameOf: NameOf = () => undefined,
 ): Promise<FormState> {
   try {
     const result = await work();
@@ -59,6 +68,9 @@ export async function attempt(
     return { saved: result ?? "Salvo." };
   } catch (error) {
     unstable_rethrow(error);
+    if (error instanceof AdminApiError && error.code === "MENU_INVALID" && error.errors?.length) {
+      return { error: errorMessage(error), problems: describeMenuErrors(error.errors, nameOf) };
+    }
     return { error: errorMessage(error) };
   }
 }
@@ -116,33 +128,35 @@ export function orderTypesError(
 }
 
 // Reais with an optional "R$", "." between thousands and up to two decimals
-// after "," or ".": "28", "28,5", "1.234,50", "13.90". Anything else is not a
-// price ("1e3", "10,005"), and is refused rather than guessed (COM-128).
+// after "," or ".": "28", "9,5", "1.234,50", "13.90". Anything else is not a
+// price ("1e3", "10,005", "-1"), and is refused rather than guessed (COM-128,
+// Review Focus 5).
 const PRICE = /^(?:R\$\s*)?(\d{1,3}(?:\.\d{3})+|\d+)(?:[,.](\d{1,2}))?$/;
 
-/** "28,00" or "28.00" or "28" → 2800 cents; null for empty or invalid. */
-export function cents(value: string): number | null {
-  const match = PRICE.exec(value.trim());
+/** "9,50", "9.50", "9,5" or "R$ 9,50" → 9.5 (decimal BRL, contract v2); null when not a price. */
+export function readPrice(raw: string): number | null {
+  const match = PRICE.exec(raw.trim());
   if (!match) return null;
   const [, reais, decimals = ""] = match;
-  const total =
-    Number(reais.replaceAll(".", "")) * 100 + Number(decimals.padEnd(2, "0"));
-  return Number.isSafeInteger(total) ? total : null;
+  const cents = Number(reais.replaceAll(".", "")) * 100 + Number(decimals.padEnd(2, "0"));
+  // Integer cents back to reais: 30 / 100 is 0.3, never 0.30000000000000004.
+  return Number.isSafeInteger(cents) ? cents / 100 : null;
 }
 
 /**
- * An optional price field: null when left empty, the cents when valid, and a
- * failed save naming `label` when it is not a price, so a typo never silently
- * drops an override (COM-128).
+ * A price field: the price when valid; null when an optional field is left
+ * empty; otherwise a failed save naming `label`, so a typo never silently
+ * drops a price (COM-128).
  */
-export function optionalPrice(
+export function priceField(
   form: FormData,
   name: string,
   label: string,
+  { optional = false }: { optional?: boolean } = {},
 ): number | null {
   const value = text(form, name);
-  if (!value) return null;
-  const parsed = cents(value);
+  if (!value && optional) return null;
+  const parsed = readPrice(value);
   if (parsed === null) throw new AdminApiError("VALIDATION_FAILED", label);
   return parsed;
 }
