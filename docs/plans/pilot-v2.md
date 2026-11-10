@@ -195,7 +195,7 @@ Session brief: Goal: the kiosk journey on `/v2` per SPEC 5. Where: `apps/web/src
 
 ### Task 2.1: Menu graph reader
 
-**Status:** ⏳ pending
+**Status:** ✅ done — `readMenu` + `findProduct`/`nameOf`, 12 tests incl. missing link, empty group, empty swap sell, loops; step plan in `docs/plans/pilot-v2-phase-2.md`.
 **Files:** Create `apps/web/src/lib/kiosk/menu-graph.ts` + test.
 **Produces:** `readMenu(menu: MenuResponse): KioskMenu` — sections tree from `root`, products per
 section in link order, groups per product (sizes first), nested groups per option, combos, swap
@@ -203,7 +203,7 @@ sells; skips missing links, empty groups and loops (Review Focus 3).
 
 ### Task 2.2: Item builder and basket on v2
 
-**Status:** ⏳ pending
+**Status:** ✅ done — `builder.ts`, `basket-v2.ts` (`toOrderItems` matches the contract example), `formatMoney`; swap-sell sheet, cross-sell from `crossSellIds`. No front-end totals: Go prices the basket after every change (menu bar included), the add button has no amount. ⚠️ Item note not built (no v1 rule, no drawing): question for Kai in `docs/backlog-pending.md`.
 **Files:** Modify the builder and basket components; create `src/lib/kiosk/basket-v2.ts` + test.
 **Produces:** builder rules (`min`/`max`, `minChoices`/`maxChoices`/`defaultQuantity`, `INGR`
 removal, combo main + sides, swap sell offer, cross-sell); `toOrderItems(basket): OrderItem[]` with
@@ -212,7 +212,7 @@ limit); unavailable shown grey; money formatting tests (Review Focus 5).
 
 ### Task 2.3: Totals, coupon, payment and order on v2
 
-**Status:** ⏳ pending
+**Status:** ✅ done — actions `priceBasket`, `applyCoupon`/`removeCoupon`, `startPayment`, `pollPayment`, `cancelPayment`, `submitOrder` (retry with the same key, 15 s); Pix, card, declined, expired, price changed, terminal off, verifying, "procure o caixa" screens; Review Focus 1, 2, 4 tested and run against the mock with fault injection.
 **Files:** Modify `src/app/kiosk/actions.ts`, checkout components; create payment screens.
 **Produces:** BFF actions `createTotals`, `applyCoupon`, `startPayment(method)`, `pollPayment`,
 `cancelPayment`, `submitOrder` (same `Idempotency-Key` on retry, 15 s budget); screens "Como quer
@@ -221,7 +221,7 @@ pagar?", Pix (QR, copia-e-cola, 5-min countdown, "Gerar novo"), card wait (+ can
 
 ### Task 2.4: Remove order type and CPF; success with invoice notice
 
-**Status:** ⏳ pending
+**Status:** ✅ done — `/kiosk` reads `GET /v2/devices/me/config` (`KioskDeviceGate`); menu, language pack, journeys and key-action reports on `/v2`; success shows `customerCheckNumber`, wait and `invoiceNotice`. ⚠️ Device token, heartbeat and status routes stay shared on `/v1` with the kitchen (phase 4/5).
 **Produces:** no "comer aqui / para viagem" screen, no CPF step; success shows
 `customerCheckNumber`, wait time and `invoiceNotice`; the kiosk's device auth, config, heartbeat,
 language pack and journey calls on `/v2` (offline / closed / maintenance / paused screens keep their

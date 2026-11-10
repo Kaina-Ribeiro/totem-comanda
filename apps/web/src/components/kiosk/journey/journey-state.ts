@@ -1,55 +1,37 @@
-import type { Order, OrderTotal, PlacedOrder } from "@/app/kiosk/actions";
-import type { components } from "@/lib/core-api";
-import type { Result } from "@/lib/kiosk/core";
-import { type BasketLine, findItem } from "@/lib/kiosk/menu-view";
+import type { SubmitOrderResponse, TotalsResponse } from "@/app/kiosk/actions";
+import type { BasketLine } from "@/lib/kiosk/basket-v2";
+import type { Result } from "@/lib/kiosk/core-v2";
+import { findProduct, type KioskMenu } from "@/lib/kiosk/menu-graph";
 import type { Language, Strings } from "@/lib/kiosk/strings";
 
-type Schemas = components["schemas"];
-export type Menu = Schemas["Menu"];
-export type OrderType = Schemas["OrderType"];
-
-/** One journey on the kiosk, held in the browser from tap to reset. */
+/** One journey on the kiosk, held in the browser from tap to reset (pilot: dine-in only). */
 export type Journey = {
-  phase:
-    | "attract"
-    | "starting"
-    | "startFailed"
-    | "orderType"
-    | "menu"
-    | "item"
-    | "basket"
-    | "checkout"
-    | "success";
+  phase: "attract" | "starting" | "startFailed" | "menu" | "item" | "basket" | "checkout" | "success";
   language: Language;
   orderNonce: string | null;
   journeyStartedTimestamp: string | null;
-  /** The menu loaded at journey start (OP-START-04), in `language`. */
-  menu: Menu | null;
+  /** The menu loaded at journey start, in `language`, read into a tree. */
+  menu: KioskMenu | null;
   strings: Strings | null;
-  orderType: OrderType | null;
-  /** What the kiosk sends: item and option ids with quantities, never prices. */
+  /** What the kiosk sends: product and option ids with quantities, never prices. */
   basket: BasketLine[];
-  /** Category open on the menu screen; kept while an item is open (F-MENU-12). */
-  categoryId: string | null;
-  /** The item open in the builder, and the basket line it edits, if any. */
-  item: { itemId: string; editGuid: string | null; returnTo: "menu" | "basket" } | null;
-  /** CPF (11) or CNPJ (14) digits for the receipt, if the guest gave one (F-BASKET-10). */
-  cpfCnpj: string | null;
-  /** Coupon or restaurant discount code on the order (one per order). */
-  discountCode: string | null;
-  /** The Core API's latest totals, for the basket they were asked for (`key`). */
-  quote: { key: string; result: Result<OrderTotal> } | null;
-  /**
-   * The order created for checkout and the Idempotency-Keys that made it and
-   * will place it. Kept per basket (`basketKey`), so a retry never makes a
-   * second order and a changed basket gets a new one.
-   */
-  checkout: { basketKey: string; orderKey: string; placeKey: string; order: Order | null } | null;
-  /** Cross-sell group to suggest now (F-MENU-11), and whether the guest turned them off. */
-  crossSell: { groupId: string } | null;
+  /** Section open on the menu screen; kept while an item is open. */
+  sectionId: string | null;
+  /** The product open in the builder, and the basket line it edits, if any. */
+  item: { productId: string; editGuid: string | null; returnTo: "menu" | "basket" } | null;
+  /** The coupon code on the basket (one per order). */
+  coupon: string | null;
+  /** Go's basket for this journey, from the first `POST /v2/totals`. */
+  basketId: string | null;
+  /** Go's latest totals, for the basket they were asked for (`key`). */
+  totals: { key: string; result: Result<TotalsResponse> } | null;
+  /** The `Idempotency-Key` that places this basket; kept while the basket stays the same. */
+  checkout: { key: string; orderKey: string } | null;
+  /** What to offer after an add: the product's swap sell, then its cross-sells. */
+  offer: { kind: "swap"; guid: string; productId: string } | { kind: "crossSell"; productId: string } | null;
   crossSellOff: boolean;
-  /** The placed order: its number comes from the Core API (OP-PAY-03). */
-  placed: PlacedOrder | null;
+  /** The placed order: its number comes from Go. */
+  placed: SubmitOrderResponse | null;
 };
 
 export type JourneyAction =
@@ -59,32 +41,32 @@ export type JourneyAction =
       type: "started";
       orderNonce: string;
       journeyStartedTimestamp: string | null;
-      menu: Menu;
+      menu: KioskMenu;
       strings: Strings;
-      /** Set when only one order type exists, so its screen is skipped (BR-START-12). */
-      orderType: OrderType | null;
     }
   | { type: "startFailed" }
-  | { type: "relocalized"; language: Language; menu: Menu; strings: Strings }
-  | { type: "orderType"; orderType: OrderType }
-  | { type: "changeOrderType" }
+  | { type: "relocalized"; language: Language; menu: KioskMenu; strings: Strings }
   | { type: "addLine"; line: BasketLine }
-  | { type: "pickCategory"; categoryId: string }
-  | { type: "openItem"; itemId: string; editGuid?: string }
+  | { type: "pickSection"; sectionId: string }
+  | { type: "openItem"; productId: string; editGuid?: string }
   | { type: "closeItem" }
   | { type: "saveItem"; line: BasketLine }
+  /** The guest took the swap: the line now holds the target product. */
+  | { type: "swapped"; line: BasketLine }
+  /** The swap offer was declined (or taken): go on to cross-sells. */
+  | { type: "swapDone" }
+  | { type: "crossSellAccepted"; lines: BasketLine[] }
+  | { type: "crossSellDismissed" }
   | { type: "openBasket" }
   | { type: "openMenu" }
   | { type: "lineQuantity"; guid: string; quantity: number }
   | { type: "removeLine"; guid: string }
-  | { type: "quoted"; key: string; result: Result<OrderTotal> }
-  | { type: "taxId"; cpfCnpj: string | null }
-  | { type: "discount"; code: string | null }
-  | { type: "openCheckout"; orderKey: string; placeKey: string }
-  | { type: "orderCreated"; order: Order }
-  | { type: "placed"; placed: PlacedOrder }
-  | { type: "crossSellAccepted"; lines: BasketLine[] }
-  | { type: "crossSellDismissed" }
+  | { type: "priced"; key: string; result: Result<TotalsResponse> }
+  /** Go no longer knows `basketId` (NOT_FOUND): price a new basket, without the coupon. */
+  | { type: "basketLost" }
+  | { type: "coupon"; code: string | null }
+  | { type: "openCheckout"; orderKey: string }
+  | { type: "placed"; placed: SubmitOrderResponse }
   | { type: "reset"; language: Language };
 
 export function initialJourney(language: Language): Journey {
@@ -95,15 +77,14 @@ export function initialJourney(language: Language): Journey {
     journeyStartedTimestamp: null,
     menu: null,
     strings: null,
-    orderType: null,
     basket: [],
-    categoryId: null,
+    sectionId: null,
     item: null,
-    cpfCnpj: null,
-    discountCode: null,
-    quote: null,
+    coupon: null,
+    basketId: null,
+    totals: null,
     checkout: null,
-    crossSell: null,
+    offer: null,
     crossSellOff: false,
     placed: null,
   };
@@ -114,41 +95,32 @@ export function journeyReducer(state: Journey, action: JourneyAction): Journey {
     case "language":
       return { ...state, language: action.language };
     case "start":
-      return state.phase === "attract" || state.phase === "startFailed"
-        ? { ...state, phase: "starting" }
-        : state;
+      return state.phase === "attract" || state.phase === "startFailed" ? { ...state, phase: "starting" } : state;
     case "started":
       if (state.phase !== "starting") return state;
       return {
         ...state,
-        phase: action.orderType ? "menu" : "orderType",
+        phase: "menu",
         orderNonce: action.orderNonce,
         journeyStartedTimestamp: action.journeyStartedTimestamp,
         menu: action.menu,
         strings: action.strings,
-        orderType: action.orderType,
       };
     case "startFailed":
       return state.phase === "starting" ? { ...state, phase: "startFailed" } : state;
     case "relocalized":
       return { ...state, language: action.language, menu: action.menu, strings: action.strings };
-    case "orderType":
-      return { ...state, phase: "menu", orderType: action.orderType };
-    case "changeOrderType":
-      return { ...state, phase: "orderType" };
     case "addLine":
-      return withCrossSell(
-        { ...state, basket: addOrMerge(state.basket, action.line) },
-        action.line.itemId,
-      );
-    case "pickCategory":
-      return { ...state, categoryId: action.categoryId };
+      return withOffer({ ...state, basket: addOrMerge(state.basket, action.line) }, action.line);
+    case "pickSection":
+      return { ...state, sectionId: action.sectionId };
     case "openItem":
       return {
         ...state,
         phase: "item",
+        offer: null,
         item: {
-          itemId: action.itemId,
+          productId: action.productId,
           editGuid: action.editGuid ?? null,
           returnTo: state.phase === "basket" ? "basket" : "menu",
         },
@@ -161,18 +133,25 @@ export function journeyReducer(state: Journey, action: JourneyAction): Journey {
         ? replaceOrMerge(state.basket, editGuid, action.line)
         : addOrMerge(state.basket, action.line);
       const saved = { ...state, phase: state.item?.returnTo ?? "menu", item: null, basket };
-      return editGuid ? saved : withCrossSell(saved, action.line.itemId);
+      return editGuid ? saved : withOffer(saved, action.line);
     }
-    case "crossSellAccepted":
+    case "swapped":
       return {
         ...state,
-        crossSell: null,
-        basket: action.lines.reduce(addOrMerge, state.basket),
+        basket: replaceOrMerge(state.basket, action.line.guid, action.line),
+        offer: crossSellOffer(state, action.line.productId),
       };
+    case "swapDone":
+      return {
+        ...state,
+        offer: state.offer?.kind === "swap" ? crossSellOffer(state, state.offer.productId) : null,
+      };
+    case "crossSellAccepted":
+      return { ...state, offer: null, basket: action.lines.reduce(addOrMerge, state.basket) };
     case "crossSellDismissed":
-      return { ...state, crossSell: null, crossSellOff: true };
+      return { ...state, offer: null, crossSellOff: true };
     case "openBasket":
-      return state.basket.length > 0 ? { ...state, phase: "basket" } : state;
+      return state.basket.length > 0 ? { ...state, phase: "basket", offer: null } : state;
     case "openMenu":
       return { ...state, phase: "menu" };
     case "lineQuantity":
@@ -182,87 +161,79 @@ export function journeyReducer(state: Journey, action: JourneyAction): Journey {
           line.guid === action.guid ? { ...line, quantity: Math.max(1, action.quantity) } : line,
         ),
       };
-    case "removeLine":
-      return { ...state, basket: state.basket.filter((line) => line.guid !== action.guid) };
-    case "openCheckout": {
-      if (state.basket.length === 0) return state;
-      const basketKey = orderKey(state);
-      const keep = state.checkout?.basketKey === basketKey;
-      return {
-        ...state,
-        phase: "checkout",
-        checkout: keep
-          ? state.checkout
-          : { basketKey, orderKey: action.orderKey, placeKey: action.placeKey, order: null },
-      };
+    case "removeLine": {
+      const basket = state.basket.filter((line) => line.guid !== action.guid);
+      return { ...state, basket, phase: basket.length === 0 && state.phase === "basket" ? "menu" : state.phase };
     }
-    case "orderCreated":
-      return state.checkout
-        ? { ...state, checkout: { ...state.checkout, order: action.order } }
-        : state;
+    case "priced": {
+      // A late answer for an older basket is dropped; Go's basket id is kept either way.
+      const basketId = action.result.ok ? action.result.data.basketId : state.basketId;
+      if (action.key !== totalsKey(state)) return { ...state, basketId };
+      return { ...state, basketId, totals: { key: action.key, result: action.result } };
+    }
+    case "basketLost":
+      return { ...state, basketId: null, coupon: null, totals: null, checkout: null };
+    case "coupon":
+      return { ...state, coupon: action.code };
+    case "openCheckout": {
+      if (state.basket.length === 0 || !currentTotals(state)) return state;
+      const key = totalsKey(state);
+      const keep = state.checkout?.key === key;
+      return { ...state, phase: "checkout", checkout: keep ? state.checkout : { key, orderKey: action.orderKey } };
+    }
     case "placed":
       return { ...state, phase: "success", placed: action.placed };
-    case "discount":
-      return { ...state, discountCode: action.code };
-    case "taxId":
-      return { ...state, cpfCnpj: action.cpfCnpj };
-    case "quoted":
-      // A late answer for an older basket is dropped.
-      return action.key === quoteKey(state)
-        ? { ...state, quote: { key: action.key, result: action.result } }
-        : state;
     case "reset":
       return initialJourney(action.language);
   }
 }
 
-/** Identifies what a quote was asked for: order type, lines and discount. */
-export function quoteKey(state: Pick<Journey, "orderType" | "basket" | "discountCode">): string {
-  return JSON.stringify([state.orderType, state.basket, state.discountCode]);
+/** Identifies what a totals call was for: the lines, the coupon and the language of the names. */
+export function totalsKey(state: Pick<Journey, "basket" | "coupon" | "language">): string {
+  return JSON.stringify([state.basket, state.coupon, state.language]);
 }
 
-/** Identifies the order a checkout creates: the quote's inputs plus the CPF/CNPJ. */
-export function orderKey(state: Journey): string {
-  return JSON.stringify([quoteKey(state), state.cpfCnpj]);
-}
-
-/** The quote's totals when they match the current basket, else null. */
-export function currentQuote(state: Journey): OrderTotal | null {
-  return state.quote && state.quote.key === quoteKey(state) && state.quote.result.ok
-    ? state.quote.result.data
+/** Go's totals when they match the basket on screen, else null. */
+export function currentTotals(state: Journey): TotalsResponse | null {
+  return state.totals && state.totals.key === totalsKey(state) && state.totals.result.ok
+    ? state.totals.result.data
     : null;
 }
 
-/** The quote error for the basket on screen; an older basket's error is not shown (COM-63). */
-export function currentQuoteFailure(
-  state: Journey,
-): Extract<Result<OrderTotal>, { ok: false }> | null {
-  return state.quote && state.quote.key === quoteKey(state) && !state.quote.result.ok
-    ? state.quote.result
-    : null;
+/** The totals error for the basket on screen; an older basket's error is not shown. */
+export function currentTotalsFailure(state: Journey): Extract<Result<TotalsResponse>, { ok: false }> | null {
+  return state.totals && state.totals.key === totalsKey(state) && !state.totals.result.ok ? state.totals.result : null;
 }
 
-/**
- * After an item is added, suggests its cross-sell group (F-MENU-11) unless the
- * guest turned suggestions off or none of the group's items are in the basket's
- * order type. Only the first group is used, as in the specs.
- */
-function withCrossSell(state: Journey, itemId: string): Journey {
-  if (state.crossSellOff || !state.menu) return state;
-  const groupId = findItem(state.menu, itemId)?.crossSellGroupId;
-  const group = groupId && state.menu.crossSellGroups.find((g) => g.id === groupId);
-  if (!group) return state;
-  const offered = group.crossSells.filter((id) => {
-    const item = findItem(state.menu!, id);
-    return item && (item.serviceAvailability?.[state.orderType ?? "DINEIN"] ?? true);
-  });
-  return offered.length > 0 ? { ...state, crossSell: { groupId: group.id } } : state;
+/** The last total Go priced for this journey (for the basket bar while re-pricing, and journey events). */
+export function lastTotal(state: Journey): number | null {
+  return state.totals?.result.ok ? state.totals.result.data.total : null;
+}
+
+/** After a product is added: its swap sell first, else its cross-sells. */
+function withOffer(state: Journey, line: BasketLine): Journey {
+  const product = state.menu && findProduct(state.menu, line.productId);
+  if (product?.swapSell) {
+    const available = product.swapSell.productIds.some((id) => findProduct(state.menu!, id)?.available);
+    if (available) return { ...state, offer: { kind: "swap", guid: line.guid, productId: product.id } };
+  }
+  return { ...state, offer: crossSellOffer(state, line.productId) };
+}
+
+/** Cross-sells of `productId` worth showing: some available and not in the basket already. */
+function crossSellOffer(state: Journey, productId: string): Journey["offer"] {
+  if (state.crossSellOff || !state.menu) return null;
+  const ids = findProduct(state.menu, productId)?.crossSellIds ?? [];
+  const offered = ids.filter(
+    (id) => findProduct(state.menu!, id)?.available && !state.basket.some((line) => line.productId === id),
+  );
+  return offered.length > 0 ? { kind: "crossSell", productId } : null;
 }
 
 const sameChoices = (a: BasketLine, b: BasketLine) =>
-  a.itemId === b.itemId && JSON.stringify(a.options) === JSON.stringify(b.options);
+  a.productId === b.productId && JSON.stringify(a.picks) === JSON.stringify(b.picks);
 
-/** Adds a line, or bumps the quantity of an identical one (F-BASKET-01 merges them). */
+/** Adds a line, or bumps the quantity of an identical one. */
 function addOrMerge(basket: BasketLine[], line: BasketLine): BasketLine[] {
   const twin = basket.find((existing) => sameChoices(existing, line));
   if (!twin) return [...basket, line];
@@ -271,23 +242,9 @@ function addOrMerge(basket: BasketLine[], line: BasketLine): BasketLine[] {
   );
 }
 
-/**
- * Saves an edited line: if it now matches another line, the two become one
- * (BR-BASKET-01, COM-64); otherwise it stays in its place.
- */
+/** Saves an edited line: if it now matches another line, the two become one; else it keeps its place. */
 function replaceOrMerge(basket: BasketLine[], editGuid: string, line: BasketLine): BasketLine[] {
   const others = basket.filter((existing) => existing.guid !== editGuid);
   if (others.some((existing) => sameChoices(existing, line))) return addOrMerge(others, line);
   return basket.map((existing) => (existing.guid === editGuid ? line : existing));
-}
-
-/** Order types the restaurant offers, DINEIN first (BR-START-11). */
-export function availableOrderTypes(restaurant: {
-  isDineInAvailable: boolean;
-  isTakeOutAvailable: boolean;
-}): OrderType[] {
-  return [
-    ...(restaurant.isDineInAvailable ? (["DINEIN"] as const) : []),
-    ...(restaurant.isTakeOutAvailable ? (["TAKE_OUT"] as const) : []),
-  ];
 }

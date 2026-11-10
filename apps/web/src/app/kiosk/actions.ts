@@ -2,54 +2,49 @@
 
 import { after } from "next/server";
 
-import { coreApi } from "@/lib/core/client";
+import { coreApiV2 } from "@/lib/core/client-v2";
 import { retryUnknown } from "@/lib/core/retry";
-import type { components } from "@/lib/core-api";
+import type { components } from "@/lib/core-api-v2";
 import {
   deviceCall,
-  deviceCallAs,
-  failure,
+  kioskCall,
   loadActiveMenu,
   loadLanguagePack,
-  type Menu,
+  type MenuResponse,
+  notKiosk,
   reportKeyAction,
   type Result,
   success,
-} from "@/lib/kiosk/core";
-import { requireDeviceKind } from "@/lib/device/config";
-import { simulatedOutcome, terminalAnswered } from "@/lib/kiosk/simulated-payment";
+} from "@/lib/kiosk/core-v2";
 import { type Language, mergeStrings, type Strings } from "@/lib/kiosk/strings";
 
-// Server Actions of the kiosk journey. The browser holds the journey state;
-// these are its only way to the Core API, and they hold the device token.
-// Every one of them runs for a KIOSK device only (COM-109): the contract has
-// no such check, so without it a kitchen tablet could quote, pay and place.
+// Server Actions of the kiosk journey on Core v2 (pilot, SPEC 4.6 and 5). The
+// browser holds the journey; these are its only way to Core, and they hold the
+// device token. Every one runs for a KIOSK device only (COM-109). The kiosk
+// sends ids and quantities; every amount it shows comes back from Go.
 
-const kiosk = <T>(call: Parameters<typeof deviceCallAs<T>>[1]) => deviceCallAs("KIOSK", call);
-
-/** Null for a kiosk; otherwise the Result to return before any Core call. */
-async function notKiosk(): Promise<Result<never> | null> {
-  try {
-    await requireDeviceKind("KIOSK");
-    return null;
-  } catch (error) {
-    return failure(error);
-  }
-}
+type Schemas = components["schemas"];
+export type { MenuResponse };
+export type OrderItem = Schemas["OrderItem"];
+export type TotalsResponse = Schemas["TotalsResponse"];
+export type DiscountResponse = Schemas["DiscountResponse"];
+export type PaymentMethod = Schemas["PaymentMethod"];
+export type PaymentSession = Schemas["PaymentSession"];
+export type SubmitOrderResponse = Schemas["SubmitOrderResponse"];
+export type JourneyEventType = Schemas["JourneyEvent"]["type"];
 
 const isLanguage = (value: unknown): value is Language => value === "pt-BR" || value === "en";
 
 export type JourneyStart = {
   orderNonce: string;
   journeyStartedTimestamp: string | null;
-  menu: Menu;
+  menu: MenuResponse;
   strings: Strings;
 };
 
 /**
- * Starts a guest journey (OP-START-01, OP-START-04): records it, and loads
- * the active menu and language pack once. Recording the journey never blocks
- * the guest; a menu that cannot load does.
+ * Starts a guest journey: records it, and loads the active menu and language
+ * pack once. Recording never blocks the guest; a menu that cannot load does.
  */
 export async function beginJourney(language: Language): Promise<Result<JourneyStart>> {
   if (!isLanguage(language)) return { ok: false, code: "VALIDATION_FAILED" };
@@ -58,9 +53,7 @@ export async function beginJourney(language: Language): Promise<Result<JourneySt
   const orderNonce = crypto.randomUUID();
 
   const [journey, menu, pack] = await Promise.all([
-    deviceCall((headers) =>
-      coreApi().POST("/v1/journeys", { headers, body: { orderNonce, language } }),
-    ),
+    deviceCall((headers) => coreApiV2().POST("/v2/journeys", { headers, body: { orderNonce, language } })),
     loadActiveMenu(language),
     loadLanguagePack(language),
   ]);
@@ -76,11 +69,7 @@ export async function beginJourney(language: Language): Promise<Result<JourneySt
     });
     return menu;
   }
-  reportKeyAction({
-    kind: "KEY_ACTION",
-    type: "START_JOURNEY_SUCCESS",
-    kioskStatusType: "TRADING",
-  });
+  reportKeyAction({ kind: "KEY_ACTION", type: "START_JOURNEY_SUCCESS", kioskStatusType: "TRADING" });
   return success({
     orderNonce,
     journeyStartedTimestamp: journey.ok ? journey.data.journeyStartedTimestamp : null,
@@ -89,10 +78,10 @@ export async function beginJourney(language: Language): Promise<Result<JourneySt
   });
 }
 
-/** Reloads menu and strings in another language mid-journey (F-START-03). */
+/** Reloads menu and strings in another language mid-journey. */
 export async function switchLanguage(
   language: Language,
-): Promise<Result<{ menu: Menu; strings: Strings }>> {
+): Promise<Result<{ menu: MenuResponse; strings: Strings }>> {
   if (!isLanguage(language)) return { ok: false, code: "VALIDATION_FAILED" };
   const refused = await notKiosk();
   if (refused) return refused;
@@ -101,176 +90,149 @@ export async function switchLanguage(
   return success({ menu: menu.data, strings: mergeStrings(language, pack) });
 }
 
-export type OrderTotal = components["schemas"]["OrderTotal"];
-export type QuoteInput = components["schemas"]["QuoteRequest"];
-
-/** Totals for the basket (OP-BASKET-01). Called after every basket or discount change. */
-export async function quoteBasket(input: QuoteInput): Promise<Result<OrderTotal>> {
-  return kiosk((headers) =>
-    coreApi().POST("/v1/quotes", {
+/**
+ * Prices the basket (`POST /v2/totals`). Go keeps it under `basketId`, which the
+ * kiosk sends back so the coupon and the payment stay on the same basket.
+ */
+export async function priceBasket(input: {
+  basketId: string | null;
+  items: OrderItem[];
+  language: Language;
+}): Promise<Result<TotalsResponse>> {
+  if (!isLanguage(input.language)) return { ok: false, code: "VALIDATION_FAILED" };
+  return kioskCall((headers) =>
+    coreApiV2().POST("/v2/totals", {
       headers,
+      params: { query: { language: input.language } },
+      body: { basketId: input.basketId, orderType: "DINEIN", items: input.items },
+    }),
+  );
+}
+
+/** Applies a coupon to the basket: one `Award` of type CODE (one coupon per order). */
+export async function applyCoupon(input: {
+  basketId: string;
+  items: OrderItem[];
+  code: string;
+  language: Language;
+}): Promise<Result<DiscountResponse>> {
+  const code = input.code.trim().toUpperCase();
+  if (!code) return { ok: false, code: "DISCOUNT_INVALID" };
+  if (!isLanguage(input.language)) return { ok: false, code: "VALIDATION_FAILED" };
+  return kioskCall((headers) =>
+    coreApiV2().POST("/v2/discounts/apply", {
+      headers,
+      params: { query: { language: input.language } },
       body: {
-        orderType: input.orderType,
-        orderItems: input.orderItems,
-        discountCode: input.discountCode ?? null,
+        basketId: input.basketId,
+        orderType: "DINEIN",
+        items: input.items,
+        awards: [{ id: code, type: "CODE" }],
       },
     }),
   );
 }
 
+/** Takes the coupon off the basket. */
+export async function removeCoupon(input: {
+  basketId: string;
+  items: OrderItem[];
+  code: string;
+}): Promise<Result<unknown>> {
+  return kioskCall((headers) =>
+    coreApiV2().POST("/v2/discounts/cancel", {
+      headers,
+      body: { basketId: input.basketId, orderType: "DINEIN", items: input.items, codesToRemove: [input.code] },
+    }),
+  );
+}
+
 /**
- * Records how a journey ended without an order (OP-KIOSK-01/02): RESET,
- * IDLE_TIMEOUT or CANCELLED_BY_GUEST. Fire-and-forget: the kiosk never waits.
+ * Records how a journey ended without an order: RESET, IDLE_TIMEOUT or
+ * CANCELLED_BY_GUEST, with the last total Go priced. Fire-and-forget.
  */
 export async function recordJourneyEvent(
   orderNonce: string,
-  type: components["schemas"]["JourneyEvent"]["type"],
-  orderTotal: number,
+  type: JourneyEventType,
+  orderTotal: number | null,
 ): Promise<void> {
   after(async () => {
-    const result = await kiosk((headers) =>
-      coreApi().POST("/v1/journeys/{orderNonce}/events", {
+    const result = await kioskCall((headers) =>
+      coreApiV2().POST("/v2/journeys/{orderNonce}/events", {
         headers,
         params: { path: { orderNonce } },
-        body: { type, orderTotal },
+        body: orderTotal === null ? { type } : { type, orderTotal },
       }),
     );
     if (!result.ok) console.warn(`Journey event ${type} not recorded: ${result.code}`);
   });
 }
 
-export type DiscountItem = components["schemas"]["DiscountItem"];
-
 /**
- * Checks a coupon or restaurant discount code against this basket (OP-DISC-01).
- * One discount per order: when replacing, `currentDiscountCode` is the one on it.
+ * Starts a Mercado Pago Pix or Point payment for the basket's current total.
+ * One `idempotencyKey` per attempt. `BASKET_CHANGED` means the total moved: the
+ * kiosk re-prices and asks the guest again, never charging the old amount.
  */
-export async function validateCoupon(input: {
-  code: string;
-  orderType: components["schemas"]["OrderType"];
-  orderItems: components["schemas"]["OrderLineInput"][];
-  currentDiscountCode: string | null;
-}): Promise<Result<DiscountItem>> {
-  const code = input.code.trim().toUpperCase();
-  if (!code) return { ok: false, code: "INVALID_COUPON" };
-  return kiosk((headers) =>
-    coreApi().POST("/v1/discounts/validate", {
-      headers,
-      body: {
-        code,
-        entryMethod: "MANUAL",
-        orderType: input.orderType,
-        orderItems: input.orderItems,
-        currentDiscountCode: input.currentDiscountCode,
-      },
-    }),
-  );
-}
-
-type Schemas = components["schemas"];
-export type Order = Schemas["Order"];
-export type Payment = Schemas["Payment"];
-export type PaymentMethod = Schemas["PaymentMethod"];
-export type PlacedOrder = Schemas["PlacedOrder"];
-
-/**
- * Stores the order as AWAITING_PAYMENT (first half of OP-PAY-01). The Core
- * API reprices every line; `idempotencyKey` makes a retry return the same order,
- * so an unknown answer is retried with it for up to 15 s.
- */
-export async function createOrder(
-  idempotencyKey: string,
-  order: Schemas["CreateOrderRequest"],
-): Promise<Result<Order>> {
-  return retryUnknown((signal) => postOrder(idempotencyKey, order, signal));
-}
-
-function postOrder(
-  idempotencyKey: string,
-  order: Schemas["CreateOrderRequest"],
-  signal: AbortSignal,
-): Promise<Result<Order>> {
-  return kiosk((headers) =>
-    coreApi().POST("/v1/orders", {
-      headers,
-      signal,
-      params: { header: { "Idempotency-Key": idempotencyKey } },
-      body: {
-        orderNonce: order.orderNonce,
-        orderType: order.orderType,
-        language: order.language,
-        orderItems: order.orderItems,
-        discountCode: order.discountCode ?? null,
-        cpfCnpj: order.cpfCnpj ?? null,
-        journeyStartedTimestamp: order.journeyStartedTimestamp ?? null,
-      },
-    }),
-  );
-}
-
-/** Starts a payment for the order total; one key per attempt (second half of OP-PAY-01). */
 export async function startPayment(
-  orderId: string,
-  method: PaymentMethod,
+  input: { basketId: string; method: PaymentMethod; amount: number },
   idempotencyKey: string,
-): Promise<Result<Payment>> {
-  return kiosk((headers) =>
-    coreApi().POST("/v1/orders/{orderId}/payments", {
+): Promise<Result<PaymentSession>> {
+  if (input.method !== "PIX" && input.method !== "CARD") return { ok: false, code: "VALIDATION_FAILED" };
+  return kioskCall((headers) =>
+    coreApiV2().POST("/v2/payments", {
       headers,
-      params: { path: { orderId }, header: { "Idempotency-Key": idempotencyKey } },
-      body: { method },
+      params: { header: { "Idempotency-Key": idempotencyKey } },
+      body: { basketId: input.basketId, method: input.method, amount: input.amount },
     }),
   );
 }
 
-/**
- * Polls a payment (OP-PAY-02), at most once a second. While the gateway is
- * SIMULATED, the BFF answers for the terminal once it has "waited" long enough.
- */
-export async function pollPayment(paymentId: string): Promise<Result<Payment>> {
-  const result = await kiosk((headers) =>
-    coreApi().GET("/v1/payments/{paymentId}", { headers, params: { path: { paymentId } } }),
-  );
-  if (!result.ok) return result;
-  const payment = result.data;
-  if (payment.gatewayType !== "SIMULATED") return result;
-  if (!terminalAnswered(payment.id, payment.paymentStatus !== "AUTHORISING")) return result;
-
-  const outcome = await simulatedOutcome();
-  if (outcome === "MANUAL") return result;
-  // Same request as the checked read above, so no second kind check.
-  const simulated = await deviceCall((headers) =>
-    coreApi().POST("/v1/payments/{paymentId}/simulate", {
-      headers,
-      params: { path: { paymentId } },
-      body: { outcome },
-    }),
-  );
-  return simulated.ok ? simulated : result;
+/** Polls a payment session; the kiosk calls it at most once a second while PENDING. */
+export async function pollPayment(paymentId: string): Promise<Result<PaymentSession>> {
+  return kioskCall((headers) => coreApiV2().GET("/v2/payments/{paymentId}", { headers, params: { path: { paymentId } } }));
 }
 
-/** Cancels a payment still AUTHORISING; `PAYMENT_NOT_CANCELLABLE` once it is final. */
-export async function cancelPayment(paymentId: string): Promise<Result<Payment>> {
-  return kiosk((headers) =>
-    coreApi().POST("/v1/payments/{paymentId}/cancel", { headers, params: { path: { paymentId } } }),
+/** Cancels a session still PENDING; `PAYMENT_NOT_CANCELLABLE` once it is final. */
+export async function cancelPayment(paymentId: string): Promise<Result<PaymentSession>> {
+  return kioskCall((headers) =>
+    coreApiV2().POST("/v2/payments/{paymentId}/cancel", { headers, params: { path: { paymentId } } }),
   );
 }
 
+/** The `Payment` Go checks against its own session (SPEC 4.6): copied, never made up. */
+function paymentOf(session: PaymentSession): Schemas["Payment"] {
+  return {
+    tenderId: session.tenderId,
+    tenderRef: session.tenderRef,
+    amount: session.amount,
+    ...(session.cardScheme ? { cardScheme: session.cardScheme } : {}),
+    ...(session.cardLast4Digits ? { cardLast4Digits: session.cardLast4Digits } : {}),
+    ...(session.authCode ? { authCode: session.authCode } : {}),
+  };
+}
+
 /**
- * Places a paid order (OP-PAY-03): the Core API assigns the order number. An
- * unknown answer is retried with the same key for up to 15 s; after that it is
- * still CORE_UNAVAILABLE, which the kiosk shows as "verificando", never "falhou".
+ * Places the paid basket (`POST /v2/orders`). Idempotent on `basketId` and on
+ * `idempotencyKey`, which the kiosk keeps for the basket: an unknown answer is
+ * retried with it for up to 15 s, and after that it is still CORE_UNAVAILABLE,
+ * which the kiosk shows as "verificando", never "falhou" (Review Focus 1).
+ * `payment` is null only when Go said the basket is already paid and the kiosk
+ * never saw the approved session; Go then finds the session itself.
  */
-export async function placeOrder(
-  orderId: string,
+export async function submitOrder(
+  input: { basketId: string; items: OrderItem[]; payment: PaymentSession | null },
   idempotencyKey: string,
-): Promise<Result<PlacedOrder>> {
+): Promise<Result<SubmitOrderResponse>> {
+  const refused = await notKiosk();
+  if (refused) return refused;
+  const payments = input.payment?.status === "APPROVED" ? [paymentOf(input.payment)] : [];
   return retryUnknown((signal) =>
-    kiosk((headers) =>
-      coreApi().POST("/v1/orders/{orderId}/place", {
+    deviceCall((headers) =>
+      coreApiV2().POST("/v2/orders", {
         headers,
         signal,
-        params: { path: { orderId }, header: { "Idempotency-Key": idempotencyKey } },
+        params: { header: { "Idempotency-Key": idempotencyKey } },
+        body: { basketId: input.basketId, orderType: "DINEIN", items: input.items, payments },
       }),
     ),
   );

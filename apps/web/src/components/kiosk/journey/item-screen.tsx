@@ -1,81 +1,60 @@
 import Image from "next/image";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
-import { formatBRL } from "@/lib/format/money";
+import { formatMoney } from "@/lib/format/money";
+import type { BasketLine } from "@/lib/kiosk/basket-v2";
 import {
   canAdd,
-  type Choice,
+  type Draft,
   draftToLine,
   groupCount,
   initialDraft,
   isBlocked,
-  isInvisible,
   isSingleChoice,
-  type ItemDraft,
   lineToDraft,
   quantityOf,
   setOptionQuantity,
   setQuantity,
-  setToggle,
   toggleOption,
-} from "@/lib/kiosk/item-draft";
-import {
-  badgesFor,
-  type BasketLine,
-  itemPrice,
-  type Menu,
-  type MenuEntity,
-  type OptionGroup,
-  optionPrice,
-  type OrderType,
-  unitPrice,
-} from "@/lib/kiosk/menu-view";
+} from "@/lib/kiosk/builder";
+import type { MenuGroup, MenuOption, Product } from "@/lib/kiosk/menu-graph";
 import { format, type Strings } from "@/lib/kiosk/strings";
 
 import { Check, ChevronLeft, Minus, Plus } from "../icons";
+import { Badges, productPrice } from "./menu-screen";
 
 /**
- * Prototype 04-Item at 1080x1920: required choices as chips, extras as a
- * checklist up to the group's maximum, ingredients to take out, quantity, and
- * the add button with the live display total. The total the guest pays comes
- * from the Core API's quote in the basket.
+ * Prototype 04-Item at 1080x1920 on the v2 groups (SPEC 5.3): sizes first,
+ * then groups in link order; single choices (sizes, combo main and sides) as
+ * chips, extras as a checklist up to the group's max, ingredients (INGR) to
+ * take out, nested groups under the option that opens them, quantity. Option
+ * prices show only when > 0. The add button carries no total: the kiosk never
+ * adds prices (SPEC 4.2); Go prices the basket.
  */
 export function ItemScreen({
-  menu,
-  item,
+  product,
   editing,
-  orderType,
   strings,
   backLabel,
   onBack,
   onSave,
 }: {
-  menu: Menu;
-  item: MenuEntity;
+  product: Product;
   editing: BasketLine | null;
-  orderType: OrderType;
   strings: Strings;
   backLabel: string;
   onBack: () => void;
   onSave: (line: BasketLine) => void;
 }) {
-  const [draft, setDraft] = useState<ItemDraft>(() =>
-    editing ? lineToDraft(item, editing) : initialDraft(item),
-  );
-  const line = draftToLine(item, draft, editing?.guid ?? "");
-  const total = unitPrice(item, line.options, orderType) * draft.quantity;
-  const ready = canAdd(item, draft);
-  const badges = badgesFor(menu, { id: item.id }, "ITEM_PAGE");
-  const groups = (item.optionGroups ?? []).filter(
-    (g) => g.role !== "COMBO_MAIN" && !isInvisible(g),
-  );
+  const [draft, setDraft] = useState<Draft>(() => (editing ? lineToDraft(product, editing) : initialDraft(product)));
+  const ready = canAdd(product, draft);
 
   return (
     <div className="flex h-full flex-col bg-surface text-ink">
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="relative h-[570px] bg-wheat">
-          {item.image && (
-            <Image src={item.image} alt="" fill sizes="1080px" priority className="object-cover" />
+          {product.picture && (
+            <Image src={product.picture.url} alt={product.picture.alt ?? ""} fill sizes="1080px" priority className="object-cover" />
           )}
           <button
             onClick={onBack}
@@ -84,45 +63,20 @@ export function ItemScreen({
             <ChevronLeft size={36} />
             {backLabel}
           </button>
-          {badges.length > 0 && (
-            <div className="absolute bottom-9 left-[66px] flex gap-3">
-              {badges.map((badge) => (
-                <span
-                  key={badge.id}
-                  className="rounded-[18px] px-[21px] py-[10px] text-[24px] font-bold"
-                  style={{ color: badge.textColour, backgroundColor: badge.backgroundColour }}
-                >
-                  {badge.label}
-                </span>
-              ))}
-            </div>
-          )}
+          {product.badges.length > 0 && <Badges badges={product.badges} large />}
         </div>
 
         <div className="flex flex-col gap-[54px] px-[66px] pt-[54px] pb-12">
           <div className="flex flex-col gap-6">
             <div className="flex items-baseline justify-between gap-8">
-              <h1 className="font-display text-[72px] leading-[1.05] font-semibold tracking-[-0.02em]">
-                {item.name}
-              </h1>
-              <span className="shrink-0 text-[39px] font-bold text-price">
-                {formatBRL(itemPrice(item, orderType))}
-              </span>
+              <h1 className="font-display text-[72px] leading-[1.05] font-semibold tracking-[-0.02em]">{product.name}</h1>
+              <span className="shrink-0 text-[39px] font-bold text-price">{productPrice(product, strings)}</span>
             </div>
-            {item.description && (
-              <p className="text-[30px] leading-[1.45] text-muted">{item.description}</p>
-            )}
+            {product.description && <p className="text-[30px] leading-[1.45] text-muted">{product.description}</p>}
           </div>
 
-          {groups.map((group) => (
-            <GroupSection
-              key={group.id}
-              group={group}
-              draft={draft}
-              orderType={orderType}
-              strings={strings}
-              onChange={setDraft}
-            />
+          {product.groups.map((group) => (
+            <GroupSection key={group.key} group={group} draft={draft} strings={strings} onChange={setDraft} />
           ))}
         </div>
       </div>
@@ -136,86 +90,80 @@ export function ItemScreen({
           >
             <Minus size={36} />
           </StepButton>
-          <span className="w-[72px] text-center font-display text-[54px] font-semibold">
-            {draft.quantity}
-          </span>
-          <StepButton
-            label={strings["item.more"]}
-            onPress={() => setDraft(setQuantity(draft, draft.quantity + 1))}
-          >
+          <span className="w-[72px] text-center font-display text-[54px] font-semibold">{draft.quantity}</span>
+          <StepButton label={strings["item.more"]} onPress={() => setDraft(setQuantity(draft, draft.quantity + 1))}>
             <Plus size={36} />
           </StepButton>
         </div>
         <button
-          onClick={() => onSave(draftToLine(item, draft, editing?.guid ?? crypto.randomUUID()))}
+          onClick={() => onSave(draftToLine(product, draft, editing?.guid ?? crypto.randomUUID()))}
           disabled={!ready}
-          className="flex h-button flex-1 items-center justify-between rounded-full bg-accent px-[54px] text-on-accent transition-opacity disabled:opacity-50"
+          className="flex h-button flex-1 items-center justify-center rounded-full bg-accent px-[54px] text-[39px] font-bold text-on-accent transition-opacity disabled:opacity-50"
         >
-          <span className="text-[36px] font-bold">
-            {editing ? strings["item.update"] : strings["item.add"]}
-          </span>
-          <span className="font-display text-[51px] font-semibold tracking-[-0.02em]">
-            {formatBRL(total)}
-          </span>
+          {editing ? strings["item.updateOrder"] : strings["item.addToOrder"]}
         </button>
       </div>
     </div>
   );
 }
 
+function groupHint(group: MenuGroup, draft: Draft, strings: Strings): { text: string; strong: boolean } {
+  if (group.modifierType === "INGR") return { text: strings["item.ingredients"], strong: false };
+  if (isSingleChoice(group) && group.min === 1) return { text: strings["item.chooseOne"], strong: true };
+  if (group.max > 1) return { text: format(strings["item.count"], { count: groupCount(draft, group), max: group.max }), strong: false };
+  if (group.min > 0) return { text: format(strings["item.chooseN"], { n: group.min }), strong: true };
+  return { text: strings["item.optional"], strong: false };
+}
+
+/** "+ R$ 1,00" for an extra; a size shows its own price; free options show nothing. */
+function optionPriceLabel(group: MenuGroup, option: MenuOption): string | null {
+  if (option.price <= 0) return null;
+  return group.kind === "SIZE" ? formatMoney(option.price) : `+ ${formatMoney(option.price)}`;
+}
+
 function GroupSection({
   group,
   draft,
-  orderType,
   strings,
   onChange,
 }: {
-  group: OptionGroup;
-  draft: ItemDraft;
-  orderType: OrderType;
+  group: MenuGroup;
+  draft: Draft;
   strings: Strings;
-  onChange: (draft: ItemDraft) => void;
+  onChange: (draft: Draft) => void;
 }) {
-  const single = isSingleChoice(group) && group.minimum === 1;
-  const hint =
-    group.options.length === 0
-      ? null
-      : single
-        ? strings["item.chooseOne"]
-        : group.maximum > 1
-          ? format(strings["item.count"], { count: groupCount(draft, group), max: group.maximum })
-          : group.minimum > 0
-            ? format(strings["item.chooseN"], { n: group.minimum })
-            : strings["item.optional"];
+  const hint = groupHint(group, draft, strings);
+  const chips = isSingleChoice(group) && group.modifierType !== "INGR";
 
   return (
     <section className="flex flex-col gap-[27px]">
-      <div className="flex items-baseline justify-between">
-        <h2 className="font-display text-[45px] font-semibold">{group.name}</h2>
-        {hint && (
-          <span className={`text-[24px] font-bold ${single ? "text-detail-text" : "text-muted"}`}>
-            {hint}
-          </span>
-        )}
+      <div className="flex items-baseline justify-between gap-6">
+        <h2 className="font-display text-[45px] font-semibold">
+          {group.kind === "SIZE" ? strings["item.size"] : group.name}
+        </h2>
+        <span className={`shrink-0 text-[24px] font-bold ${hint.strong ? "text-detail-text" : "text-muted"}`}>{hint.text}</span>
       </div>
 
-      {single ? (
+      {chips ? (
         <div className="grid grid-cols-3 gap-[18px]">
           {group.options.map((option) => {
             const on = quantityOf(draft, group, option) > 0;
-            const price = optionPrice(option, orderType);
+            const price = optionPriceLabel(group, option);
             return (
               <button
                 key={option.id}
                 onClick={() => onChange(toggleOption(draft, group, option))}
+                disabled={!option.available}
                 aria-pressed={on}
-                className={`flex min-h-[114px] flex-col items-center justify-center rounded-[24px] px-4 text-[27px] font-bold ${
-                  on ? "bg-accent text-on-accent" : "bg-wheat text-ink"
+                className={`flex min-h-[114px] flex-col items-center justify-center rounded-[24px] px-4 py-3 text-center text-[27px] font-bold ${
+                  on ? "bg-accent text-on-accent" : option.available ? "bg-wheat text-ink" : "bg-ground text-muted opacity-75"
                 }`}
               >
                 {option.name}
-                {price > 0 && (
-                  <span className="text-[22px] font-semibold opacity-80">+ {formatBRL(price)}</span>
+                {!option.available ? (
+                  <span className="text-[22px] font-semibold">{strings["item.unavailable"]}</span>
+                ) : (
+                  price && <span className="text-[22px] font-semibold opacity-80">{price}</span>
                 )}
               </button>
             );
@@ -224,66 +172,18 @@ function GroupSection({
       ) : (
         <ul className="flex flex-col">
           {group.options.map((option) => (
-            <OptionRow
-              key={option.id}
-              group={group}
-              option={option}
-              draft={draft}
-              orderType={orderType}
-              strings={strings}
-              onChange={onChange}
-            />
+            <OptionRow key={option.id} group={group} option={option} draft={draft} strings={strings} onChange={onChange} />
           ))}
         </ul>
       )}
 
-      {group.compositeOptions.length > 0 && (
-        <ul className="flex flex-col">
-          {group.compositeOptions.map((composite) => {
-            const choice: Choice =
-              draft.toggles[composite.positiveOption.id] ?? composite.defaultChoice ?? "POSITIVE";
-            const kept = choice === "POSITIVE";
-            return (
-              <li key={composite.positiveOption.id} className="border-b border-line last:border-0">
-                <button
-                  onClick={() =>
-                    onChange(
-                      setToggle(draft, composite.positiveOption.id, kept ? "NEGATIVE" : "POSITIVE"),
-                    )
-                  }
-                  aria-pressed={kept}
-                  className="flex h-[114px] w-full items-center gap-[27px] text-left text-[30px] font-semibold"
-                >
-                  <CheckBox on={kept} />
-                  <span className={kept ? "" : "text-muted line-through"}>
-                    {composite.positiveOption.name}
-                  </span>
-                  {!kept && (
-                    <span className="ml-auto text-[24px] font-bold text-danger">
-                      {composite.negativeOption.name}
-                    </span>
-                  )}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      {/* Nested groups of picked options (BR-MENU-17), shown inline under their group. */}
+      {/* Nested groups of picked options, inline under their group. */}
       {group.options
-        .filter((option) => quantityOf(draft, group, option) > 0 && option.optionGroups.length > 0)
-        .flatMap((option) => option.optionGroups)
-        .filter((nested) => !isInvisible(nested))
+        .filter((option) => quantityOf(draft, group, option) > 0 && option.groups.length > 0)
+        .flatMap((option) => option.groups)
         .map((nested) => (
-          <div key={nested.id} className="border-l-[6px] border-wheat pl-9">
-            <GroupSection
-              group={nested}
-              draft={draft}
-              orderType={orderType}
-              strings={strings}
-              onChange={onChange}
-            />
+          <div key={nested.key} className="border-l-[6px] border-wheat pl-9">
+            <GroupSection group={nested} draft={draft} strings={strings} onChange={onChange} />
           </div>
         ))}
     </section>
@@ -294,28 +194,33 @@ function OptionRow({
   group,
   option,
   draft,
-  orderType,
   strings,
   onChange,
 }: {
-  group: OptionGroup;
-  option: OptionGroup["options"][number];
-  draft: ItemDraft;
-  orderType: OrderType;
+  group: MenuGroup;
+  option: MenuOption;
+  draft: Draft;
   strings: Strings;
-  onChange: (draft: ItemDraft) => void;
+  onChange: (draft: Draft) => void;
 }) {
   const quantity = quantityOf(draft, group, option);
   const blocked = isBlocked(draft, group, option);
-  const price = optionPrice(option, orderType);
-  const priceLabel = price > 0 ? `+ ${formatBRL(price)}` : null;
+  const price = optionPriceLabel(group, option);
+  const ingredient = group.modifierType === "INGR";
+  const right: ReactNode = !option.available ? (
+    <span className="ml-auto text-[24px] font-bold text-muted">{strings["item.unavailable"]}</span>
+  ) : ingredient && quantity === 0 ? (
+    <span className="ml-auto text-[24px] font-bold text-danger">{format(strings["item.without"], { name: option.name })}</span>
+  ) : price ? (
+    <span className="ml-auto text-[25.5px] text-muted">{price}</span>
+  ) : null;
 
-  if (option.maximumQuantity > 1) {
+  if (option.maxChoices > 1 && option.available) {
     return (
       <li className="flex h-[114px] items-center justify-between gap-6 border-b border-line text-[30px] font-semibold last:border-0">
         <span>{option.name}</span>
         <span className="flex items-center gap-6">
-          {priceLabel && <span className="text-[25.5px] text-muted">{priceLabel}</span>}
+          {price && <span className="text-[25.5px] text-muted">{price}</span>}
           <span className="flex items-center gap-3 rounded-full bg-ground p-2">
             <StepButton
               small
@@ -329,7 +234,7 @@ function OptionRow({
             <StepButton
               small
               label={strings["item.more"]}
-              disabled={blocked || quantity >= option.maximumQuantity}
+              disabled={blocked || quantity >= option.maxChoices}
               onPress={() => onChange(setOptionQuantity(draft, group, option, quantity + 1))}
             >
               <Plus size={27} />
@@ -344,13 +249,13 @@ function OptionRow({
     <li className="border-b border-line last:border-0">
       <button
         onClick={() => onChange(toggleOption(draft, group, option))}
-        disabled={blocked}
+        disabled={blocked && quantity === 0}
         aria-pressed={quantity > 0}
         className="flex h-[114px] w-full items-center gap-[27px] text-left text-[30px] font-semibold disabled:opacity-40"
       >
         <CheckBox on={quantity > 0} />
-        <span>{option.name}</span>
-        {priceLabel && <span className="ml-auto text-[25.5px] text-muted">{priceLabel}</span>}
+        <span className={ingredient && quantity === 0 ? "text-muted line-through" : ""}>{option.name}</span>
+        {right}
       </button>
     </li>
   );
@@ -368,7 +273,7 @@ function CheckBox({ on }: { on: boolean }) {
   );
 }
 
-function StepButton({
+export function StepButton({
   label,
   disabled,
   small,
@@ -379,7 +284,7 @@ function StepButton({
   disabled?: boolean;
   small?: boolean;
   onPress: () => void;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <button
