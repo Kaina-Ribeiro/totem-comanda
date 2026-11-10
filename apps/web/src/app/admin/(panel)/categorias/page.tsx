@@ -1,269 +1,88 @@
-import Link from "next/link";
-import { revalidatePath } from "next/cache";
-
+import { refreshAdmin } from "@/app/admin/(panel)/catalogue-actions";
+import {
+  type Choice,
+  DeleteButton,
+  HoursFields,
+  ImageField,
+  LinkRows,
+  TextsFields,
+} from "@/components/admin/catalogue-fields";
 import { ActionForm, SubmitButton } from "@/components/admin/form";
 import { FormSkeleton, Streamed } from "@/components/admin/skeleton";
+import { Badge, Card, Checkbox, LoadError, PageHeader } from "@/components/admin/ui";
 import {
-  Card,
-  Checkbox,
-  Field,
-  inputClass,
-  LoadError,
-  PageHeader,
-} from "@/components/admin/ui";
-import {
-  attempt,
-  checked,
-  type FormState,
-  load,
-  optionalPrice,
-  sameText,
-  saveBoth,
-  text,
-} from "@/lib/admin/form";
-import { AdminApiError, asOwner } from "@/lib/admin/session";
-import { coreApi } from "@/lib/core/client";
-import type { components } from "@/lib/core-api";
-import { formatBRL } from "@/lib/format/money";
+  attemptCatalogue,
+  type Catalogue,
+  imageOf,
+  loadCatalogue,
+  optionIds,
+  parentsOf,
+  putSection,
+} from "@/lib/admin/catalogue";
+import { readSection, type Section } from "@/lib/admin/catalogue-form";
+import { type FormState, load, text } from "@/lib/admin/form";
+import { uploadImageV2 } from "@/lib/admin/media";
+import { asOwner } from "@/lib/admin/session";
+import { coreApiV2 } from "@/lib/core/client-v2";
 
-type Category = components["schemas"]["AdminCategory"];
-type CategoryInput = components["schemas"]["CategoryInput"];
-type Item = components["schemas"]["AdminItem"];
-type Link = components["schemas"]["CategoryItemLink"];
-
-const PATH = "/admin/categorias";
-
-const categoryName = (form: FormData) => {
-  const en = text(form, "name.en");
-  return { "pt-BR": text(form, "name.pt"), ...(en ? { en } : {}) };
-};
-
-async function createCategory(
-  _: FormState,
-  form: FormData,
-): Promise<FormState> {
+async function saveSection(_: FormState, form: FormData): Promise<FormState> {
   "use server";
-  return attempt(async () => {
-    await asOwner((headers) =>
-      coreApi().POST("/v1/admin/categories", {
-        headers,
-        body: {
-          menuId: text(form, "menuId"),
-          name: categoryName(form),
-          displayOrder: Number(text(form, "displayOrder")) || 1,
-        },
-      }),
-    );
-    revalidatePath(PATH);
-    return "Categoria criada.";
+  const sectionId = text(form, "sectionId");
+  return attemptCatalogue(async () => {
+    const sections = await asOwner((headers) => coreApiV2().GET("/v2/admin/sections", { headers }));
+    const current = sectionId ? (sections.find((s) => s.id === sectionId) ?? null) : null;
+    const uploaded = await uploadImageV2(form, "imageFile");
+    if (uploaded) form.set("image", uploaded);
+    await putSection(readSection(form, current));
+    await refreshAdmin();
+    return current ? "Categoria salva. Aparece no totem na próxima jornada." : "Categoria criada. Coloque ela num cardápio ou dentro de outra categoria.";
   });
 }
 
-/** The links a category form describes: kept rows plus the one being added. */
-function readLinks(form: FormData): Link[] {
-  const links: Link[] = form
-    .getAll("linked")
-    .map(String)
-    .filter((itemId) => !checked(form, `${itemId}.remove`))
-    .map((itemId) => ({
-      itemId,
-      displayOrder: Number(text(form, `${itemId}.order`)) || 0,
-      priceOverride: optionalPrice(form, `${itemId}.price`, "preço"),
-    }));
-  const added = text(form, "add.itemId");
-  if (added) {
-    links.push({
-      itemId: added,
-      displayOrder: Number(text(form, "add.order")) || links.length + 1,
-      priceOverride: optionalPrice(
-        form,
-        "add.price",
-        "preço do item adicionado",
-      ),
-    });
-  }
-  return links;
-}
-
-async function saveCategory(_: FormState, form: FormData): Promise<FormState> {
-  "use server";
-  const categoryId = text(form, "categoryId");
-  const menuId = text(form, "menuId");
-  return attempt(async () => {
-    const links = readLinks(form);
-    const putCategory = (body: CategoryInput) =>
-      asOwner((headers) =>
-        coreApi().PUT("/v1/admin/categories/{categoryId}", {
-          headers,
-          params: { path: { categoryId } },
-          body,
-        }),
-      );
-    // Two calls. The items cannot be read back (categoryLinks), so they go
-    // second and the category is put back if they fail (COM-129).
-    const categories = await asOwner((headers) =>
-      coreApi().GET("/v1/admin/categories", {
-        headers,
-        params: { query: { menuId } },
-      }),
-    );
-    const current = categories.find((c) => c.id === categoryId);
-    if (!current) throw new AdminApiError("NOT_FOUND");
-    const before: CategoryInput = {
-      menuId: current.menuId,
-      parentId: current.parentId ?? null,
-      name: current.name,
-      image: current.image ?? null,
-      displayOrder: current.displayOrder,
-    };
-    // A replace: keep what this form does not edit (parent, image).
-    const next: CategoryInput = {
-      ...before,
-      menuId,
-      name: categoryName(form),
-      displayOrder: Number(text(form, "displayOrder")) || 1,
-    };
-    const changed =
-      !sameText(before.name, next.name) ||
-      before.displayOrder !== next.displayOrder ||
-      before.menuId !== next.menuId;
-    await saveBoth(
-      changed
-        ? {
-            label: "o nome e a ordem da categoria",
-            save: () => putCategory(next),
-            undo: () => putCategory(before),
-          }
-        : null,
-      {
-        label: "os itens",
-        save: () =>
-          asOwner((headers) =>
-            coreApi().PUT("/v1/admin/categories/{categoryId}/items", {
-              headers,
-              params: { path: { categoryId } },
-              body: links,
-            }),
-          ),
-      },
-    );
-    revalidatePath(PATH);
-    return "Categoria salva. O totem mostra na próxima jornada.";
-  });
-}
-
-async function deleteCategory(
-  _: FormState,
-  form: FormData,
-): Promise<FormState> {
-  "use server";
-  const categoryId = text(form, "categoryId");
-  return attempt(async () => {
-    await asOwner((headers) =>
-      coreApi().DELETE("/v1/admin/categories/{categoryId}", {
-        headers,
-        params: { path: { categoryId } },
-      }),
-    );
-    revalidatePath(PATH);
-    return "Categoria apagada. Os itens continuam em Itens.";
-  });
-}
-
-export default function CategoriesPage({
-  searchParams,
-}: PageProps<"/admin/categorias">) {
+export default function SectionsPage() {
   return (
     <>
       <PageHeader
         title="Categorias"
-        description="As categorias de cada cardápio e os itens de cada uma, com o preço nesse cardápio."
+        description="Categorias guardam itens e outras categorias. Um cardápio mostra as categorias de cima; as de dentro aparecem ao tocar."
       />
-      <Streamed fallback={<FormSkeleton />}>
-        <Categories searchParams={searchParams} />
+      <Streamed fallback={<FormSkeleton cards={3} fields={3} />}>
+        <SectionList />
       </Streamed>
     </>
   );
 }
 
-async function Categories({
-  searchParams,
-}: {
-  searchParams: PageProps<"/admin/categorias">["searchParams"];
-}) {
-  const { menu: wanted } = await searchParams;
-  const loaded = await load(async () => {
-    const [menus, items] = await Promise.all([
-      asOwner((headers) => coreApi().GET("/v1/admin/menus", { headers })),
-      asOwner((headers) => coreApi().GET("/v1/admin/items", { headers })),
-    ]);
-    const menu = menus.find((m) => m.id === wanted) ?? menus[0];
-    const categories = menu
-      ? await asOwner((headers) =>
-          coreApi().GET("/v1/admin/categories", {
-            headers,
-            params: { query: { menuId: menu.id } },
-          }),
-        )
-      : [];
-    return { menus, items, menu, categories };
-  });
+async function SectionList() {
+  const loaded = await load(() =>
+    Promise.all([loadCatalogue(), asOwner((headers) => coreApiV2().GET("/v2/admin/menus", { headers }))]),
+  );
   if ("error" in loaded) return <LoadError message={loaded.error} />;
-  const { menus, items, menu, categories } = loaded.data;
-  if (!menu)
-    return <LoadError message="Crie um cardápio primeiro, em Cardápios." />;
-
+  const [catalogue, menus] = loaded.data;
+  const parents = parentsOf(catalogue, menus);
+  // Sections on a menu first, then the ones inside others, then the loose ones.
+  const rank = (s: Section) => {
+    const where = parents("CATEGORY", s.id);
+    return where.some((p) => p.startsWith("Cardápio ")) ? 0 : where.length ? 1 : 2;
+  };
+  const sections = [...catalogue.sections].sort(
+    (a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, "pt-BR"),
+  );
   return (
     <>
-      <nav className="flex flex-wrap gap-2" aria-label="Cardápio">
-        {menus.map((m) => (
-          <Link
-            key={m.id}
-            href={`${PATH}?menu=${m.id}`}
-            className={`rounded-[10px] px-4 py-2 text-sm font-bold ${
-              m.id === menu.id
-                ? "bg-accent text-on-accent"
-                : "bg-surface text-ink"
-            }`}
-          >
-            {m.name["pt-BR"]}
-          </Link>
+      <div className="flex flex-col gap-3">
+        {sections.map((section) => (
+          <SectionCard key={section.id} section={section} catalogue={catalogue} where={parents("CATEGORY", section.id)} />
         ))}
-      </nav>
-      {categories.map((category) => (
-        <CategoryCard
-          key={category.id}
-          category={category}
-          items={items}
-          links={categoryLinks(category)}
-        />
-      ))}
+      </div>
       <Card>
-        <h2 className="mb-4 text-lg font-bold tracking-[-0.01em]">
-          Nova categoria em {menu.name["pt-BR"]}
-        </h2>
-        <ActionForm
-          action={createCategory}
-          resetOnSave
-          className="grid gap-4 sm:grid-cols-4"
-        >
-          <input type="hidden" name="menuId" value={menu.id} />
-          <Field label="Nome (PT)">
-            <input name="name.pt" required className={inputClass} />
-          </Field>
-          <Field label="Nome (EN)">
-            <input name="name.en" className={inputClass} />
-          </Field>
-          <Field label="Ordem">
-            <input
-              name="displayOrder"
-              type="number"
-              defaultValue={categories.length + 1}
-              className={inputClass}
-            />
-          </Field>
-          <div className="flex items-end">
-            <SubmitButton pendingLabel="Criando…">Criar</SubmitButton>
+        <h2 className="mb-4 text-lg font-bold tracking-[-0.01em]">Nova categoria</h2>
+        <ActionForm action={saveSection} resetOnSave className="flex flex-col gap-4">
+          <input type="hidden" name="sectionId" value="" />
+          <input type="hidden" name="available" value="on" />
+          <TextsFields entity={null} namePlaceholder="Doces" />
+          <div>
+            <SubmitButton pendingLabel="Criando…">Criar categoria</SubmitButton>
           </div>
         </ActionForm>
       </Card>
@@ -271,169 +90,61 @@ async function Categories({
   );
 }
 
-/**
- * The items of a category, with their price in its menu. OPEN QUESTION
- * (docs/backlog-pending.md, COM-28): the contract writes them
- * (replaceCategoryItems) but has no read. The mock sends them as an extra
- * `items` field on AdminCategory; the proposal is to add it to the contract.
- * Only this function knows where they come from.
- */
-function categoryLinks(category: Category): Link[] {
-  const items = (category as Category & { items?: unknown }).items;
-  return Array.isArray(items) ? (items as Link[]) : [];
+function contentChoices(catalogue: Catalogue, self: string): Choice[] {
+  const options = optionIds(catalogue);
+  const sections = catalogue.sections
+    .filter((s) => s.id !== self)
+    .map((s) => ({ value: `CATEGORY:${s.id}`, label: `Categoria · ${s.name}` }));
+  const products = catalogue.items
+    .filter((i) => !options.has(i.id) || i.type !== "ITEM")
+    .map((i) => ({ value: `${i.type}:${i.id}`, label: i.name }));
+  return [...products.sort((a, b) => a.label.localeCompare(b.label, "pt-BR")), ...sections];
 }
 
-function CategoryCard({
-  category,
-  items,
-  links,
-}: {
-  category: Category;
-  items: Item[];
-  links: Link[];
-}) {
-  const byId = new Map(items.map((i) => [i.id, i]));
-  const sorted = [...links].sort((a, b) => a.displayOrder - b.displayOrder);
-  const free = items.filter((i) => !links.some((l) => l.itemId === i.id));
+function SectionCard({ section, catalogue, where }: { section: Section; catalogue: Catalogue; where: string[] }) {
+  const names = new Map<string, string>(
+    [...catalogue.sections, ...catalogue.items].map((e) => [`${e.type}:${e.id}`, e.name]),
+  );
+  const contents = section.links.filter((l) => l.type !== "IMAGE");
+  const products = contents.filter((l) => l.type !== "CATEGORY").length;
+  const subsections = contents.length - products;
   return (
-    <Card className="flex flex-col gap-4">
-      <ActionForm action={saveCategory} className="flex flex-col gap-4">
-        <input type="hidden" name="categoryId" value={category.id} />
-        <input type="hidden" name="menuId" value={category.menuId} />
-        <div className="grid gap-4 sm:grid-cols-[1fr_1fr_6rem]">
-          <Field label="Categoria (PT)">
-            <input
-              name="name.pt"
-              defaultValue={category.name["pt-BR"]}
-              required
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Categoria (EN)">
-            <input
-              name="name.en"
-              defaultValue={category.name.en}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Ordem">
-            <input
-              name="displayOrder"
-              type="number"
-              defaultValue={category.displayOrder}
-              className={inputClass}
-            />
-          </Field>
+    <details className="group rounded-[14px] border border-line bg-surface">
+      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-5 py-4 [&::-webkit-details-marker]:hidden">
+        <span className="text-lg font-bold tracking-[-0.01em]">{section.name}</span>
+        {section.available === false && <Badge tone="danger">Oculta</Badge>}
+        {(section.availableHours?.length ?? 0) > 0 && <Badge tone="warn">Com horário</Badge>}
+        {where.length === 0 && <Badge tone="danger">Fora do cardápio</Badge>}
+        <span className="w-full text-xs font-medium text-muted sm:ml-auto sm:w-auto">
+          {products} {products === 1 ? "item" : "itens"}
+          {subsections > 0 && ` · ${subsections} ${subsections === 1 ? "subcategoria" : "subcategorias"}`}
+          {where.length > 0 && ` · em ${where.join(", ")}`}
+        </span>
+      </summary>
+      <div className="flex flex-col gap-5 border-t border-line px-5 py-5">
+        <ActionForm action={saveSection} className="flex flex-col gap-5">
+          <input type="hidden" name="sectionId" value={section.id} />
+          <TextsFields entity={section} description />
+          <Checkbox name="available" label="Mostrar no totem" defaultChecked={section.available !== false} />
+          <ImageField current={imageOf(section.links)} images={catalogue.images} />
+          <LinkRows
+            name="links"
+            legend="Itens e subcategorias, na ordem do totem"
+            links={contents}
+            nameOf={(l) => names.get(`${l.type}:${l.id}`) ?? l.id}
+            choices={contentChoices(catalogue, section.id)}
+            addLabel="Adicionar item ou subcategoria…"
+            empty="Vazia: o totem não mostra categoria sem itens."
+          />
+          <HoursFields hours={section.availableHours ?? []} toggle legend="Horário da categoria" />
+          <div>
+            <SubmitButton>Salvar categoria</SubmitButton>
+          </div>
+        </ActionForm>
+        <div className="border-t border-line pt-4">
+          <DeleteButton kind="section" id={section.id} label="Apagar categoria" />
         </div>
-        <table className="w-full text-sm">
-          <thead className="text-left text-xs text-muted">
-            <tr>
-              <th className="py-1 font-semibold">Item</th>
-              <th className="w-20 font-semibold">Ordem</th>
-              <th className="w-36 font-semibold">Preço aqui (R$)</th>
-              <th className="w-16 font-semibold">Tirar</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((link) => {
-              const item = byId.get(link.itemId);
-              return (
-                <tr key={link.itemId} className="border-t border-line">
-                  <td className="py-2">
-                    <input type="hidden" name="linked" value={link.itemId} />
-                    <Link
-                      href={`/admin/itens/${link.itemId}`}
-                      className="font-semibold hover:underline"
-                    >
-                      {item?.name["pt-BR"] ?? link.itemId}
-                    </Link>
-                    {item && (
-                      <span className="ml-2 text-xs text-muted">
-                        base {formatBRL(item.price)}
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    <input
-                      name={`${link.itemId}.order`}
-                      type="number"
-                      defaultValue={link.displayOrder}
-                      aria-label="Ordem"
-                      className={`${inputClass} h-9`}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      name={`${link.itemId}.price`}
-                      defaultValue={
-                        link.priceOverride == null
-                          ? ""
-                          : (link.priceOverride / 100)
-                              .toFixed(2)
-                              .replace(".", ",")
-                      }
-                      placeholder="base"
-                      inputMode="decimal"
-                      aria-label="Preço neste cardápio"
-                      className={`${inputClass} h-9`}
-                    />
-                  </td>
-                  <td className="text-center">
-                    <Checkbox name={`${link.itemId}.remove`} label="" />
-                  </td>
-                </tr>
-              );
-            })}
-            <tr className="border-t border-line">
-              <td className="py-2 pr-2">
-                <select
-                  name="add.itemId"
-                  defaultValue=""
-                  aria-label="Adicionar item"
-                  className={`${inputClass} h-9`}
-                >
-                  <option value="">Adicionar item…</option>
-                  {free.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name["pt-BR"]}
-                    </option>
-                  ))}
-                </select>
-              </td>
-              <td>
-                <input
-                  name="add.order"
-                  type="number"
-                  placeholder={String(links.length + 1)}
-                  aria-label="Ordem"
-                  className={`${inputClass} h-9`}
-                />
-              </td>
-              <td>
-                <input
-                  name="add.price"
-                  placeholder="base"
-                  inputMode="decimal"
-                  aria-label="Preço neste cardápio"
-                  className={`${inputClass} h-9`}
-                />
-              </td>
-              <td />
-            </tr>
-          </tbody>
-        </table>
-        <div>
-          <SubmitButton>Salvar categoria</SubmitButton>
-        </div>
-      </ActionForm>
-      <ActionForm action={deleteCategory} className="border-t border-line pt-3">
-        <input type="hidden" name="categoryId" value={category.id} />
-        <div>
-          <SubmitButton variant="danger" pendingLabel="Apagando…">
-            Apagar categoria
-          </SubmitButton>
-        </div>
-      </ActionForm>
-    </Card>
+      </div>
+    </details>
   );
 }

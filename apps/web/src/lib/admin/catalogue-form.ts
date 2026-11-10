@@ -307,7 +307,8 @@ export function readGroup(
     max,
     modifierType: modifierType || current?.modifierType || "MODI",
     internalName: optionalText(form, "internalName", current?.internalName),
-    links: [...imageLink(form), ...links],
+    // The group form has no picture field: keep the current one.
+    links: [...(form.has("image") ? imageLink(form) : (current?.links ?? []).filter((l) => l.type === "IMAGE")), ...links],
   };
   return { group, options };
 }

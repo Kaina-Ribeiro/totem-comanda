@@ -4,8 +4,9 @@ import { coreApiV2 } from "@/lib/core/client-v2";
 import type { components } from "@/lib/core-api-v2";
 
 import type { AdminItem, Badge, Group, Item, Section, SwapSell } from "./catalogue-form";
-import type { NameOf } from "./menu-errors";
-import { asOwner } from "./session";
+import { attempt, type FormState } from "./form";
+import { describeMenuErrors, type NameOf } from "./menu-errors";
+import { AdminApiError, asOwner } from "./session";
 
 type Image = components["schemas"]["MediaAsset"];
 
@@ -111,3 +112,49 @@ export function nextComboId(items: AdminItem[]): number {
   const ids = items.map((i) => (i.type === "COMBO_MEAL" ? i.comboMealId : 0));
   return Math.max(0, ...ids) + 1;
 }
+
+/**
+ * `attempt()` for catalogue saves: a `MENU_INVALID` answer lists each broken
+ * rule with the entities' names, read from the catalogue as it is now.
+ */
+export async function attemptCatalogue(work: () => Promise<string | void | FormState>): Promise<FormState> {
+  const caught: { error?: AdminApiError } = {};
+  const state = await attempt(async () => {
+    try {
+      return await work();
+    } catch (error) {
+      if (error instanceof AdminApiError && error.code === "MENU_INVALID") caught.error = error;
+      throw error;
+    }
+  });
+  const errors = caught.error?.errors;
+  if (!errors?.length) return state;
+  const names = await loadCatalogue()
+    .then(namesOf)
+    .catch((): NameOf => () => undefined);
+  return { ...state, problems: describeMenuErrors(errors, names) };
+}
+
+/** Ids of items used as an option of a group or a size of a sized item. */
+export function optionIds(catalogue: Pick<Catalogue, "items" | "groups">): Set<string> {
+  const ids = new Set<string>();
+  for (const g of catalogue.groups) for (const l of g.links) if (l.type !== "IMAGE") ids.add(l.id);
+  for (const i of catalogue.items) {
+    if (i.type === "SIZED_ITEM") for (const l of i.links) if (l.type === "ITEM") ids.add(l.id);
+  }
+  return ids;
+}
+
+/** Who links each entity (`TYPE:id` → parent names), for "Onde aparece". */
+export function parentsOf(catalogue: Catalogue, menus: Array<{ name: string; root: { type: string; id: string }[] }> = []) {
+  const parents = new Map<string, string[]>();
+  const add = (key: string, name: string) => parents.set(key, [...(parents.get(key) ?? []), name]);
+  for (const m of menus) for (const l of m.root) add(`${l.type}:${l.id}`, `Cardápio ${m.name}`);
+  for (const e of [...catalogue.sections, ...catalogue.items, ...catalogue.groups, ...catalogue.swapSells]) {
+    for (const l of e.links) if (l.type !== "IMAGE") add(`${l.type}:${l.id}`, e.name);
+  }
+  return (type: string, id: string) => parents.get(`${type}:${id}`) ?? [];
+}
+
+/** The IMAGE an entity shows (its first IMAGE link), or null. */
+export const imageOf = (links: { type: string; id: string }[]) => links.find((l) => l.type === "IMAGE")?.id ?? null;
