@@ -1,209 +1,138 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
-import userEvent, { type UserEvent } from "@testing-library/user-event";
+import { act, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Order, PlacedOrder } from "@/app/kiosk/actions";
 import type { Language } from "@/lib/kiosk/strings";
 
+import { applyScenario, now } from "../../../../mock/state";
+import { guestMenu } from "../../../../mock/v2/menu";
 import { type KioskSettings, KioskJourney } from "./kiosk-journey";
-import { menu, order, payment, strings, total } from "./test-journey";
+import { placed, session, strings, totals } from "./test-journey";
 
 const spies = vi.hoisted(() => ({
   beginJourney: vi.fn(),
   switchLanguage: vi.fn(),
-  quoteBasket: vi.fn(),
+  priceBasket: vi.fn(),
+  applyCoupon: vi.fn(),
+  removeCoupon: vi.fn(),
   recordJourneyEvent: vi.fn(),
-  validateCoupon: vi.fn(),
-  createOrder: vi.fn(),
   startPayment: vi.fn(),
   pollPayment: vi.fn(),
   cancelPayment: vi.fn(),
-  placeOrder: vi.fn(),
+  submitOrder: vi.fn(),
   refresh: vi.fn(),
 }));
-
-vi.mock("@/app/kiosk/actions", () => ({
-  beginJourney: spies.beginJourney,
-  switchLanguage: spies.switchLanguage,
-  quoteBasket: spies.quoteBasket,
-  recordJourneyEvent: spies.recordJourneyEvent,
-  validateCoupon: spies.validateCoupon,
-  createOrder: spies.createOrder,
-  startPayment: spies.startPayment,
-  pollPayment: spies.pollPayment,
-  cancelPayment: spies.cancelPayment,
-  placeOrder: spies.placeOrder,
-}));
-
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ refresh: spies.refresh }),
-}));
-
-const ORDER_NONCE = "00000000-0000-4000-8000-000000000001";
+vi.mock("@/app/kiosk/actions", () => spies);
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: spies.refresh }) }));
 
 const settings: KioskSettings = {
-  brand: "Fornada Teste",
+  brand: "Padaria Teste",
   defaultLanguage: "pt-BR",
   languages: ["pt-BR", "en"],
-  orderTypes: ["DINEIN", "TAKE_OUT"],
-  checkNumberDigits: 4,
   idleMs: 0, // no idle warning: these tests do not wait for it
+  cardAvailable: true,
+  waitMinutes: 8,
+  invoiceNotice: { "pt-BR": "Se quiser nota fiscal, dirija-se ao caixa.", en: "If you need an invoice, please go to the counter." },
 };
+const attract: Record<Language, ReactNode> = { "pt-BR": <p>Vitrine</p>, en: <p>Showcase</p> };
 
-const attract: Record<Language, ReactNode> = {
-  "pt-BR": <p>Vitrine da padaria</p>,
-  en: <p>Bakery showcase</p>,
-};
+const flush = (ms = 0) => act(() => vi.advanceTimersByTimeAsync(ms));
+const user = () => userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+const button = (name: RegExp | string) => screen.getByRole("button", { name });
 
-const started = {
-  orderNonce: ORDER_NONCE,
-  journeyStartedTimestamp: "2026-10-30T09:00:00Z",
-  menu,
-  strings,
-};
-
-let user: UserEvent;
-
-const start = () => screen.getByRole("button", { name: strings["attract.cta"] });
-const pay = () => screen.getByRole<HTMLButtonElement>("button", { name: "Escolher como pagar" });
-
-/** Taps from the attract screen to the menu, with one baguete in the basket. */
-async function startAndAddBaguete() {
-  await user.click(start());
-  await user.click(await screen.findByRole("button", { name: /Para viagem/ }));
-  await user.click(await screen.findByRole("button", { name: "Adicionar Baguete tradicional" }));
-}
-
-/** From the basket to the payment method screen, once the Core API has quoted it. */
-async function toPaymentMethods() {
-  await user.click(screen.getByRole("button", { name: /Ver meu pedido/ }));
-  await screen.findAllByText(/R\$\s*12,00/);
-  await vi.waitFor(() => expect(pay().disabled).toBe(false));
-  await user.click(pay());
-  await screen.findByRole("button", { name: /^Crédito/ });
-}
-
-function renderKiosk() {
-  render(<KioskJourney settings={settings} attract={attract} />);
-}
-
-beforeEach(() => {
-  vi.resetAllMocks();
-  vi.useFakeTimers({ shouldAdvanceTime: true });
-  user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-  spies.beginJourney.mockResolvedValue({ ok: true, data: started });
-  spies.quoteBasket.mockResolvedValue({ ok: true, data: total(1200) });
-  spies.recordJourneyEvent.mockResolvedValue(undefined);
-});
-
-afterEach(() => {
-  vi.useRealTimers();
-});
-
-describe("KioskJourney", () => {
-  it("takes a guest from the attract screen to the success number", async () => {
-    const placed: PlacedOrder = { orderId: "ord-1", posCheckNumber: "1042", waitTime: 8, status: "PAID" };
-    const created: Order = order(1200);
-    spies.createOrder.mockResolvedValue({ ok: true, data: created });
-    spies.startPayment.mockResolvedValue({ ok: true, data: payment("AUTHORISING") });
-    spies.pollPayment.mockResolvedValue({ ok: true, data: payment("AUTHORISED") });
-    spies.placeOrder.mockResolvedValue({ ok: true, data: placed });
-    renderKiosk();
-
-    await startAndAddBaguete();
-    expect(spies.beginJourney).toHaveBeenCalledWith("pt-BR");
-    expect((await screen.findAllByText(/R\$\s*12,00/)).length).toBeGreaterThan(0); // the basket bar
-    await toPaymentMethods();
-
-    expect(spies.quoteBasket).toHaveBeenLastCalledWith(
-      expect.objectContaining({ orderType: "TAKE_OUT", discountCode: null }),
-    );
-    await user.click(screen.getByRole("button", { name: /^Crédito/ }));
-
-    await vi.waitFor(() =>
-      expect(spies.createOrder).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          orderNonce: ORDER_NONCE,
-          orderType: "TAKE_OUT",
-          language: "pt-BR",
-          orderItems: [expect.objectContaining({ itemId: "itm-baguete", quantity: 1 })],
-        }),
-      ),
-    );
-    expect(spies.startPayment).toHaveBeenCalledWith("ord-1", "CREDIT", expect.any(String));
-    // The terminal is polled until it authorises, then the order is placed.
-    expect(await screen.findByRole("heading", { level: 1, name: /maquininha/ })).toBeTruthy();
-    await vi.waitFor(() => expect(spies.placeOrder).toHaveBeenCalledWith("ord-1", expect.any(String)));
-
-    expect(await screen.findByText("1042")).toBeTruthy();
-    expect(screen.getByText(strings["success.tag"])).toBeTruthy();
+describe("KioskJourney (v2)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.resetAllMocks();
+    applyScenario("afternoon");
+    spies.beginJourney.mockResolvedValue({
+      ok: true,
+      data: {
+        orderNonce: "00000000-0000-4000-8000-000000000001",
+        journeyStartedTimestamp: "2026-11-10T12:00:00Z",
+        menu: guestMenu(now(), "pt-BR"),
+        strings,
+      },
+    });
+    spies.priceBasket.mockResolvedValue({
+      ok: true,
+      data: totals(5.2, { orderItems: [{ id: "2010", name: "Chope (pint)", quantity: 1, total: 5.2 }] }),
+    });
+    spies.recordJourneyEvent.mockResolvedValue(undefined);
+    spies.startPayment.mockResolvedValue({ ok: true, data: session("PENDING") });
+    spies.pollPayment.mockResolvedValue({ ok: true, data: session("APPROVED") });
+    spies.submitOrder.mockResolvedValue({ ok: true, data: placed });
   });
 
-  it("asks before cancelling an order with items, then records it and returns to the start", async () => {
-    renderKiosk();
-    await startAndAddBaguete();
-
-    await user.click(await screen.findByRole("button", { name: strings["menu.cancel"] }));
-    expect(screen.getByText(strings["cancel.bodyOne"])).toBeTruthy();
-    expect(spies.recordJourneyEvent).not.toHaveBeenCalled();
-
-    await user.click(screen.getByRole("button", { name: strings["cancel.confirm"] }));
-
-    expect(spies.recordJourneyEvent).toHaveBeenCalledWith(ORDER_NONCE, "CANCELLED_BY_GUEST", 1200);
-    expect(await screen.findByRole("button", { name: strings["attract.cta"] })).toBeTruthy();
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
-  it("returns to the start and reloads the gate when the menu is no longer active", async () => {
-    spies.beginJourney.mockResolvedValue({ ok: false, code: "NO_ACTIVE_MENU" });
-    renderKiosk();
+  it("orders a pint with Pix, from the tap to the number and the invoice notice", async () => {
+    render(<KioskJourney settings={settings} attract={attract} />);
+    await user().click(button(strings["attract.cta"]));
+    // No order-type screen: straight to the menu, dine-in.
+    await user().click(await screen.findByRole("button", { name: "Bebidas" }));
+    await user().click(button("Adicionar Chope (pint)"));
 
-    await user.click(start());
+    // Go prices the basket; the bar shows Go's total.
+    await flush(400);
+    expect(spies.priceBasket).toHaveBeenCalledWith({
+      basketId: null,
+      items: [{ id: "2010", quantity: 1, uniqueId: 1, modifiers: [] }],
+      language: "pt-BR",
+    });
+    expect(within(button(/Ver meu pedido/)).getByText(/R\$\s*5,20/)).toBeTruthy();
 
-    await vi.waitFor(() => expect(spies.refresh).toHaveBeenCalledOnce());
-    expect(await screen.findByRole("button", { name: strings["attract.cta"] })).toBeTruthy();
-    expect(spies.beginJourney).toHaveBeenCalledOnce();
+    await user().click(button(/Ver meu pedido/));
+    await flush(400);
+    await user().click(button(strings["basket.pay"]));
+    await user().click(button(/^Pix/));
+    await flush(1_000);
+    await flush();
+
+    expect(spies.submitOrder).toHaveBeenCalledWith(expect.objectContaining({ basketId: "B-1" }), expect.any(String));
+    expect(screen.getByText("42")).toBeTruthy();
+    expect(screen.getByText("Fica pronto em cerca de 8 min.")).toBeTruthy();
+    expect(screen.getByText("Se quiser nota fiscal, dirija-se ao caixa.")).toBeTruthy();
   });
 
-  it("offers to start over when the menu cannot load, and retries the start", async () => {
-    spies.beginJourney.mockResolvedValueOnce({ ok: false, code: "CORE_UNAVAILABLE" });
-    renderKiosk();
-
-    await user.click(start());
-    expect(await screen.findByText(strings["startFailed.title"])).toBeTruthy();
-
-    await user.click(screen.getByRole("button", { name: strings.startOver }));
-    expect(await screen.findByRole("button", { name: /Para viagem/ })).toBeTruthy();
-    expect(spies.beginJourney).toHaveBeenCalledTimes(2);
+  it("shows unavailable products grey, and they cannot be added", async () => {
+    applyScenario("afternoon");
+    const menu = guestMenu(now(), "pt-BR")!;
+    const pint = menu.entities.find((e) => e.id === "2010" && e.type === "ITEM") as { available: boolean };
+    pint.available = false;
+    spies.beginJourney.mockResolvedValue({
+      ok: true,
+      data: { orderNonce: "n", journeyStartedTimestamp: null, menu, strings },
+    });
+    render(<KioskJourney settings={settings} attract={attract} />);
+    await user().click(button(strings["attract.cta"]));
+    await user().click(await screen.findByRole("button", { name: "Bebidas" }));
+    const cell = button("Chope (pint), Indisponível") as HTMLButtonElement;
+    expect(cell.disabled).toBe(true);
   });
 
-  // COM-110: a payment whose answer was lost is cancelled when the guest leaves the order.
-  it("cancels a payment whose start answer was lost when the guest cancels the order", async () => {
-    spies.createOrder.mockResolvedValue({ ok: true, data: order(1200) });
-    spies.startPayment
-      .mockResolvedValueOnce({ ok: false, code: "CORE_UNAVAILABLE" })
-      .mockResolvedValueOnce({ ok: true, data: payment("AUTHORISING") });
-    spies.pollPayment.mockResolvedValue({ ok: true, data: payment("AUTHORISING") });
-    spies.cancelPayment.mockResolvedValue({ ok: true, data: payment("CANCELLED") });
-    renderKiosk();
+  it("offers the swap sell after a burger, then the cross-sell", async () => {
+    render(<KioskJourney settings={settings} attract={attract} />);
+    await user().click(button(strings["attract.cta"]));
+    await user().click(await screen.findByRole("button", { name: "Adicionar Hambúrguer clássico" }));
+    await user().click(button(strings["item.addToOrder"]));
+    expect(screen.getByRole("heading", { name: "Turbine seu hambúrguer" })).toBeTruthy();
+    await user().click(button("Manter Hambúrguer clássico"));
+    expect(screen.getByRole("heading", { name: strings["crossSell.title"] })).toBeTruthy();
+  });
 
-    await startAndAddBaguete();
-    await toPaymentMethods();
-    await user.click(screen.getByRole("button", { name: /^Crédito/ }));
-
-    const errorTitle = await screen.findByRole("heading", { level: 1, name: /Não deu para\s+concluir/ });
-    expect(errorTitle).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: strings["menu.cancel"] }));
-    await user.click(screen.getByRole("button", { name: strings["cancel.confirm"] }));
-
-    // The lost attempt is replayed with its own key, read, then cancelled, after the reset.
-    await vi.waitFor(() => expect(spies.cancelPayment).toHaveBeenCalledWith("pay-1"));
-    expect(spies.startPayment).toHaveBeenCalledTimes(2);
-    const [, method, key] = spies.startPayment.mock.calls[0];
-    expect(spies.startPayment.mock.calls[1]).toEqual(["ord-1", method, key]);
-    expect(method).toBe("CREDIT");
-    expect(await screen.findByRole("button", { name: strings["attract.cta"] })).toBeTruthy();
+  it("records an abandoned journey with Go's last total", async () => {
+    render(<KioskJourney settings={settings} attract={attract} />);
+    await user().click(button(strings["attract.cta"]));
+    await user().click(await screen.findByRole("button", { name: "Bebidas" }));
+    await user().click(button("Adicionar Chope (pint)"));
+    await flush(400);
+    await user().click(button(strings["menu.cancel"]));
+    await user().click(button(strings["cancel.confirm"]));
+    expect(spies.recordJourneyEvent).toHaveBeenCalledWith("00000000-0000-4000-8000-000000000001", "CANCELLED_BY_GUEST", 5.2);
   });
 });

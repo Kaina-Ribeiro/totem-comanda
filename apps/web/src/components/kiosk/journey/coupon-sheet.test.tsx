@@ -3,151 +3,68 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { DiscountItem } from "@/app/kiosk/actions";
-import type { BasketLine } from "@/lib/kiosk/menu-view";
+import { CouponRow, CouponSheet } from "./coupon-sheet";
+import { strings } from "./test-journey";
 
-import { CouponSheet } from "./coupon-sheet";
-import { line, strings } from "./test-journey";
+const actions = vi.hoisted(() => ({ applyCoupon: vi.fn() }));
+vi.mock("@/app/kiosk/actions", () => actions);
 
-const { validateCoupon } = vi.hoisted(() => ({ validateCoupon: vi.fn() }));
-
-vi.mock("@/app/kiosk/actions", () => ({ validateCoupon }));
-
-const BASKET: BasketLine[] = [line("itm-baguete", 2)];
-
-const discount = {
-  type: "PERCENT",
-  value: "BEMVINDO10",
-  entryMethod: "MANUAL",
-  title: "10% na primeira compra",
-  amount: { value: 150, currency: "BRL" },
-} as unknown as DiscountItem;
+const items = [{ id: "2010", quantity: 1, uniqueId: 1, modifiers: [] }];
 
 function renderSheet(current: string | null = null) {
   const on = { onClose: vi.fn(), onApplied: vi.fn() };
-  render(
-    <CouponSheet
-      current={current}
-      orderType="TAKE_OUT"
-      basket={BASKET}
-      strings={strings}
-      {...on}
-    />,
-  );
+  render(<CouponSheet current={current} basketId="B-1" items={items} language="pt-BR" strings={strings} {...on} />);
   return on;
 }
 
-const key = (label: string) => screen.getByRole("button", { name: label });
-const apply = () => screen.getByRole<HTMLButtonElement>("button", { name: strings["coupon.apply"] });
-
-async function typeCode(code: string) {
-  for (const char of code) await userEvent.click(key(char));
+async function type(code: string) {
+  const user = userEvent.setup();
+  for (const key of code) await user.click(screen.getByRole("button", { name: key }));
+  await user.click(screen.getByRole("button", { name: strings["coupon.apply"] }));
+  return user;
 }
 
-describe("CouponSheet", () => {
-  beforeEach(() => {
-    validateCoupon.mockReset();
-  });
+describe("CouponSheet (v2)", () => {
+  beforeEach(() => vi.resetAllMocks());
 
-  it("keeps Aplicar disabled until a code is typed", async () => {
-    renderSheet();
-    expect(apply().disabled).toBe(true);
-
-    await typeCode("B");
-    expect(apply().disabled).toBe(false);
-  });
-
-  it("checks the typed code against this basket and applies it on success", async () => {
-    validateCoupon.mockResolvedValue({ ok: true, data: discount });
+  it("applies the code on Go's basket and reports it", async () => {
+    actions.applyCoupon.mockResolvedValue({ ok: true, data: { awards: [{ id: "CAFE5", type: "CODE" }] } });
     const on = renderSheet();
-
-    await typeCode("BEMVINDO10");
-    await userEvent.click(apply());
-
-    expect(validateCoupon).toHaveBeenCalledWith({
-      code: "BEMVINDO10",
-      orderType: "TAKE_OUT",
-      orderItems: BASKET,
-      currentDiscountCode: null,
-    });
-    await vi.waitFor(() => expect(on.onApplied).toHaveBeenCalledWith(discount));
+    await type("CAFE5");
+    expect(actions.applyCoupon).toHaveBeenCalledWith({ basketId: "B-1", items, code: "CAFE5", language: "pt-BR" });
+    expect(on.onApplied).toHaveBeenCalledWith("CAFE5");
   });
 
-  it("erases the last letter", async () => {
+  it("shows Go's reason for DISCOUNT_INVALID", async () => {
+    actions.applyCoupon.mockResolvedValue({ ok: false, code: "DISCOUNT_INVALID", detail: "Pedido mínimo de R$ 20,00" });
     renderSheet();
-    await typeCode("NATAL");
-    await userEvent.click(key(strings["coupon.erase"]));
-    expect(screen.getByText("NATA")).toBeTruthy();
+    await type("CAFE5");
+    expect(await screen.findByText("Pedido mínimo de R$ 20,00")).toBeTruthy();
   });
 
-  it("shows the invalid-coupon message and keeps the sheet open", async () => {
-    validateCoupon.mockResolvedValue({ ok: false, code: "INVALID_COUPON" });
-    const on = renderSheet();
-
-    await typeCode("XXXX");
-    await userEvent.click(apply());
-
-    expect(await screen.findByText(strings["coupon.invalid"])).toBeTruthy();
-    expect(on.onApplied).not.toHaveBeenCalled();
-    expect(on.onClose).not.toHaveBeenCalled();
-  });
-
-  it("tells the guest when the coupon is already on the order", async () => {
-    validateCoupon.mockResolvedValue({ ok: false, code: "COUPON_ALREADY_APPLIED" });
+  it("has its own copy for a used-up coupon and for the same coupon twice", async () => {
+    actions.applyCoupon.mockResolvedValueOnce({ ok: false, code: "DISCOUNT_LIMIT_REACHED" });
     renderSheet();
-
-    await typeCode("BEMVINDO10");
-    await userEvent.click(apply());
-
+    await type("A");
+    expect(await screen.findByText(strings["coupon.limit"])).toBeTruthy();
+    actions.applyCoupon.mockResolvedValueOnce({ ok: false, code: "COUPON_ALREADY_APPLIED" });
+    await userEvent.setup().click(screen.getByRole("button", { name: strings["coupon.apply"] }));
     expect(await screen.findByText(strings["coupon.already"])).toBeTruthy();
   });
 
-  it("shows the generic error when the check itself fails", async () => {
-    validateCoupon.mockResolvedValue({ ok: false, code: "CORE_UNAVAILABLE" });
-    renderSheet();
-
-    await typeCode("BEMVINDO10");
-    await userEvent.click(apply());
-
-    expect(await screen.findByText(strings["coupon.error"])).toBeTruthy();
+  it("asks before replacing the coupon already on the order", async () => {
+    actions.applyCoupon.mockResolvedValue({ ok: true, data: { awards: [{ id: "CAFE5", type: "CODE" }] } });
+    renderSheet("BEMVINDO10");
+    await type("CAFE5");
+    expect(actions.applyCoupon).not.toHaveBeenCalled();
+    await userEvent.setup().click(screen.getByRole("button", { name: strings["coupon.replaceConfirm"] }));
+    expect(actions.applyCoupon).toHaveBeenCalled();
   });
+});
 
-  it("asks before replacing the coupon already on the order, and keeps it if asked", async () => {
-    const on = renderSheet("BEMVINDO10");
-
-    await typeCode("NATAL");
-    await userEvent.click(apply());
-
-    expect(screen.getByText(strings["coupon.replaceTitle"])).toBeTruthy();
-    expect(screen.getByText(/O BEMVINDO10 sai e entra o NATAL/)).toBeTruthy();
-    expect(validateCoupon).not.toHaveBeenCalled();
-
-    await userEvent.click(screen.getByRole("button", { name: "Manter o BEMVINDO10" }));
-    expect(screen.queryByText(strings["coupon.replaceTitle"])).toBeNull();
-    expect(validateCoupon).not.toHaveBeenCalled();
-    expect(on.onApplied).not.toHaveBeenCalled();
-  });
-
-  it("replaces the current coupon: the check sends the old code along", async () => {
-    validateCoupon.mockResolvedValue({ ok: true, data: { ...discount, value: "NATAL" } });
-    const on = renderSheet("BEMVINDO10");
-
-    await typeCode("NATAL");
-    await userEvent.click(apply());
-    await userEvent.click(screen.getByRole("button", { name: strings["coupon.replaceConfirm"] }));
-
-    expect(validateCoupon).toHaveBeenCalledWith(
-      expect.objectContaining({ code: "NATAL", currentDiscountCode: "BEMVINDO10" }),
-    );
-    await vi.waitFor(() =>
-      expect(on.onApplied).toHaveBeenCalledWith(expect.objectContaining({ value: "NATAL" })),
-    );
-  });
-
-  it("closes without checking when the guest taps Voltar", async () => {
-    const on = renderSheet();
-    await userEvent.click(screen.getByRole("button", { name: strings["coupon.cancel"] }));
-    expect(on.onClose).toHaveBeenCalledOnce();
-    expect(validateCoupon).not.toHaveBeenCalled();
+describe("CouponRow", () => {
+  it("says when Go no longer applies the coupon", () => {
+    render(<CouponRow code="CAFE5" title={null} gone strings={strings} onOpen={vi.fn()} onRemove={vi.fn()} />);
+    expect(screen.getByText(/O cupom CAFE5 não vale mais/)).toBeTruthy();
   });
 });

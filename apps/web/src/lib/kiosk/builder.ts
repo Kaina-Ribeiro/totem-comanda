@@ -147,3 +147,22 @@ export function lineToDraft(product: Product, line: BasketLine): Draft {
   fill(product.groups);
   return { quantity: line.quantity, picks };
 }
+
+/**
+ * The line after the guest takes a swap-sell offer: the target product, with
+ * the picks of the groups both products share (e.g. the extras), and whether it
+ * can go in as it is or the builder must ask for a missing choice.
+ */
+export function swapTo(target: Product, line: BasketLine): { line: BasketLine; ready: boolean } {
+  const from = `${line.productId}/`;
+  const moved: BasketLine = {
+    guid: line.guid,
+    productId: target.id,
+    quantity: line.quantity,
+    picks: line.picks
+      .filter((p) => p.groupKey.startsWith(from))
+      .map((p) => ({ ...p, groupKey: `${target.id}/${p.groupKey.slice(from.length)}` })),
+  };
+  const draft = lineToDraft(target, moved);
+  return { line: draftToLine(target, draft, line.guid), ready: canAdd(target, draft) };
+}

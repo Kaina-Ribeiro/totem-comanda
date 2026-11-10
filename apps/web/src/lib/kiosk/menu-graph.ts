@@ -239,3 +239,24 @@ export function readMenu(menu: MenuResponse): KioskMenu {
 }
 
 export const findProduct = (menu: KioskMenu, id: string): Product | undefined => menu.products[id];
+
+/** The guest-facing name of a product or option id (Core names it in `detail`), or null. */
+export function nameOf(menu: KioskMenu, id: string): string | null {
+  const product = menu.products[id];
+  if (product) return product.name;
+  const walk = (groups: MenuGroup[]): string | null => {
+    for (const group of groups) {
+      for (const option of group.options) {
+        if (option.id === id) return option.name;
+        const nested = walk(option.groups);
+        if (nested) return nested;
+      }
+    }
+    return null;
+  };
+  for (const p of Object.values(menu.products)) {
+    const found = walk(p.groups);
+    if (found) return found;
+  }
+  return null;
+}

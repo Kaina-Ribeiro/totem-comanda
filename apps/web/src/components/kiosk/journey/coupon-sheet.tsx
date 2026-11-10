@@ -1,36 +1,39 @@
 import { useState, useTransition } from "react";
 
-import { type DiscountItem, validateCoupon } from "@/app/kiosk/actions";
-import type { ResultCode } from "@/lib/kiosk/core";
-import type { BasketLine, OrderType } from "@/lib/kiosk/menu-view";
-import { format, type Strings } from "@/lib/kiosk/strings";
+import { applyCoupon, type OrderItem } from "@/app/kiosk/actions";
+import type { ResultCode } from "@/lib/kiosk/core-v2";
+import { format, type Language, type Strings } from "@/lib/kiosk/strings";
 
 const ROWS = ["1234567890", "QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"];
 const MAX_CODE = 20;
 
+type CouponError = { code: ResultCode; detail?: string };
+
 /**
- * Coupon entry (F-DISC-01, 02, 05). Not drawn in the prototype: same sheet as
- * 09-Cpf with an on-screen keyboard, since the kiosk has none. Replacing a
- * code on the order asks first (SCR-DISC-05), then validates the new one with
- * the current one attached; the Core API decides if and how much it discounts.
+ * Coupon entry. Not drawn in the prototype: same sheet as 09-Cpf with an
+ * on-screen keyboard, since the kiosk has none. Replacing a code on the order
+ * asks first; Go puts the new one in place of the old (one coupon per order)
+ * and decides if and how much it discounts (`POST /v2/discounts/apply`).
  */
 export function CouponSheet({
   current,
-  orderType,
-  basket,
+  basketId,
+  items,
+  language,
   strings,
   onClose,
   onApplied,
 }: {
   current: string | null;
-  orderType: OrderType;
-  basket: BasketLine[];
+  basketId: string;
+  items: OrderItem[];
+  language: Language;
   strings: Strings;
   onClose: () => void;
-  onApplied: (discount: DiscountItem) => void;
+  onApplied: (code: string) => void;
 }) {
   const [code, setCode] = useState("");
-  const [error, setError] = useState<ResultCode | null>(null);
+  const [error, setError] = useState<CouponError | null>(null);
   const [confirmReplace, setConfirmReplace] = useState(false);
   const [checking, startChecking] = useTransition();
 
@@ -43,14 +46,10 @@ export function CouponSheet({
   const check = () => {
     setConfirmReplace(false);
     startChecking(async () => {
-      const result = await validateCoupon({
-        code,
-        orderType,
-        orderItems: basket,
-        currentDiscountCode: current,
-      });
-      if (result.ok) onApplied(result.data);
-      else setError(result.code);
+      // A Server Action that never reached the BFF (kiosk offline) is a failure too.
+      const result = await applyCoupon({ basketId, items, code, language }).catch(() => null);
+      if (result?.ok) onApplied(result.data.awards[0]?.id ?? code);
+      else setError(result && !result.ok ? { code: result.code, detail: result.detail } : { code: "CORE_UNAVAILABLE" });
     });
   };
 
@@ -60,15 +59,7 @@ export function CouponSheet({
     else check();
   };
 
-  const message =
-    error === "INVALID_COUPON"
-      ? strings["coupon.invalid"]
-      : error === "COUPON_ALREADY_APPLIED"
-        ? strings["coupon.already"]
-        : error
-          ? strings["coupon.error"]
-          : null;
-
+  const message = couponMessage(error, strings);
   const keyClass =
     "flex h-[108px] flex-1 items-center justify-center rounded-[21px] border-[3px] border-line bg-surface text-[36px] font-bold";
 
@@ -76,9 +67,7 @@ export function CouponSheet({
     <div className="fixed inset-0 z-40 flex items-end bg-[#2b211c]/75" role="dialog" aria-modal>
       <div className="flex w-full flex-col gap-9 rounded-t-[60px] bg-surface px-[54px] pt-[72px] pb-12 text-ink">
         <div className="flex flex-col gap-3 px-3">
-          <h2 className="font-display text-[69px] leading-none font-semibold tracking-[-0.02em]">
-            {strings["coupon.title"]}
-          </h2>
+          <h2 className="font-display text-[69px] leading-none font-semibold tracking-[-0.02em]">{strings["coupon.title"]}</h2>
           <p className="text-[28.5px] text-muted">{strings["coupon.body"]}</p>
         </div>
         <div className="flex flex-col gap-3 px-3">
@@ -102,11 +91,7 @@ export function CouponSheet({
                 </button>
               ))}
               {index === ROWS.length - 1 && (
-                <button
-                  onClick={() => press("back")}
-                  aria-label={strings["coupon.erase"]}
-                  className={`${keyClass} flex-[1.6]`}
-                >
+                <button onClick={() => press("back")} aria-label={strings["coupon.erase"]} className={`${keyClass} flex-[1.6]`}>
                   <svg
                     width="45"
                     height="45"
@@ -127,10 +112,7 @@ export function CouponSheet({
           ))}
         </div>
         <div className="flex gap-[30px] px-3 pt-3">
-          <button
-            onClick={onClose}
-            className="h-[138px] flex-1 rounded-full bg-ground text-[31.5px] font-bold"
-          >
+          <button onClick={onClose} className="h-[138px] flex-1 rounded-full bg-ground text-[31.5px] font-bold">
             {strings["coupon.cancel"]}
           </button>
           <button
@@ -155,16 +137,10 @@ export function CouponSheet({
               </p>
             </div>
             <div className="flex flex-col gap-[21px]">
-              <button
-                onClick={check}
-                className="h-[150px] rounded-full bg-ink text-[33px] font-bold text-on-accent"
-              >
+              <button onClick={check} className="h-[150px] rounded-full bg-ink text-[33px] font-bold text-on-accent">
                 {strings["coupon.replaceConfirm"]}
               </button>
-              <button
-                onClick={() => setConfirmReplace(false)}
-                className="h-[150px] rounded-full bg-ground text-[33px] font-bold"
-              >
+              <button onClick={() => setConfirmReplace(false)} className="h-[150px] rounded-full bg-ground text-[33px] font-bold">
                 {format(strings["coupon.replaceKeep"], { current })}
               </button>
             </div>
@@ -175,39 +151,66 @@ export function CouponSheet({
   );
 }
 
-/** The basket row for the discount: add, or the applied code with its title and remove. */
+/** Go's words for a refused coupon (`detail`, e.g. "Pedido mínimo de R$ 20,00"), else ours. */
+export function couponMessage(error: CouponError | null, strings: Strings): string | null {
+  if (!error) return null;
+  switch (error.code) {
+    case "DISCOUNT_INVALID":
+      return error.detail ?? strings["coupon.invalid"];
+    case "DISCOUNT_LIMIT_REACHED":
+      return strings["coupon.limit"];
+    case "COUPON_ALREADY_APPLIED":
+      return strings["coupon.already"];
+    default:
+      return strings["coupon.error"];
+  }
+}
+
+/**
+ * The basket row for the coupon: add, or the applied code with its name. A
+ * code Go no longer applies (the basket fell under its minimum) says so.
+ */
 export function CouponRow({
   code,
   title,
+  gone,
   strings,
   onOpen,
   onRemove,
 }: {
   code: string | null;
   title: string | null;
+  gone: boolean;
   strings: Strings;
   onOpen: () => void;
   onRemove: () => void;
 }) {
   return (
-    <div className="flex h-[120px] items-center justify-between rounded-[36px] bg-sage px-[42px] text-[28.5px]">
-      <button onClick={onOpen} className="flex flex-1 items-center gap-3 text-left">
-        <span className="font-bold">{code ?? strings["coupon.row"]}</span>
-        <span className="text-muted">{code ? title : strings["item.optional"]}</span>
-      </button>
-      {code ? (
-        <span className="flex gap-[30px] font-bold">
-          <button onClick={onOpen} className="text-detail-text">
-            {strings["taxId.change"]}
-          </button>
-          <button onClick={onRemove} className="text-muted">
-            {strings["coupon.remove"]}
-          </button>
-        </span>
-      ) : (
-        <button onClick={onOpen} className="font-bold text-detail-text">
-          {strings["coupon.add"]}
+    <div className="flex flex-col gap-3">
+      <div className="flex h-[120px] items-center justify-between rounded-[36px] bg-sage px-[42px] text-[28.5px]">
+        <button onClick={onOpen} className="flex flex-1 items-center gap-3 text-left">
+          <span className="font-bold">{code ?? strings["coupon.row"]}</span>
+          <span className="text-muted">{code ? title : strings["item.optional"]}</span>
         </button>
+        {code ? (
+          <span className="flex gap-[30px] font-bold">
+            <button onClick={onOpen} className="text-detail-text">
+              {strings["coupon.change"]}
+            </button>
+            <button onClick={onRemove} className="text-muted">
+              {strings["coupon.remove"]}
+            </button>
+          </span>
+        ) : (
+          <button onClick={onOpen} className="font-bold text-detail-text">
+            {strings["coupon.add"]}
+          </button>
+        )}
+      </div>
+      {code && gone && (
+        <p className="px-[42px] text-[25.5px] font-semibold text-danger">
+          {format(strings["basket.couponGone"], { code })}
+        </p>
       )}
     </div>
   );

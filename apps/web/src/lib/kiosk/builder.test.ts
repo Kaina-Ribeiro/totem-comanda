@@ -10,6 +10,7 @@ import {
   isBlocked,
   lineToDraft,
   setOptionQuantity,
+  swapTo,
   toggleOption,
 } from "./builder";
 import { findProduct, type KioskMenu, type MenuGroup, readMenu } from "./menu-graph";
@@ -126,5 +127,21 @@ describe("item builder", () => {
     const line = draftToLine(burger, draft, "g1");
     expect(line.quantity).toBe(3);
     expect(draftToLine(burger, lineToDraft(burger, line), "g1")).toEqual(line);
+  });
+});
+
+describe("swapTo", () => {
+  it("keeps the picks of shared groups and says whether a choice is missing", () => {
+    const burger = product("1001");
+    const extras = group("1001", "M-EXTRAS");
+    const draft = toggleOption(initialDraft(burger), extras, option(extras, "X-CHEESE"));
+    const { line, ready } = swapTo(product("1003"), draftToLine(burger, draft, "g1"));
+    expect(line).toEqual({
+      guid: "g1",
+      productId: "1003",
+      quantity: 1,
+      picks: [{ groupKey: "1003/M-EXTRAS", optionId: "X-CHEESE", quantity: 1 }],
+    });
+    expect(ready).toBe(true);
   });
 });
