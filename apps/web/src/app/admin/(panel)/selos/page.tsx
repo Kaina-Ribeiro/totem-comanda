@@ -1,314 +1,161 @@
-import { revalidatePath } from "next/cache";
-
+import { refreshAdmin } from "@/app/admin/(panel)/catalogue-actions";
+import { DeleteButton, LinkRows, TextsFields } from "@/components/admin/catalogue-fields";
 import { ActionForm, SubmitButton } from "@/components/admin/form";
 import { FormSkeleton, Streamed } from "@/components/admin/skeleton";
-import { Card, Checkbox, Field, inputClass, LoadError, PageHeader } from "@/components/admin/ui";
-import { attempt, checked, type FormState, load, optionalText, text } from "@/lib/admin/form";
+import { Card, Field, inputClass, LoadError, PageHeader } from "@/components/admin/ui";
+import {
+  attemptCatalogue,
+  byId,
+  type Catalogue,
+  loadCatalogue,
+  optionIds,
+  putSwapSell,
+} from "@/lib/admin/catalogue";
+import { type Badge, readBadge, readSwapSell, type SwapSell } from "@/lib/admin/catalogue-form";
+import { type FormState, load, text } from "@/lib/admin/form";
 import { asOwner } from "@/lib/admin/session";
-import { coreApi } from "@/lib/core/client";
-import type { components } from "@/lib/core-api";
+import { coreApiV2 } from "@/lib/core/client-v2";
 
-type Tag = components["schemas"]["AdminTag"];
-type TagsPage = components["schemas"]["TagsPage"];
-type CrossSell = components["schemas"]["AdminCrossSellGroup"];
-type Item = components["schemas"]["AdminItem"];
-
-const PATH = "/admin/selos";
-const PAGES: Array<[TagsPage, string]> = [
-  ["ITEM_MENU", "Na grade do cardápio"],
-  ["ITEM_PAGE", "Na página do item"],
-  ["BASKET", "No carrinho"],
-];
-
-const localized = (form: FormData, name: string) => {
-  const en = text(form, `${name}.en`);
-  return { "pt-BR": text(form, `${name}.pt`), ...(en ? { en } : {}) };
-};
-
-async function saveTag(_: FormState, form: FormData): Promise<FormState> {
+async function saveBadge(_: FormState, form: FormData): Promise<FormState> {
   "use server";
-  const tagId = text(form, "tagId");
-  const startDate = optionalText(form, "startDate") ?? null;
-  const endDate = optionalText(form, "endDate") ?? null;
-  const body = {
-    badgeName: localized(form, "badge"),
-    textColour: text(form, "textColour"),
-    backgroundColour: text(form, "backgroundColour"),
-    tagsPages: PAGES.filter(([page]) => checked(form, page)).map(([page]) => page),
-    scheduleEnabled: !!(startDate || endDate),
-    startDate,
-    endDate,
-    links: form
-      .getAll("items")
-      .map((id) => ({ menuItemId: String(id), categoryId: null, enabled: true })),
-  };
-  return attempt(async () => {
-    if (tagId) {
-      await asOwner((headers) =>
-        coreApi().PUT("/v1/admin/tags/{tagId}", { headers, params: { path: { tagId } }, body }),
-      );
-    } else {
-      await asOwner((headers) => coreApi().POST("/v1/admin/tags", { headers, body }));
-    }
-    revalidatePath(PATH);
-    return tagId ? "Selo salvo." : "Selo criado.";
-  });
-}
-
-async function deleteTag(_: FormState, form: FormData): Promise<FormState> {
-  "use server";
-  const tagId = text(form, "tagId");
-  return attempt(async () => {
+  const badgeId = text(form, "badgeId");
+  return attemptCatalogue(async () => {
+    const badges = await asOwner((headers) => coreApiV2().GET("/v2/admin/badges", { headers }));
+    const current = badgeId ? (badges.find((b) => b.id === badgeId) ?? null) : null;
+    const body = readBadge(form, current);
     await asOwner((headers) =>
-      coreApi().DELETE("/v1/admin/tags/{tagId}", { headers, params: { path: { tagId } } }),
+      coreApiV2().PUT("/v2/admin/badges/{badgeId}", { headers, params: { path: { badgeId: body.id } }, body }),
     );
-    revalidatePath(PATH);
-    return "Selo apagado.";
+    await refreshAdmin();
+    return current ? "Selo salvo." : "Selo criado. Marque nos itens que devem mostrar ele.";
   });
 }
 
-async function saveCrossSell(_: FormState, form: FormData): Promise<FormState> {
+async function saveSwapSell(_: FormState, form: FormData): Promise<FormState> {
   "use server";
-  const groupId = text(form, "groupId");
-  const body = { name: localized(form, "name"), crossSells: form.getAll("items").map(String) };
-  return attempt(async () => {
-    if (groupId) {
-      await asOwner((headers) =>
-        coreApi().PUT("/v1/admin/cross-sells/{crossSellGroupId}", {
-          headers,
-          params: { path: { crossSellGroupId: groupId } },
-          body,
-        }),
-      );
-    } else {
-      await asOwner((headers) => coreApi().POST("/v1/admin/cross-sells", { headers, body }));
-    }
-    revalidatePath(PATH);
-    return groupId
-      ? "Sugestão salva."
-      : "Sugestão criada. Escolha em cada item, na página dele, quando sugerir.";
+  const swapSellId = text(form, "swapSellId");
+  return attemptCatalogue(async () => {
+    const swaps = await asOwner((headers) => coreApiV2().GET("/v2/admin/swap-sells", { headers }));
+    const current = swapSellId ? (swaps.find((s) => s.id === swapSellId) ?? null) : null;
+    await putSwapSell(readSwapSell(form, current));
+    await refreshAdmin();
+    return current ? "Oferta salva." : "Oferta criada. Ligue ela a um item na página do item.";
   });
 }
 
-async function deleteCrossSell(_: FormState, form: FormData): Promise<FormState> {
-  "use server";
-  const groupId = text(form, "groupId");
-  return attempt(async () => {
-    await asOwner((headers) =>
-      coreApi().DELETE("/v1/admin/cross-sells/{crossSellGroupId}", {
-        headers,
-        params: { path: { crossSellGroupId: groupId } },
-      }),
-    );
-    revalidatePath(PATH);
-    return "Sugestão apagada.";
-  });
-}
-
-export default function TagsPage() {
+export default function BadgesPage() {
   return (
     <>
       <PageHeader
         title="Selos e sugestões"
-        description="Selos como “Mais pedido” nos itens, e as sugestões que o totem faz ao adicionar um item."
+        description="Selos aparecem no item (“Novidade”). Ofertas de troca aparecem depois de adicionar (“Turbine seu hambúrguer”). As sugestões “Que tal…?” ficam na página de cada item."
       />
-      <Streamed fallback={<FormSkeleton />}>
-        <Lists />
+      <Streamed fallback={<FormSkeleton cards={2} fields={4} />}>
+        <BadgesAndSwaps />
       </Streamed>
     </>
   );
 }
 
-async function Lists() {
-  const loaded = await load(() =>
-    Promise.all([
-      asOwner((headers) => coreApi().GET("/v1/admin/tags", { headers })),
-      asOwner((headers) => coreApi().GET("/v1/admin/cross-sells", { headers })),
-      asOwner((headers) => coreApi().GET("/v1/admin/items", { headers })),
-    ]),
-  );
+async function BadgesAndSwaps() {
+  const loaded = await load(loadCatalogue);
   if ("error" in loaded) return <LoadError message={loaded.error} />;
-  const [tags, crossSells, unsorted] = loaded.data;
-  const items = [...unsorted].sort((a, b) =>
-    a.name["pt-BR"].localeCompare(b.name["pt-BR"], "pt-BR"),
-  );
+  const catalogue = loaded.data;
   return (
     <>
-      <h2 className="text-xl font-bold tracking-[-0.02em]">Selos</h2>
-      {tags.map((tag) => (
-        <TagForm key={tag.id} tag={tag} items={items} />
-      ))}
-      <TagForm tag={null} items={items} />
-      <h2 className="mt-4 text-xl font-bold tracking-[-0.02em]">Sugestões ao adicionar</h2>
-      {crossSells.map((group) => (
-        <CrossSellForm key={group.id} group={group} items={items} />
-      ))}
-      <CrossSellForm group={null} items={items} />
+      <section className="flex flex-col gap-4">
+        <h2 className="text-xl font-bold tracking-[-0.02em]">Selos</h2>
+        {catalogue.badges.map((badge) => (
+          <BadgeCard key={badge.id} badge={badge} />
+        ))}
+        <BadgeCard badge={null} />
+      </section>
+      <section className="flex flex-col gap-4">
+        <h2 className="text-xl font-bold tracking-[-0.02em]">Ofertas de troca</h2>
+        {catalogue.swapSells.map((swap) => (
+          <SwapCard key={swap.id} swap={swap} catalogue={catalogue} />
+        ))}
+        <SwapCard swap={null} catalogue={catalogue} />
+      </section>
     </>
   );
 }
 
-function ItemPicker({ items, chosen }: { items: Item[]; chosen: Set<string> }) {
-  return (
-    <fieldset className="flex flex-col gap-2">
-      <legend className="mb-2 text-sm font-semibold text-muted">Itens</legend>
-      <div className="grid max-h-56 gap-1.5 overflow-y-auto rounded-[10px] border border-line p-3 sm:grid-cols-2">
-        {items.map((item) => (
-          <label key={item.id} className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              name="items"
-              value={item.id}
-              defaultChecked={chosen.has(item.id)}
-              className="size-4 accent-[#4e3426]"
-            />
-            {item.name["pt-BR"]}
-          </label>
-        ))}
-      </div>
-    </fieldset>
-  );
-}
-
-function TagForm({ tag, items }: { tag: Tag | null; items: Item[] }) {
-  const chosen = new Set(tag?.links.filter((l) => l.enabled).map((l) => l.menuItemId ?? "") ?? []);
+function BadgeCard({ badge }: { badge: Badge | null }) {
   return (
     <Card className="flex flex-col gap-4">
-      <ActionForm action={saveTag} resetOnSave={!tag} className="flex flex-col gap-4">
-        <input type="hidden" name="tagId" value={tag?.id ?? ""} />
-        <div className="flex flex-wrap items-end gap-4">
-          <Field label="Selo (PT)">
-            <input
-              name="badge.pt"
-              defaultValue={tag?.badgeName["pt-BR"]}
-              required
-              placeholder="Mais pedido"
-              className={inputClass}
-            />
+      <div className="flex flex-wrap items-center gap-3">
+        {badge ? (
+          <span
+            className="rounded-full px-3 py-1 text-sm font-bold"
+            style={{ color: badge.textColour, backgroundColor: badge.backgroundColour }}
+          >
+            {badge.name}
+          </span>
+        ) : (
+          <h3 className="text-lg font-bold tracking-[-0.01em]">Novo selo</h3>
+        )}
+      </div>
+      <ActionForm action={saveBadge} resetOnSave={!badge} className="flex flex-col gap-4">
+        <input type="hidden" name="badgeId" value={badge?.id ?? ""} />
+        <TextsFields entity={badge} namePlaceholder="Novidade" />
+        <div className="grid grid-cols-2 gap-4 sm:max-w-sm">
+          <Field label="Cor do texto">
+            <input name="textColour" type="color" defaultValue={badge?.textColour ?? "#FAF6F0"} className={`${inputClass} p-1`} />
           </Field>
-          <Field label="Selo (EN)">
-            <input
-              name="badge.en"
-              defaultValue={tag?.badgeName.en}
-              placeholder="Most ordered"
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Texto">
-            <input
-              name="textColour"
-              type="color"
-              defaultValue={tag?.textColour ?? "#2B211C"}
-              className="h-11 w-16 rounded-[10px] border border-line"
-            />
-          </Field>
-          <Field label="Fundo">
+          <Field label="Cor do fundo">
             <input
               name="backgroundColour"
               type="color"
-              defaultValue={tag?.backgroundColour ?? "#FFFFFF"}
-              className="h-11 w-16 rounded-[10px] border border-line"
-            />
-          </Field>
-          {tag && (
-            <span
-              className="mb-2 rounded-lg px-3 py-1 text-sm font-bold"
-              style={{ color: tag.textColour, backgroundColor: tag.backgroundColour }}
-            >
-              {tag.badgeName["pt-BR"]}
-            </span>
-          )}
-        </div>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div className="flex flex-col gap-2">
-            <span className="text-sm font-semibold text-muted">Onde aparece</span>
-            {PAGES.map(([page, label]) => (
-              <Checkbox
-                key={page}
-                name={page}
-                label={label}
-                defaultChecked={tag ? tag.tagsPages.includes(page) : true}
-              />
-            ))}
-          </div>
-          <Field label="De (opcional)">
-            <input
-              name="startDate"
-              type="date"
-              defaultValue={tag?.startDate ?? ""}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Até (opcional)">
-            <input
-              name="endDate"
-              type="date"
-              defaultValue={tag?.endDate ?? ""}
-              className={inputClass}
+              defaultValue={badge?.backgroundColour ?? "#4E3426"}
+              className={`${inputClass} p-1`}
             />
           </Field>
         </div>
-        <ItemPicker items={items} chosen={chosen} />
         <div>
-          <SubmitButton>{tag ? "Salvar selo" : "Criar selo"}</SubmitButton>
+          <SubmitButton>{badge ? "Salvar selo" : "Criar selo"}</SubmitButton>
         </div>
       </ActionForm>
-      {tag && (
-        <ActionForm action={deleteTag} className="border-t border-line pt-3">
-          <input type="hidden" name="tagId" value={tag.id} />
-          <div>
-            <SubmitButton variant="danger" pendingLabel="Apagando…">
-              Apagar selo
-            </SubmitButton>
-          </div>
-        </ActionForm>
-      )}
+      {badge && <DeleteButton kind="badge" id={badge.id} label="Apagar selo" />}
     </Card>
   );
 }
 
-function CrossSellForm({ group, items }: { group: CrossSell | null; items: Item[] }) {
+function SwapCard({ swap, catalogue }: { swap: SwapSell | null; catalogue: Catalogue }) {
+  const items = byId(catalogue.items);
+  const options = optionIds(catalogue);
+  const choices = catalogue.items
+    .filter((i) => !(i.type === "ITEM" && options.has(i.id)))
+    .map((i) => ({ value: `${i.type}:${i.id}`, label: i.name }))
+    .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+  const usedBy = swap ? catalogue.items.filter((i) => i.links.some((l) => l.type === "SWAP_SELL" && l.id === swap.id)) : [];
   return (
     <Card className="flex flex-col gap-4">
-      <ActionForm action={saveCrossSell} resetOnSave={!group} className="flex flex-col gap-4">
-        <input type="hidden" name="groupId" value={group?.id ?? ""} />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Pergunta (PT)">
-            <input
-              name="name.pt"
-              defaultValue={group?.name["pt-BR"]}
-              required
-              placeholder="Que tal um café?"
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Pergunta (EN)">
-            <input
-              name="name.en"
-              defaultValue={group?.name.en}
-              placeholder="How about a coffee?"
-              className={inputClass}
-            />
-          </Field>
-        </div>
-        <ItemPicker items={items} chosen={new Set(group?.crossSells ?? [])} />
-        <p className="text-xs text-muted">
-          Para o totem sugerir, escolha esta sugestão na página de cada item que a dispara.
-        </p>
+      <div className="flex flex-col gap-1">
+        <h3 className="text-lg font-bold tracking-[-0.01em]">{swap?.name ?? "Nova oferta de troca"}</h3>
+        {swap && (
+          <p className="text-xs font-medium text-muted">
+            {usedBy.length ? `Oferecida depois de: ${usedBy.map((i) => i.name).join(", ")}` : "Nenhum item oferece ainda."}
+          </p>
+        )}
+      </div>
+      <ActionForm action={saveSwapSell} resetOnSave={!swap} className="flex flex-col gap-4">
+        <input type="hidden" name="swapSellId" value={swap?.id ?? ""} />
+        <TextsFields entity={swap} namePlaceholder="Turbine seu hambúrguer" />
+        <LinkRows
+          name="links"
+          legend="Trocar por"
+          links={swap?.links ?? []}
+          nameOf={(l) => items.get(l.id)?.name ?? l.id}
+          choices={choices}
+          addLabel="Adicionar produto…"
+          empty="Escolha pelo menos um produto."
+        />
         <div>
-          <SubmitButton>{group ? "Salvar sugestão" : "Criar sugestão"}</SubmitButton>
+          <SubmitButton>{swap ? "Salvar oferta" : "Criar oferta"}</SubmitButton>
         </div>
       </ActionForm>
-      {group && (
-        <ActionForm action={deleteCrossSell} className="border-t border-line pt-3">
-          <input type="hidden" name="groupId" value={group.id} />
-          <div>
-            <SubmitButton variant="danger" pendingLabel="Apagando…">
-              Apagar sugestão
-            </SubmitButton>
-          </div>
-        </ActionForm>
-      )}
+      {swap && <DeleteButton kind="swapSell" id={swap.id} label="Apagar oferta" />}
     </Card>
   );
 }

@@ -63,9 +63,16 @@ export function ActionForm({
     >
       <Saving value={saving}>{children}</Saving>
       {state.error && (
-        <p role="alert" className="text-sm font-semibold text-danger">
-          {state.error}
-        </p>
+        <div role="alert" className="flex flex-col gap-1.5 text-sm font-semibold text-danger">
+          <p>{state.error}</p>
+          {state.problems && (
+            <ul className="flex list-disc flex-col gap-1 pl-5 font-medium">
+              {state.problems.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
       {state.reveal && (
         <div className="flex flex-col gap-1 rounded-[10px] border border-detail bg-butter p-3">

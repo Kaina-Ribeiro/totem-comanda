@@ -1,6 +1,7 @@
 import "server-only";
 
 import { coreMediaApi } from "@/lib/core/client";
+import { coreMediaApiV2 } from "@/lib/core/client-v2";
 
 import { AdminApiError, asOwner } from "./session";
 
@@ -28,4 +29,27 @@ export async function uploadImage(form: FormData, field: string): Promise<string
     }),
   );
   return asset.url;
+}
+
+/**
+ * Uploads an image from a form field (v2 uploadMedia) and returns the id of
+ * the `IMAGE` entity it became, or null when the field is empty.
+ */
+export async function uploadImageV2(form: FormData, field: string): Promise<string | null> {
+  const file = form.get(field);
+  if (!(file instanceof File) || file.size === 0) return null;
+  if (file.size > MAX_UPLOAD_BYTES || !file.type.startsWith("image/")) {
+    throw new AdminApiError("VALIDATION_FAILED", "imagem até 5 MB");
+  }
+  const body = new FormData();
+  body.set("file", file, file.name);
+  const asset = await asOwner((headers) =>
+    coreMediaApiV2().POST("/v2/admin/media", {
+      headers,
+      // The generated type says `file: string` (binary); the multipart body is built here.
+      body: {} as never,
+      bodySerializer: () => body,
+    }),
+  );
+  return asset.id;
 }
