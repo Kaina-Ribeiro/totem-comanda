@@ -1,4 +1,4 @@
-import type { components } from "@/lib/core-api";
+import type { components } from "@/lib/core-api-v2";
 
 type StorePace = components["schemas"]["StorePace"];
 

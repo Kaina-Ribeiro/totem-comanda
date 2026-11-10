@@ -2,10 +2,8 @@
 
 import { useState } from "react";
 
-import type { components } from "@/lib/core-api";
 import { findByNumber } from "@/lib/kitchen/collected";
-
-type KitchenOrder = components["schemas"]["KitchenOrder"];
+import { kitchenLines, type KitchenOrder, updatedAt } from "@/lib/kitchen/order";
 
 const clock = new Intl.DateTimeFormat("pt-BR", {
   hour: "2-digit",
@@ -109,23 +107,20 @@ export function CollectedView({
           <ul className="grid grid-cols-3 content-start gap-3">
             {shown.map((order) => (
               <li
-                key={order.id}
+                key={order.number}
                 className="flex flex-col gap-3 rounded-xl bg-surface px-4 pt-3.5 pb-4 shadow-[0_1px_2px_rgba(28,28,26,.08)]"
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-2.5">
                     <span className="text-[38px] leading-none font-extrabold tracking-[-0.02em]">
-                      {order.posCheckNumber}
-                    </span>
-                    <span className={`${chip} ${order.orderType === "TAKE_OUT" ? "bg-butter" : "bg-oat"}`}>
-                      {order.orderType === "TAKE_OUT" ? "Para viagem" : "Comer aqui"}
+                      {order.customerCheckNumber}
                     </span>
                   </span>
-                  <span className={`${chip} bg-sage`}>retirado {clock.format(Date.parse(order.updatedAt))}</span>
+                  <span className={`${chip} bg-sage`}>retirado {clock.format(Date.parse(updatedAt(order)))}</span>
                 </div>
                 <ul className="flex flex-col gap-[7px]">
-                  {order.lines.map((line, i) => (
-                    <li key={i} className="flex flex-col gap-px">
+                  {kitchenLines(order).map((line) => (
+                    <li key={line.key} className="flex flex-col gap-px">
                       <span className="text-[17px] font-bold">
                         {line.quantity}× {line.name}
                       </span>
@@ -137,7 +132,7 @@ export function CollectedView({
                 </ul>
                 <button
                   onClick={() => onBack(order)}
-                  disabled={busyId === order.id}
+                  disabled={busyId === order.number}
                   className="mt-auto flex h-[52px] items-center justify-center gap-2 rounded-2xl bg-ground text-[17px] font-extrabold transition-transform active:scale-[.97] disabled:opacity-60"
                 >
                   <svg
@@ -154,7 +149,7 @@ export function CollectedView({
                     <path d="M9 14L4 9l5-5" />
                     <path d="M4 9h10.5a5.5 5.5 0 010 11H11" />
                   </svg>
-                  {busyId === order.id ? "Voltando…" : "Voltar para Prontos"}
+                  {busyId === order.number ? "Voltando…" : "Voltar para Prontos"}
                 </button>
               </li>
             ))}

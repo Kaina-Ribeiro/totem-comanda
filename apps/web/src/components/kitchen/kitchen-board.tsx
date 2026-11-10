@@ -7,10 +7,10 @@ import {
   closeKitchenDay,
   moveOrder,
   readKitchenPace,
+  setAvailable,
   setKitchenPace,
-  setSoldOut,
 } from "@/app/kitchen/actions";
-import type { components } from "@/lib/core-api";
+import type { components } from "@/lib/core-api-v2";
 import {
   accept,
   applyOrder,
@@ -25,6 +25,7 @@ import {
 } from "@/lib/kitchen/board";
 import { closeDayError, closedDayLabel } from "@/lib/kitchen/close-day";
 import { applyCollected } from "@/lib/kitchen/collected";
+import { kitchenLines, type KitchenOrder } from "@/lib/kitchen/order";
 import { newerPace } from "@/lib/kitchen/pace";
 
 import { CancelDialog, cancelErrorText } from "./cancel-dialog";
@@ -38,7 +39,6 @@ import { ProductionView } from "./production-view";
 import { lineTargets, SoldOutButton, SoldOutPanel, soldOutKey, type SoldOutTarget } from "./sold-out";
 import { UndoToast } from "./undo-toast";
 
-type KitchenOrder = components["schemas"]["KitchenOrder"];
 type StorePace = components["schemas"]["StorePace"];
 
 /** The contract's fallback when the event stream drops: poll every 2 s. */
@@ -107,7 +107,7 @@ export function KitchenBoard({
   const [view, setView] = useState<"orders" | "production" | "collected">("orders");
   // The order open in the detail drawer (K2); it follows the board's copy.
   const [openId, setOpenId] = useState<string | null>(null);
-  const opened = orders.find((o) => o.id === openId) ?? null;
+  const opened = orders.find((o) => o.number === openId) ?? null;
   // The last action that can be undone for 5 s (prototype K1 toast): a move or an "Acabou".
   const [undo, setUndo] = useState<{ key: string; label: string; run?: () => void } | null>(null);
   // "Cancelar pedido" (G-K11): the order asked about and the last error.
@@ -120,7 +120,7 @@ export function KitchenBoard({
   // "Encerrar o dia" (G-K9): the confirmation and its last error.
   const [closeOpen, setCloseOpen] = useState(false);
   const [closeError, setCloseError] = useState<string | null>(null);
-  // "Acabou" (G-K4): the line being asked about, and what this tablet marked today.
+  // "Acabou" (G-K4): the line being asked about, and what this tablet marked unavailable.
   const [soldOutAsk, setSoldOutAsk] = useState<{ line: number; target: SoldOutTarget } | null>(
     null,
   );
@@ -128,16 +128,16 @@ export function KitchenBoard({
   const [marked, setMarked] = useState<ReadonlySet<string>>(() => new Set());
   // Highest version seen per order, so late events and reloads cannot move a card back (G-K3).
   const seen = useRef<Seen>(
-    new Map([...initial, ...initialCollected].map((o) => [o.id, { version: o.version, at: 0 }])),
+    new Map([...initial, ...initialCollected].map((o) => [o.number, { version: o.version, at: 0 }])),
   );
   const alert = useNewOrderAlert();
   // Orders the board has shown; a PAID one not in here is new (G-K1).
-  const known = useRef(new Set(initial.map((o) => o.id)));
+  const known = useRef(new Set(initial.map((o) => o.number)));
 
   /** Paid orders the board has not shown yet; remembers every order it sees. */
   const newPaid = (list: KitchenOrder[]) => {
-    const ids = list.filter((o) => o.status === "PAID" && !known.current.has(o.id)).map((o) => o.id);
-    for (const o of list) known.current.add(o.id);
+    const ids = list.filter((o) => o.status === "PAID" && !known.current.has(o.number)).map((o) => o.number);
+    for (const o of list) known.current.add(o.number);
     return ids;
   };
   const onIncoming = useEffectEvent((list: KitchenOrder[]) => alert.arrived(newPaid(list)));
@@ -314,12 +314,12 @@ export function KitchenBoard({
    * or Retirado offers "Desfazer" for 5 s.
    */
   function move(order: KitchenOrder, status: MoveError["status"], { back = false } = {}) {
-    setBusy(order.id);
+    setBusy(order.number);
     setMoveError(null);
     setUndo(null);
     startTransition(async () => {
       // A tablet that lost the network rejects instead of answering.
-      const result = await moveOrder(order.id, status, order.version).catch(
+      const result = await moveOrder(order.number, status, order.version).catch(
         () => ({ ok: false, code: "NETWORK" }) as const,
       );
       if (result.ok) {
@@ -327,11 +327,11 @@ export function KitchenBoard({
         const label = !back && movedLabel(result.data);
         const moved = result.data;
         if (label) {
-          setUndo({ key: `${moved.id}:${moved.version}`, label, run: () => stepBack(moved) });
+          setUndo({ key: `${moved.number}:${moved.version}`, label, run: () => stepBack(moved) });
         } else if (back && order.status === "COLLECTED") {
           setUndo({
-            key: `${moved.id}:${moved.version}`,
-            label: `Pedido ${moved.posCheckNumber} voltou para Prontos`,
+            key: `${moved.number}:${moved.version}`,
+            label: `Pedido ${moved.customerCheckNumber} voltou para Prontos`,
           });
         }
       } else {
@@ -355,13 +355,14 @@ export function KitchenBoard({
   }
 
   /**
-   * Marks `target` sold out for today (or back, for the undo). The order on
-   * screen stays open (KDS BR-027); the kiosk loses the item on its next menu load.
+   * Marks `target` unavailable until someone brings it back (or back, for the
+   * undo). The order on screen stays open (KDS BR-027); the kiosk loses the
+   * item on its next menu load.
    */
   function markSoldOut(target: SoldOutTarget, soldOut: boolean) {
     setSoldOutError(null);
     startTransition(async () => {
-      const result = await setSoldOut(target.itemId, target.optionId, soldOut).catch(
+      const result = await setAvailable(target.id, !soldOut).catch(
         () => ({ ok: false, code: "NETWORK" }) as const,
       );
       if (!result.ok) {
@@ -386,7 +387,7 @@ export function KitchenBoard({
         setSoldOutAsk(null);
         setUndo({
           key: `sold-out:${key}`,
-          label: `${target.name}: esgotado hoje`,
+          label: `${target.name}: indisponível no totem`,
           run: () => markSoldOut(target, false),
         });
       } else {
@@ -402,7 +403,7 @@ export function KitchenBoard({
   ) {
     setCancelError(null);
     startTransition(async () => {
-      const result = await cancelOrder(order.id, input.email, input.password, input.reason).catch(
+      const result = await cancelOrder(order.number, input.email, input.password, input.reason).catch(
         () => ({ ok: false, code: "NETWORK" }) as const,
       );
       if (!result.ok) {
@@ -417,7 +418,7 @@ export function KitchenBoard({
       }
       setCancelling(null);
       openOrder(null);
-      setUndo({ key: `cancel:${order.id}`, label: `Pedido ${order.posCheckNumber} cancelado` });
+      setUndo({ key: `cancel:${order.number}`, label: `Pedido ${order.customerCheckNumber} cancelado` });
     });
   }
 
@@ -520,7 +521,7 @@ export function KitchenBoard({
 
       {alert.unseen.length > 0 && (
         <NewOrdersBar
-          numbers={orders.filter((o) => alert.unseen.includes(o.id)).map((o) => o.posCheckNumber)}
+          numbers={orders.filter((o) => alert.unseen.includes(o.number)).map((o) => o.customerCheckNumber)}
           repeating={alert.soundOn && alert.settings.repeat}
           onSeen={alert.acknowledge}
         />
@@ -578,12 +579,12 @@ export function KitchenBoard({
                 </h2>
                 {list.map((order) => (
                   <OrderCard
-                    key={order.id}
+                    key={order.number}
                     order={order}
                     now={now}
-                    busy={pending && busy === order.id}
-                    isNew={alert.unseen.includes(order.id)}
-                    onOpen={() => openOrder(order.id)}
+                    busy={pending && busy === order.number}
+                    isNew={alert.unseen.includes(order.number)}
+                    onOpen={() => openOrder(order.number)}
                     onAdvance={() => advance(order)}
                   />
                 ))}
@@ -596,7 +597,7 @@ export function KitchenBoard({
         <OrderDrawer
           order={opened}
           now={now}
-          busy={pending && busy === opened.id}
+          busy={pending && busy === opened.number}
           onClose={() => openOrder(null)}
           footnote={
             <button
@@ -611,7 +612,7 @@ export function KitchenBoard({
           }
           lineAction={(line, index) => (
             <SoldOutButton
-              marked={marked.has(soldOutKey({ itemId: line.itemId, optionId: null }))}
+              marked={marked.has(soldOutKey(line))}
               onPress={() => {
                 setSoldOutError(null);
                 const first = lineTargets(line).find((t) => !marked.has(soldOutKey(t)))!;
@@ -638,7 +639,7 @@ export function KitchenBoard({
             opened.status === "READY" && (
               <button
                 onClick={() => stepBack(opened)}
-                disabled={pending && busy === opened.id}
+                disabled={pending && busy === opened.number}
                 className="flex h-16 flex-[1_1_0] items-center justify-center gap-2 rounded-2xl bg-ground text-[17px] font-extrabold transition-transform active:scale-[.97] disabled:opacity-60"
               >
                 <svg
@@ -681,9 +682,9 @@ export function KitchenBoard({
       )}
       {cancelling && (
         <CancelDialog
-          number={cancelling.posCheckNumber}
+          number={cancelling.customerCheckNumber}
           defaultReason={
-            cancelling.lines.some((l) => lineTargets(l).some((t) => marked.has(soldOutKey(t))))
+            kitchenLines(cancelling).some((l) => lineTargets(l).some((t) => marked.has(soldOutKey(t))))
               ? "ITEM_SOLD_OUT"
               : "CANNOT_PREPARE"
           }

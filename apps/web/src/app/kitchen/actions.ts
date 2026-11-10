@@ -1,15 +1,17 @@
 "use server";
 
-import { coreApi } from "@/lib/core/client";
+import { coreApiV2 } from "@/lib/core/client-v2";
 import { requireDeviceKind } from "@/lib/device/config";
-import { deviceCallAs, failure, type Result } from "@/lib/kiosk/core";
+import { failure } from "@/lib/kiosk/core-v2";
 import {
+  type Availability,
   cancelAsOwner,
-  getKitchenPace,
   type CancelReason,
-  type KitchenAvailability,
+  deviceCallAs,
+  getKitchenPace,
   type KitchenOrder,
   type KitchenStatus,
+  type Result,
   type StorePace,
 } from "@/lib/kitchen/core";
 
@@ -20,32 +22,31 @@ const STATUSES = new Set<KitchenStatus>(["PREPARING", "READY", "COLLECTED"]);
  * With `expectedVersion`, Go refuses if another screen moved it first.
  */
 export async function moveOrder(
-  orderId: string,
+  number: string,
   status: KitchenStatus,
   expectedVersion?: number,
 ): Promise<Result<KitchenOrder>> {
   if (!STATUSES.has(status)) return { ok: false, code: "VALIDATION_FAILED" };
   return deviceCallAs("KITCHEN", (headers) =>
-    coreApi().POST("/v1/kitchen/orders/{orderId}/status", {
+    coreApiV2().POST("/v2/kitchen/orders/{number}/status", {
       headers,
-      params: { path: { orderId } },
+      params: { path: { number } },
       body: { status, expectedVersion },
     }),
   );
 }
 
 /**
- * "Acabou": marks an item, or one option of it, sold out for today's business
- * date; `soldOut: false` brings it back (the 5 s undo). Orders already placed
- * stay open (KDS BR-027).
+ * "Acabou": sets a product, or one option of it (both are menu entities),
+ * unavailable until someone brings it back; `available: true` is the 5 s
+ * undo. Orders already placed stay open (KDS BR-027).
  */
-export async function setSoldOut(
-  itemId: string,
-  optionId: string | null,
-  soldOut: boolean,
-): Promise<Result<KitchenAvailability>> {
+export async function setAvailable(id: string, available: boolean): Promise<Result<Availability>> {
+  if (typeof id !== "string" || !id || typeof available !== "boolean") {
+    return { ok: false, code: "VALIDATION_FAILED" };
+  }
   return deviceCallAs("KITCHEN", (headers) =>
-    coreApi().PUT("/v1/kitchen/availability", { headers, body: { itemId, optionId, soldOut } }),
+    coreApiV2().PUT("/v2/kitchen/availability", { headers, body: { id, available } }),
   );
 }
 
@@ -56,7 +57,7 @@ const REASONS = new Set<CancelReason>(["ITEM_SOLD_OUT", "CANNOT_PREPARE", "OTHER
  * the owner's email and password (no PIN, decision 12).
  */
 export async function cancelOrder(
-  orderId: string,
+  number: string,
   email: string,
   password: string,
   reason: CancelReason,
@@ -77,7 +78,7 @@ export async function cancelOrder(
   } catch (error) {
     return failure(error);
   }
-  return cancelAsOwner(orderId, { email: email.trim(), password }, reason);
+  return cancelAsOwner(number, { email: email.trim(), password }, reason);
 }
 
 /** "Ritmo da cozinha" (K4): Normal, Movimentado, or paused for 15 or 30 min. */
@@ -92,7 +93,7 @@ export async function setKitchenPace(
     return { ok: false, code: "VALIDATION_FAILED" };
   }
   return deviceCallAs("KITCHEN", (headers) =>
-    coreApi().PUT("/v1/kitchen/pace", {
+    coreApiV2().PUT("/v2/kitchen/pace", {
       headers,
       body: pace === "PAUSED" ? { pace, pauseMinutes } : { pace },
     }),
@@ -104,7 +105,7 @@ export async function setKitchenPace(
  * NOT_COLLECTED and answers how many it moved.
  */
 export async function closeKitchenDay(): Promise<Result<{ count: number }>> {
-  return deviceCallAs("KITCHEN", (headers) => coreApi().POST("/v1/kitchen/close-day", { headers }));
+  return deviceCallAs("KITCHEN", (headers) => coreApiV2().POST("/v2/kitchen/close-day", { headers }));
 }
 
 /** Reads the pace again (the owner may have changed it on Início). */

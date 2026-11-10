@@ -1,10 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import type { components } from "@/lib/core-api";
-
 import { changeLabel, historyRows, timesLine } from "./detail";
+import type { KitchenOrder } from "./order";
 
-type KitchenOrder = components["schemas"]["KitchenOrder"];
 
 // 10:30 in São Paulo is 13:30 UTC.
 const at = (hhmm: string) =>
@@ -12,16 +10,18 @@ const at = (hhmm: string) =>
 
 function order(partial: Partial<KitchenOrder>): KitchenOrder {
   return {
-    id: "o1",
-    posCheckNumber: "41",
+    number: "20261104-0041",
+    customerCheckNumber: "41",
     orderType: "DINEIN",
     status: "PAID",
     placedAt: at("10:30"),
-    readyAt: null,
-    updatedAt: at("10:30"),
     version: 1,
     history: [{ status: "PAID", at: at("10:30"), by: "KIOSK" }],
-    lines: [],
+    basketId: "B-1",
+    subTotal: 0,
+    tax: 0,
+    total: 0,
+    orderItems: [],
     ...partial,
   };
 }
