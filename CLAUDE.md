@@ -130,12 +130,19 @@ npm run mock:orders -- 3 --days-ago 7   # ...on the same weekday last week (Iní
 # /kiosk). In dev with the mock, "Totem" and "Cozinha" on / pair this browser as the mock's
 # device of that kind first.
 # Extend apps/web/mock with the operations each story needs; Prism flags any drift from the contract.
+# Pilot v2 (COM-145): the same `npm run mock` also starts a second Prism on :4011 for
+# contract/openapi.v2.yaml (CORE_API_V2_URL=http://localhost:4011); v2 routes live in mock/v2.
+# Mercado Pago is simulated: MOCK_PAYMENT_OUTCOME=APPROVED|DECLINED|EXPIRED|NONE (default APPROVED)
+# after MOCK_PAYMENT_DELAY_MS (3000); POST /__mock/payments/{id} {"outcome": …} decides one session.
+npm run mock:smoke:v2                   # with the mock running: every v2 operation through Prism
 
 # Regenerate API types after any contract change
 npx openapi-typescript contract/openapi.yaml -o apps/web/src/lib/core-api.d.ts
+npm run gen:api:v2   # in apps/web: contract/openapi.v2.yaml → src/lib/core-api-v2.d.ts
 
 # Lint the contract
 npx @redocly/cli lint contract/openapi.yaml
+npx @redocly/cli lint contract/openapi.v2.yaml
 ```
 
 ## Working agreements

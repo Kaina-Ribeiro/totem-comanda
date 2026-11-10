@@ -92,7 +92,7 @@ approved by the partner. Limits: no app screens change in this phase.
 
 ### Task 1.1: Contract v2 skeleton and shared parts
 
-**Status:** ⏳ pending
+**Status:** ✅ done — `contract/openapi.v2.yaml` 2.0.0 + README v2 section (cb94097); step plan in `docs/plans/pilot-v2-phase-1.md`.
 
 **Files:**
 - Create: `contract/openapi.v2.yaml` (becomes `contract/openapi.yaml` in phase 5)
@@ -106,7 +106,7 @@ components `Problem`, `ProblemCode` (v1 codes still valid + SPEC 4.7 codes), par
 
 ### Task 1.2: v2 menu and store schemas, device and guest-menu operations
 
-**Status:** ⏳ pending
+**Status:** ✅ done — menu, store, device and guest-menu operations; MODELS 5.20 minus tax is the `getActiveMenu` example.
 
 **Files:** Modify `contract/openapi.v2.yaml`.
 
@@ -126,7 +126,7 @@ fields, `paymentTerminalId`). Operations under `/v2`: `authenticateDevice`, `get
 
 ### Task 1.3: v2 order, totals, discount, payment and kitchen
 
-**Status:** ⏳ pending
+**Status:** ✅ done — totals, coupons, Mercado Pago sessions, `submitOrder` (idempotent on `basketId`, webhook placement documented), kitchen.
 
 **Files:** Modify `contract/openapi.v2.yaml`.
 
@@ -147,7 +147,7 @@ fields, `paymentTerminalId`). Operations under `/v2`: `authenticateDevice`, `get
 
 ### Task 1.4: v2 back office operations
 
-**Status:** ⏳ pending
+**Status:** ✅ done in the contract (`/v2/admin/…`, `422 MENU_INVALID`). ⏳ PR waits for Kai's yes, then the partner's approval.
 
 **Files:** Modify `contract/openapi.v2.yaml`.
 
@@ -163,7 +163,7 @@ empty groups and loops.
 
 ### Task 1.5: Mock serves v2 next to v1, types generated
 
-**Status:** ⏳ pending
+**Status:** ✅ done — mock serves `/v2` behind a second Prism on 4011 (`mock/v2/`), `gen:api:v2` → `core-api-v2.d.ts`, 32 v2 unit tests, `npm run mock:smoke:v2` = 107 calls valid through Prism; test 342/342, typecheck and lint pass. ⏳ Cubeship itodev env (4011, `CORE_API_V2_URL`) waits for Kai's yes.
 
 **Files:**
 - Modify: `apps/web/mock/server.ts` (spawn a second Prism on `PRISM_V2_PORT` = 4011 for

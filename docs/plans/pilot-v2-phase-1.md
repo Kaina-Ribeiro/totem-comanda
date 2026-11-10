@@ -85,7 +85,7 @@ pace are shared with v1, everything else (catalogue, menus, baskets, payments, o
 
 ## Task 1: Contract v2 (master Tasks 1.1–1.4)
 
-**Status:** ⏳ pending
+**Status:** ✅ done
 
 **Files:**
 - Create: `contract/openapi.v2.yaml`
@@ -137,7 +137,7 @@ pace are shared with v1, everything else (catalogue, menus, baskets, payments, o
 
 ## Task 2: Generated types and scripts
 
-**Status:** ⏳ pending
+**Status:** ✅ done
 
 **Files:** Modify `apps/web/package.json`; generate `apps/web/src/lib/core-api-v2.d.ts`.
 
@@ -149,7 +149,7 @@ pace are shared with v1, everything else (catalogue, menus, baskets, payments, o
 
 ## Task 3: v2 catalogue, guest menu and validator in the mock
 
-**Status:** ⏳ pending
+**Status:** ✅ done
 
 **Files:**
 - Create: `apps/web/mock/v2/http.ts`, `v2/seed.ts`, `v2/state.ts`, `v2/menu.ts`, `v2/menu.test.ts`
@@ -190,7 +190,7 @@ pace are shared with v1, everything else (catalogue, menus, baskets, payments, o
 
 ## Task 4: Pricing, payments (simulated Mercado Pago) and orders in the mock
 
-**Status:** ⏳ pending
+**Status:** ✅ done
 
 **Files:**
 - Create: `apps/web/mock/v2/pricing.ts`, `v2/payments.ts`, `v2/orders.ts`, `v2/pricing.test.ts`,
@@ -230,7 +230,7 @@ pace are shared with v1, everything else (catalogue, menus, baskets, payments, o
 
 ## Task 5: v2 routes, second Prism, smoke through Prism
 
-**Status:** ⏳ pending
+**Status:** ✅ done
 
 **Files:**
 - Create: `apps/web/mock/v2/routes-guest.ts`, `v2/routes-kitchen.ts`, `v2/routes-admin.ts`,
