@@ -26,7 +26,16 @@ describe("describeMenuErrors (MENU_INVALID, Review Focus 3)", () => {
     ]);
   });
 
-  it("names the missing target of a broken link from the message", () => {
+  it("names the target of a broken link when it is known (a refused delete)", () => {
+    expect(
+      describeMenuErrors(
+        [problem("MISSING_LINK", "ITEM", "1001", "links[1]", "MODIFIERS M-EXTRAS does not exist")],
+        nameOf,
+      ),
+    ).toEqual(["Item “Hambúrguer clássico”: liga a “Adicionais”, que não existe mais."]);
+  });
+
+  it("keeps the message of a broken link to something unknown", () => {
     expect(
       describeMenuErrors(
         [problem("MISSING_LINK", "MODIFIERS", "M-EXTRAS", "links[3]", "ITEM X-NOPE does not exist")],

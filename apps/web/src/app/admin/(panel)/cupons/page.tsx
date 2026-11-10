@@ -67,9 +67,10 @@ async function CouponList() {
       {rules.map((rule) => {
         const usedUp = rule.maxUses != null && (rule.usesCount ?? 0) >= rule.maxUses;
         return (
-          <details key={rule.id} className="rounded-[14px] border border-line bg-surface">
+          <details key={rule.id} className="group rounded-[14px] border border-line bg-surface">
             <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-5 py-4 [&::-webkit-details-marker]:hidden">
-              <span className="font-mono text-lg font-bold tracking-wide">{rule.code}</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 shrink-0 fill-none stroke-current stroke-2 text-muted transition-transform group-open:rotate-90"><path d="M9 6l6 6-6 6" /></svg>
+        <span className="font-mono text-lg font-bold tracking-wide">{rule.code}</span>
               {!rule.active && <Badge tone="muted">Desligado</Badge>}
               {usedUp && <Badge tone="danger">Esgotado</Badge>}
               <span className="w-full text-sm font-medium text-muted sm:ml-auto sm:w-auto">

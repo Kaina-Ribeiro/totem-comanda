@@ -158,10 +158,16 @@ npx @redocly/cli lint contract/openapi.v2.yaml
 - Do not change `contract/openapi.yaml` silently. Propose the change to Kai first; it needs the
   partner's approval.
 - Never edit generated files.
-- Back office forms (`apps/web/src/lib/admin/form.ts`): read prices with `cents()` / `optionalPrice()`,
-  which refuse what is not a price and never guess. A form saved through two Core calls uses
-  `saveBoth()`: the part that can be read back and undone goes first, and it is put back if the
-  second call fails. The contract has no atomic save.
+- Back office forms (`apps/web/src/lib/admin/form.ts`): read prices with `readPrice()` / `priceField()`
+  (decimal BRL, contract v2), which refuse what is not a price and never guess. A form saved through
+  two Core calls uses `saveBoth()`: the part that can be read back and undone goes first, and it is
+  put back if the second call fails. The contract has no atomic save.
+- Back office v2 menu editor (COM-147): every form is read by a pure reader in
+  `src/lib/admin/catalogue-form.ts` (FormData + current entity → v2 body; fields the form does not
+  show are kept), tested on its own and by `reference-menu.test.ts`, which builds the MODELS 5.20
+  menu through those readers (`MOCK_V2_URL=http://localhost:4011` runs it through Prism). Catalogue
+  saves go through `attemptCatalogue()` (`src/lib/admin/catalogue.ts`), which lists each
+  `MENU_INVALID` rule by entity name.
 - Back office loading (COM-140, COM-141): a page part that loads data goes in
   `<Streamed fallback={<…Skeleton />}>` (`components/admin/skeleton.tsx`), never a bare
   `<Suspense>`. The skeleton has the page's shape with its fixed labels as real text; the

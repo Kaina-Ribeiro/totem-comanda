@@ -125,7 +125,7 @@ export function LinkRows({
                 defaultValue={i + 1}
                 inputMode="numeric"
                 aria-label={`Posição de ${nameOf(link)}`}
-                className={`${inputClass} h-9 w-14 shrink-0 px-2 text-center`}
+                className={`${inputClass.replace("w-full", "w-14")} h-9 shrink-0 px-2 text-center`}
               />
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate font-semibold">{nameOf(link)}</span>
@@ -249,7 +249,7 @@ export function CheckList({
   name,
   choices,
   selected,
-  columns = "sm:grid-cols-3",
+  columns = "grid-cols-2 sm:grid-cols-3",
 }: {
   name: string;
   choices: Choice[];
@@ -401,7 +401,7 @@ export function OptionRows({
             </div>
             {mode === "options" && (
               <div className="grid grid-cols-3 gap-3 sm:grid-cols-[repeat(3,minmax(0,7rem))_minmax(0,1fr)]">
-                <Field label="Começa com">
+                <Field label="Inicial">
                   <input name={`${p}defaultQuantity`} defaultValue={option?.defaultQuantity ?? ""} inputMode="numeric" placeholder="0" className={inputClass} />
                 </Field>
                 <Field label="Mín.">

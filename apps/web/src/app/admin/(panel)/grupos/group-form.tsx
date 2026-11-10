@@ -93,7 +93,7 @@ export function GroupForm({ group, catalogue }: { group: Group | null; catalogue
           <div>
             <h2 className="text-lg font-bold tracking-[-0.01em]">Opções</h2>
             <p className="text-sm text-muted">
-              Na ordem do totem (Pos.). Preço vazio = grátis. “Começa com” 1 deixa a opção marcada. Para mais linhas, salve.
+              Na ordem do totem (Pos.). Preço vazio = grátis. “Inicial” 1 deixa a opção já marcada. Para mais linhas, salve.
             </p>
           </div>
           <OptionRows options={options} groups={nestable} mode="options" blank={group ? 2 : 3} />

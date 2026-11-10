@@ -19,8 +19,19 @@ const KIND: Partial<Record<EntityType, string>> = {
   IMAGE: "Foto",
 };
 
-const WHY: Record<NonNullable<MenuProblem["rule"]>, (problem: MenuProblem) => string> = {
-  MISSING_LINK: (p) => `liga a algo que não existe mais (${p.message}).`,
+/**
+ * "liga a “Adicionais”, que não existe mais." when the message starts with the
+ * missing target (`MODIFIERS M-EXTRAS does not exist`, as the contract example
+ * does) and its name is known; otherwise the message as Go sent it.
+ */
+function missing(problem: MenuProblem, nameOf: NameOf): string {
+  const target = /^([A-Z_]+) (\S+)/.exec(problem.message);
+  const name = target && nameOf(target[1], target[2]);
+  return name ? `liga a “${name}”, que não existe mais.` : `liga a algo que não existe mais (${problem.message}).`;
+}
+
+const WHY: Record<NonNullable<MenuProblem["rule"]>, (problem: MenuProblem, nameOf: NameOf) => string> = {
+  MISSING_LINK: missing,
   EMPTY_GROUP: () => "precisa de pelo menos uma opção.",
   EMPTY_SWAP_SELL: () => "precisa de pelo menos um produto.",
   LOOP: () => "volta para ela mesma (um dentro do outro em círculo).",
@@ -42,6 +53,6 @@ export function describeMenuErrors(errors: MenuProblem[], nameOf: NameOf): strin
     const { type, id } = problem.entity;
     const kind = KIND[type] ?? type;
     const name = (problem.rule === "INVALID_ID" ? undefined : nameOf(type, id)) ?? id;
-    return `${kind} “${name}”: ${WHY[problem.rule](problem)}`;
+    return `${kind} “${name}”: ${WHY[problem.rule](problem, nameOf)}`;
   });
 }

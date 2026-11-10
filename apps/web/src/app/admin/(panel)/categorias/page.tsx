@@ -111,6 +111,7 @@ function SectionCard({ section, catalogue, where }: { section: Section; catalogu
   return (
     <details className="group rounded-[14px] border border-line bg-surface">
       <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-5 py-4 [&::-webkit-details-marker]:hidden">
+        <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 shrink-0 fill-none stroke-current stroke-2 text-muted transition-transform group-open:rotate-90"><path d="M9 6l6 6-6 6" /></svg>
         <span className="text-lg font-bold tracking-[-0.01em]">{section.name}</span>
         {section.available === false && <Badge tone="danger">Oculta</Badge>}
         {(section.availableHours?.length ?? 0) > 0 && <Badge tone="warn">Com horário</Badge>}

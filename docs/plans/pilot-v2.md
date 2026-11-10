@@ -237,7 +237,7 @@ the kiosk.
 
 ### Task 3.1: Decimal price reader and v2 editor forms
 
-**Status:** ⏳ pending
+**Status:** ✅ done — `readPrice`/`priceField` replace `cents`/`optionalPrice`; pure readers in `lib/admin/catalogue-form.ts`; editors for menus, sections, items (sized, combo), groups with inline options, badges, swap sells, cross-sells, allergens; `MENU_INVALID` listed per entity; MODELS 5.20 built through the readers and checked through Prism 4011 (`reference-menu.test.ts`); step plan in `docs/plans/pilot-v2-phase-3.md`. ⏳ Kiosk check waits for phase 2 on the same mock.
 **Produces:** `readPrice(raw: string): number | null` in `src/lib/admin/form.ts` replacing `cents()`
 / `optionalPrice()` (Review Focus 5); editors for sections (nesting, hours), items, sized items,
 combos, modifier groups (type, limits, nesting), swap sells, cross-sells, badges, allergens (+ traces,
@@ -247,7 +247,7 @@ skeleton rule (COM-140/141).
 
 ### Task 3.2: Availability page and coupon rules
 
-**Status:** ⏳ pending
+**Status:** ✅ done — `/admin/disponibilidade` (products, then options and sizes by group; filter by unavailable; `/admin/esgotados` redirects); coupons as `DiscountRule`.
 **Produces:** "Disponibilidade" page (on/off per item and option, filter by unavailable) replacing
 "Esgotados"; coupons as `DiscountRule` (uses cap, minimum order, maximum discount).
 
