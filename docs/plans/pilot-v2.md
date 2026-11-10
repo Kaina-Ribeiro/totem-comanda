@@ -237,7 +237,7 @@ the kiosk.
 
 ### Task 3.1: Decimal price reader and v2 editor forms
 
-**Status:** ✅ done — `readPrice`/`priceField` replace `cents`/`optionalPrice`; pure readers in `lib/admin/catalogue-form.ts`; editors for menus, sections, items (sized, combo), groups with inline options, badges, swap sells, cross-sells, allergens; `MENU_INVALID` listed per entity; MODELS 5.20 built through the readers and checked through Prism 4011 (`reference-menu.test.ts`); step plan in `docs/plans/pilot-v2-phase-3.md`. ⏳ Kiosk check waits for phase 2 on the same mock.
+**Status:** ✅ done — `readPrice`/`priceField` replace `cents`/`optionalPrice`; pure readers in `lib/admin/catalogue-form.ts`; editors for menus, sections, items (sized, combo), groups with inline options, badges, swap sells, cross-sells, allergens; `MENU_INVALID` listed per entity; MODELS 5.20 built through the readers and checked through Prism 4011 (`reference-menu.test.ts`); step plan in `docs/plans/pilot-v2-phase-3.md`; the kiosk (phase 2) shows the built menu at 1080×1920.
 **Produces:** `readPrice(raw: string): number | null` in `src/lib/admin/form.ts` replacing `cents()`
 / `optionalPrice()` (Review Focus 5); editors for sections (nesting, hours), items, sized items,
 combos, modifier groups (type, limits, nesting), swap sells, cross-sells, badges, allergens (+ traces,
