@@ -387,7 +387,7 @@ export function KitchenBoard({
         setSoldOutAsk(null);
         setUndo({
           key: `sold-out:${key}`,
-          label: `${target.name}: indisponível no totem`,
+          label: `${target.name} saiu do totem`,
           run: () => markSoldOut(target, false),
         });
       } else {

@@ -126,7 +126,7 @@ the waiter and QR apps are outside the MVP. A desktop screen and its phone versi
 # contract. Front end and BFF are built against it until the Go API exists. In apps/web:
 npm run mock        # CORE_API_URL=http://localhost:4010, CORE_API_V2_URL=http://localhost:4011 (contract v2,
                     # src/lib/core/client-v2.ts), MOCK_CONTROL_URL=http://localhost:4020/__mock
-npm run mock:orders -- 3                # with the mock running: 3 paid kiosk orders now
+npm run mock:orders -- 3                # with the mock running: 3 paid v2 kiosk orders now (kitchen, report)
 npm run mock:orders -- 3 --days-ago 7   # ...on the same weekday last week (Início, Relatório)
 # A browser is one device and opens only its area (a kiosk browser sent to /kitchen lands on
 # /kiosk). In dev with the mock, "Totem" and "Cozinha" on / pair this browser as the mock's
@@ -137,8 +137,9 @@ npm run mock:orders -- 3 --days-ago 7   # ...on the same weekday last week (Iní
 # Mercado Pago is simulated: MOCK_PAYMENT_OUTCOME=APPROVED|DECLINED|EXPIRED|NONE (default APPROVED)
 # after MOCK_PAYMENT_DELAY_MS (3000); POST /__mock/payments/{id} {"outcome": …} decides one session.
 npm run mock:smoke:v2                   # with the mock running: every v2 operation through Prism
-# The kiosk runs on /v2 (COM-146): /kiosk needs CORE_API_V2_URL; back office and kitchen stay on
-# /v1 until COM-147/148. The kiosk never adds prices: Go prices the basket (POST /v2/totals) after
+# The kiosk (COM-146), the kitchen and the back office's Início, Relatório, Loja and Aparelhos
+# (COM-148) run on /v2 and need CORE_API_V2_URL; the menu pages stay on /v1 until COM-147. The
+# kitchen reads order lines through src/lib/kitchen/order.ts (one line per unit merged). The kiosk never adds prices: Go prices the basket (POST /v2/totals) after
 # every change. To see a Pix or card outcome, run the mock with MOCK_PAYMENT_OUTCOME=NONE and decide
 # the session with POST /__mock/payments/{id}; /dev/mock's payment buttons only affect v1.
 # Ports taken by another worktree? MOCK_PORT, PRISM_PORT and PRISM_V2_PORT move the mock.
