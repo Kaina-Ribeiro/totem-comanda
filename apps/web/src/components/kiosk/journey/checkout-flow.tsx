@@ -27,6 +27,9 @@ const POLL_MS = 1_000;
 const CARD_TIMEOUT_MS = 120_000;
 /** Go turns a Pix still PENDING at `expiresAt` into EXPIRED; past this grace the kiosk cancels it. */
 const PIX_GRACE_MS = 10_000;
+/** An unknown answer when starting a payment is asked again this many times, this far apart. */
+const START_RETRIES = 2;
+const START_RETRY_MS = 1_000;
 /** While an order's placement is unknown, how long to wait between checks. */
 const VERIFY_RETRY_MS = 5_000;
 /** After this long verifying, the screen also offers the counter. */
@@ -152,7 +155,13 @@ export function CheckoutFlow({
 
   async function attempt(method: PaymentMethod, key: string) {
     setStep({ kind: "working", label: "pay.preparing" });
-    const started = await settle(startPayment({ basketId, method, amount: total }, key));
+    // No answer may still mean Go made the session (a card charge on the terminal): ask again
+    // with the same key, which returns that session, before showing anything the guest can leave by.
+    let started = await settle(startPayment({ basketId, method, amount: total }, key));
+    for (let retry = 0; !started.ok && started.code === "CORE_UNAVAILABLE" && retry < START_RETRIES; retry++) {
+      await new Promise((resolve) => setTimeout(resolve, START_RETRY_MS));
+      started = await settle(startPayment({ basketId, method, amount: total }, key));
+    }
     if (started.ok) {
       const session = started.data;
       return setStep({ kind: method === "PIX" ? "pix" : "card", session, cancelling: false });
@@ -183,6 +192,19 @@ export function CheckoutFlow({
   }
 
   const newAttempt = (method: PaymentMethod) => void pay(method, crypto.randomUUID());
+
+  /**
+   * "Gerar novo": the guest may have just paid the QR on screen. Ask Go about it
+   * first; only a session still unpaid is replaced (Go cancels it when the new
+   * one starts, and flags a late payment of it for refund).
+   */
+  async function newPix(current: PaymentSession) {
+    if (attempting.current) return;
+    setStep({ kind: "working", label: "pay.preparing" });
+    const latest = await settle(pollPayment(current.id));
+    if (latest.ok && latest.data.status === "APPROVED") return place(latest.data);
+    newAttempt("PIX");
+  }
 
   // Polls the session until it is final; a card that never answers is cancelled.
   const session = step.kind === "pix" || step.kind === "card" ? step.session : null;
@@ -264,7 +286,7 @@ export function CheckoutFlow({
           session={step.session}
           strings={strings}
           cancelling={step.cancelling}
-          onNew={() => newAttempt("PIX")}
+          onNew={() => void newPix(step.session)}
           onOther={cancel}
         />
       );

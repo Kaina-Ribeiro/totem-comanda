@@ -151,6 +151,33 @@ describe("CheckoutFlow (Mercado Pago on v2)", () => {
     expect(actions.pollPayment.mock.calls.map(([id]) => id)).toEqual(["pay-2", "pay-2", "pay-2"]);
   });
 
+  it("Gerar novo first asks Go about the QR on screen: if it was just paid, places it", async () => {
+    renderCheckout();
+    await user().click(button(/^Pix/));
+    await flush();
+    actions.pollPayment.mockResolvedValue({ ok: true, data: session("APPROVED") });
+    await user().click(button(strings["pix.new"]));
+    await flush();
+    expect(actions.startPayment).toHaveBeenCalledOnce();
+    expect(actions.submitOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ payment: expect.objectContaining({ id: "pay-1", status: "APPROVED" }) }),
+      "order-key",
+    );
+  });
+
+  it("an unknown answer when starting is asked again with the same key before any way out", async () => {
+    actions.startPayment
+      .mockResolvedValueOnce({ ok: false, code: "CORE_UNAVAILABLE" })
+      .mockResolvedValueOnce({ ok: true, data: session("PENDING", "CARD") });
+    renderCheckout();
+    await user().click(button(/^Cartão/));
+    await flush(1_000);
+    const keys = actions.startPayment.mock.calls.map(([, key]) => key);
+    expect(keys).toHaveLength(2);
+    expect(keys[0]).toBe(keys[1]);
+    expect(screen.getByText(strings["pay.waiting"])).toBeTruthy();
+  });
+
   it("a basket already paid (an older Pix approved) places the order", async () => {
     actions.startPayment.mockResolvedValue({ ok: false, code: "BASKET_ALREADY_PAID" });
     const on = renderCheckout();

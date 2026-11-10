@@ -159,10 +159,16 @@ export function KioskJourney({ settings, attract }: { settings: KioskSettings; a
     });
   }
 
-  function dropCoupon() {
+  /**
+   * Takes the coupon off Go's basket first, and only then off the screen, so
+   * the next totals never carry a discount the guest no longer sees. If Go
+   * cannot answer, the coupon stays (the guest can tap Remover again).
+   */
+  async function dropCoupon() {
     const { basketId, coupon, menu, basket } = journey;
     if (basketId && coupon && menu) {
-      void removeCoupon({ basketId, items: toOrderItems(menu, basket), code: coupon }).catch(() => {});
+      const removed = await removeCoupon({ basketId, items: toOrderItems(menu, basket), code: coupon }).catch(() => null);
+      if (!removed?.ok) return;
     }
     dispatch({ type: "coupon", code: null });
   }
