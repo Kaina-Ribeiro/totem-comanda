@@ -127,9 +127,12 @@ Phase 5 (Tasks 5.1–5.2).
 
 ## Status
 
+Tasks 1 and 2 landed together (one commit): renaming the contract first let `tsc` list every v1
+caller.
+
 | Task | Status |
 |:--|:--|
-| 1 App callers on v2 | ⏳ |
-| 2 One contract, client, Prism | ⏳ |
-| 3 Docs | ⏳ |
-| 4 Proof and PR | ⏳ |
+| 1 App callers on v2 | ✅ device sign-in, config, heartbeat, status, setup, owner login, uploads, store status, home off-items card, `/api/dev/core`, `/dev/mock` payments |
+| 2 One contract, client, Prism | ✅ `contract/openapi.yaml`, `client.ts`, one Prism on 4010; smoke 107 calls valid |
+| 3 Docs | ✅ CLAUDE.md, contract/README.md, plan.md and data-model-and-api.md notes |
+| 4 Proof and PR | ✅ Pix order → kitchen (every status) → report; off item on Início, "Ligar" works; PR into `release/v0.4` waits for the partner |

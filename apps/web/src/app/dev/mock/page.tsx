@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -42,6 +43,7 @@ async function decidePayment(form: FormData) {
   const outcome = form.get("outcome");
   if (typeof paymentId === "string" && PAYMENT_OUTCOMES.includes(outcome as PaymentOutcome)) {
     await decideMockPayment(paymentId, outcome as PaymentOutcome);
+    revalidatePath("/dev/mock");
   }
 }
 
