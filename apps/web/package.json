@@ -9,9 +9,12 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "gen:api": "openapi-typescript ../../contract/openapi.yaml -o src/lib/core-api.d.ts",
+    "gen:api:v2": "openapi-typescript ../../contract/openapi.v2.yaml -o src/lib/core-api-v2.d.ts",
     "mock": "node mock/server.ts",
     "mock:orders": "node mock/seed-orders.ts",
+    "mock:smoke:v2": "node mock/v2/smoke.ts",
     "lint:contract": "redocly lint ../../contract/openapi.yaml",
+    "lint:contract:v2": "redocly lint ../../contract/openapi.v2.yaml",
     "test": "vitest run",
     "analyze": "next analyze",
     "mock:raw": "prism mock ../../contract/openapi.yaml -p 4010"
