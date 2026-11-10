@@ -1,0 +1,4830 @@
+openapi: 3.0.3
+info:
+  title: Comanda Core API
+  version: 2.0.0
+  license:
+    name: Proprietary
+  description: |
+    Contract v2 between the Comanda BFF (Next.js server, built by Kai) and the Comanda
+    Core API (Go, built by the partner), for the dine-in pilot (`docs/pilot-v2/SPEC.md`).
+    Every data model follows `docs/v2-research/MODELS.md` (the "v2" models of
+    `lib-pos-integration`): same schema names without the Java `I` prefix, same JSON field
+    names and types. The Go API owns every business rule: prices, discounts, availability,
+    order numbers and payment approval. The BFF only combines and formats.
+
+    `/v1` (`contract/openapi.yaml`) and `/v2` live side by side while the app moves over
+    (pilot plan phases 1–4); `/v1` is removed in phase 5 and this file becomes
+    `contract/openapi.yaml`. Any change goes through a pull request both partners approve.
+
+    Conventions
+    - Money: JSON number in BRL, main currency unit, 2 decimals. `9.50` means R$ 9,50.
+      Never cents. Go computes every amount; discounts are rounded per line, half up, to the
+      cent, then summed. No tax in the pilot: tax amounts are `0` and tax lists are `[]`.
+    - Ids are strings and never contain `::`. An entity is identified by `type` + `id`.
+      Comanda keeps product ids (`ITEM`, `SIZED_ITEM`, `COMBO_MEAL`) unique across those three
+      types. Back-office writes take the id in the path and refuse anything outside
+      `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`.
+    - `x-comanda: true` on a property marks a field Comanda adds inside a v2 model (SPEC D-2);
+      on a schema it marks a schema that is Comanda's own (not in MODELS.md).
+    - Optional fields may be left out or sent as `null`. Lists the reader walks (`root`,
+      `links`) are `[]` when empty, never `null`. Clients ignore fields they do not know.
+    - Timestamps added by Comanda are ISO 8601 in UTC (`2026-11-10T12:00:00Z`). Times of day
+      follow MODELS (`HH:mm:ss` in menus, `HH:mm:ss.SSS` in store hours).
+    - Errors: `application/problem+json` (RFC 9457) with a stable `code`; switch on `code`.
+    - `POST /v2/payments` and `POST /v2/orders` require an `Idempotency-Key` header.
+    - `GET /v2/devices/me/config` and `GET /v2/menus/active` return an `ETag`; send it back
+      in `If-None-Match` to get `304`.
+    - Guest endpoints take `language` (`pt-BR` or `en`) and return text already resolved;
+      back-office endpoints return `name`/`description` in pt-BR plus `translations.en`.
+    - Every order is `DINEIN`. Payment is Mercado Pago (Pix and Point), called only by Go.
+    - `x-phase` on each operation is the pilot v2 plan phase (`docs/plans/pilot-v2.md`) that
+      moves the app onto it: 2 kiosk, 3 menu editor, 4 kitchen, store, devices, orders, report.
+servers:
+  - url: http://localhost:4011
+    description: Prism in front of the stateful mock (front-end work before Go v2 exists)
+  - url: http://localhost:8080
+    description: Go API, local
+tags:
+  - name: Devices
+    description: Kiosk and kitchen device identity, configuration and health.
+  - name: Kiosk
+    description: Guest menu, journey, totals and coupons.
+  - name: Payments
+    description: Mercado Pago Pix and Point sessions, and placing the paid order.
+  - name: Kitchen
+    description: Kitchen screen.
+  - name: Admin
+    description: Back office for the owner.
+
+paths:
+  # ---------------------------------------------------------------- Devices
+  /v2/devices/auth:
+    post:
+      tags: [Devices]
+      operationId: authenticateDevice
+      summary: Exchange device credentials for a short-lived token
+      description: |
+        Called by the BFF with the `deviceId` and `deviceSecret` typed at `/setup`.
+        A device disabled in the back office gets `403 DEVICE_DISABLED`.
+      x-phase: 2
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceAuthRequest'
+      responses:
+        '200':
+          description: Token issued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceToken'
+        '401':
+          $ref: '#/components/responses/InvalidCredentials'
+        '403':
+          $ref: '#/components/responses/DeviceDisabled'
+
+  /v2/devices/me/config:
+    get:
+      tags: [Devices]
+      operationId: getDeviceConfig
+      summary: Configuration of the calling device and its store
+      description: |
+        Evaluates the menu schedule in the store's timezone and returns `isOpen`. With no
+        active menu, `isOpen` is false and the kiosk shows the closed screen with
+        `store.closedMessage`. The kiosk retries every 5 s on failure. A change of pace, store
+        settings or active menu changes the ETag.
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Current configuration.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceConfig'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v2/devices/heartbeat:
+    post:
+      tags: [Devices]
+      operationId: sendHeartbeat
+      summary: Report that the device is alive
+      description: Updates `lastSeenAt` on the device. The server records the request's source IP.
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Heartbeat'
+      responses:
+        '204':
+          description: Recorded.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v2/devices/status:
+    post:
+      tags: [Devices]
+      operationId: reportDeviceStatus
+      summary: Report a status change or a key action
+      description: Fire-and-forget; the kiosk ignores errors.
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceReport'
+            examples:
+              trading:
+                value:
+                  kind: STATUS
+                  statusType: TRADING
+                  category: APPLICATION_STATUS
+                  message: Config refreshed
+      responses:
+        '204':
+          description: Recorded.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  # ---------------------------------------------------------------- Kiosk
+  /v2/menus/active:
+    get:
+      tags: [Kiosk]
+      operationId: getActiveMenu
+      summary: The menu active right now, as one MenuResponse
+      description: |
+        The graph reachable from the active menu's `root`, following MODELS.md section 5:
+        flat `entities`, `links` between them, `root` in display order. Called once per
+        journey (at start and on a language change); the kiosk keeps it in memory until the
+        journey ends.
+
+        - Text is resolved to `language` (`name`, `description`, badge names); entities
+          carry no `translations` here.
+        - Items and options with `available: false` are sent; the kiosk shows them grey
+          ("Indisponível" / "Unavailable") and they cannot be added.
+        - A section outside its `availableHours` at request time is sent with
+          `available: false` (hidden); `availableHours` stays for display. A window whose
+          `close` is before its `open` runs past midnight; the closing minute is closed.
+        - `TAX` entities and `TAX` links are never sent in the pilot.
+        - Go ignores `included` on modifier groups in the pilot (MODELS: a venue feature, off).
+        - `menuId` and `validUntil` say which scheduled menu this is and when the next switch
+          happens.
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Language'
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Active menu.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuResponse'
+              examples:
+                reference:
+                  $ref: '#/components/examples/ReferenceMenu'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No menu is active now (`NO_ACTIVE_MENU`); the kiosk shows the closed screen.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: /problems/no-active-menu
+                title: No menu is active now
+                status: 404
+                code: NO_ACTIVE_MENU
+
+  /v2/languages/{code}:
+    get:
+      tags: [Kiosk]
+      operationId: getLanguagePack
+      summary: Language pack override for the kiosk UI
+      description: |
+        Strings the owner changed; the kiosk merges them over its bundled pack and falls back
+        to the bundled pack on any error.
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/LanguageCode'
+      responses:
+        '200':
+          description: Language pack.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LanguagePack'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v2/journeys:
+    post:
+      tags: [Kiosk]
+      operationId: startJourney
+      summary: Record the start of a guest journey
+      description: Non-blocking for the guest; the kiosk logs failures and carries on.
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartJourneyRequest'
+      responses:
+        '201':
+          description: Journey recorded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JourneyStarted'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v2/journeys/{orderNonce}/events:
+    post:
+      tags: [Kiosk]
+      operationId: recordJourneyEvent
+      summary: Record a reset or an abandoned journey
+      description: Fire-and-forget.
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderNonce'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JourneyEvent'
+      responses:
+        '204':
+          description: Recorded.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v2/totals:
+    post:
+      tags: [Kiosk]
+      operationId: createTotals
+      summary: Price the basket (TotalsRequest → TotalsResponse)
+      description: |
+        Called after every basket or coupon change. Go keeps the basket and returns its
+        `basketId`; send it back on later calls so the coupon and the payment stay attached
+        to the same basket. Without `basketId`, Go opens a new basket.
+
+        The kiosk sends ids, quantities and the line tree only (`uniqueId`, `parentId`,
+        `position`, one line per unit); any price or total it sends is ignored. Go prices
+        every line from the menu: the product's price (`dineInPriceOverride` when set), plus
+        each option's extra `price` × quantity; a sized item costs its chosen size. An
+        option's group is found among the groups its parent links (an option is linked from
+        at most one group of the same parent). Lines in `orderItems` are named in `language`.
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Language'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TotalsRequest'
+            example:
+              basketId: null
+              orderType: DINEIN
+              items:
+                - id: '1001'
+                  quantity: 1
+                  uniqueId: 1
+                  specialNotes: Cortar ao meio, por favor
+                  modifiers:
+                    - id: X-CHEESE
+                      quantity: 2
+                      uniqueId: 2
+                      parentId: 1
+                      position: 1
+                      modifierType: MODI
+                    - id: X-SAUCE
+                      quantity: 1
+                      uniqueId: 3
+                      parentId: 1
+                      position: 3
+                      modifierType: MODI
+                    - id: S-BBQ
+                      quantity: 1
+                      uniqueId: 4
+                      parentId: 3
+                      position: 1
+                      modifierType: MODI
+                - id: '2001'
+                  quantity: 1
+                  uniqueId: 5
+                  modifiers:
+                    - id: 2001-L
+                      quantity: 1
+                      uniqueId: 6
+                      parentId: 5
+                      position: 2
+                      modifierType: SIZE
+      responses:
+        '200':
+          description: The priced basket.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TotalsResponse'
+              example:
+                basketId: B-55501
+                subTotal: 14.7
+                discount: 0
+                serviceChargeTotal: 0
+                tax: 0
+                total: 14.7
+                orderItems:
+                  - id: '1001'
+                    name: Classic Burger
+                    quantity: 1
+                    price: 9.5
+                    netTotal: 11.5
+                    taxTotal: 0
+                    total: 11.5
+                    specialNotes: Cortar ao meio, por favor
+                    modifiers:
+                      - id: X-CHEESE
+                        name: Queijo extra
+                        quantity: 2
+                        price: 1
+                        netTotal: 2
+                        taxTotal: 0
+                        total: 2
+                        modifiers: []
+                        taxes: []
+                      - id: X-SAUCE
+                        name: Adicionar molho
+                        quantity: 1
+                        price: 0
+                        netTotal: 0
+                        taxTotal: 0
+                        total: 0
+                        modifiers:
+                          - id: S-BBQ
+                            name: Molho barbecue
+                            quantity: 1
+                            price: 0
+                            netTotal: 0
+                            taxTotal: 0
+                            total: 0
+                            modifiers: []
+                            taxes: []
+                        taxes: []
+                    taxes: []
+                  - id: '2001'
+                    name: Refrigerante de cola
+                    quantity: 1
+                    price: 0
+                    netTotal: 3.2
+                    taxTotal: 0
+                    total: 3.2
+                    modifiers:
+                      - id: 2001-L
+                        name: Grande
+                        quantity: 1
+                        price: 3.2
+                        netTotal: 3.2
+                        taxTotal: 0
+                        total: 3.2
+                        modifiers: []
+                        taxes: []
+                    taxes: []
+                taxes: []
+                discounts: []
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/BasketNotFound'
+        '422':
+          $ref: '#/components/responses/BasketRejected'
+
+  /v2/discounts/apply:
+    post:
+      tags: [Kiosk]
+      operationId: applyDiscount
+      summary: Apply a coupon code to the basket
+      description: |
+        The code is sent as one `Award` with `type: CODE` and `id` = the code typed by the
+        guest. Go checks the `DiscountRule` (active, dates, `minOrderTotal`, `maxUses`),
+        attaches it to `basketId` and answers the award with its `discountAmount`. One coupon
+        per order: a different code replaces the current one (the kiosk warns first); the
+        same code again is `409 COUPON_ALREADY_APPLIED`. Call `POST /v2/totals` afterwards
+        for the new total; the coupon shows in `discounts` with `id` = the code.
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Language'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiscountRequest'
+            example:
+              basketId: B-55501
+              orderType: DINEIN
+              items:
+                - id: '1001'
+                  quantity: 1
+                  uniqueId: 1
+              awards:
+                - id: BEMVINDO10
+                  type: CODE
+      responses:
+        '200':
+          description: Applied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscountResponse'
+              example:
+                awards:
+                  - id: BEMVINDO10
+                    description: 10% de boas-vindas
+                    type: CODE
+                    source: COMANDA
+                    isExternal: false
+                    discountAmount: 0.95
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/BasketNotFound'
+        '409':
+          description: The same code is already on the basket (`COUPON_ALREADY_APPLIED`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: |
+            Unknown, inactive, expired code or minimum order not reached (`DISCOUNT_INVALID`,
+            `detail` says which), the coupon's uses are used up (`DISCOUNT_LIMIT_REACHED`), or
+            the basket cannot be priced (see `BasketRejected`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: /problems/discount-invalid
+                title: Coupon not valid
+                status: 422
+                code: DISCOUNT_INVALID
+                detail: Pedido mínimo de R$ 20,00
+
+  /v2/discounts/cancel:
+    post:
+      tags: [Kiosk]
+      operationId: cancelDiscount
+      summary: Remove a coupon from the basket
+      description: Codes in `codesToRemove` are taken off `basketId`. Unknown codes are ignored.
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiscountRequest'
+            example:
+              basketId: B-55501
+              orderType: DINEIN
+              items:
+                - id: '1001'
+                  quantity: 1
+                  uniqueId: 1
+              codesToRemove: [BEMVINDO10]
+      responses:
+        '204':
+          description: Removed.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/BasketNotFound'
+
+  # ---------------------------------------------------------------- Payments
+  /v2/payments:
+    post:
+      tags: [Payments]
+      operationId: createPayment
+      summary: Start a Mercado Pago Pix or Point payment for a basket
+      description: |
+        Anchored on `basketId`, not on an order: the order only exists after payment.
+        `amount` must equal the basket's current total, else `409 BASKET_CHANGED` (price or
+        availability changed since totals; the kiosk re-prices and asks the guest again,
+        never charging the old total).
+
+        - `PIX`: Go creates a Mercado Pago Pix charge; the session carries `qrCode`,
+          `copyPaste` and `expiresAt` (5 minutes, Mercado Pago setting).
+        - `CARD`: Go sends the charge to the Point terminal in the device's
+          `paymentTerminalId`; the guest follows the terminal. No terminal configured, or the
+          terminal offline or busy, is `409 PAYMENT_TERMINAL_UNAVAILABLE`.
+
+        A new session for a basket cancels its other PENDING session ("Gerar novo", or a
+        change of method). A basket that already has an APPROVED session is
+        `409 BASKET_ALREADY_PAID`: the kiosk goes on to `POST /v2/orders`. Same
+        `Idempotency-Key` and body returns the first session.
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+            example:
+              basketId: B-55501
+              method: PIX
+              amount: 14.7
+      responses:
+        '201':
+          description: Session started.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentSession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/BasketNotFound'
+        '409':
+          description: |
+            `BASKET_CHANGED`, `BASKET_ALREADY_PAID`, `PAYMENT_TERMINAL_UNAVAILABLE` or
+            `IDEMPOTENCY_KEY_REUSED`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: /problems/basket-changed
+                title: The basket changed since totals
+                status: 409
+                code: BASKET_CHANGED
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v2/payments/{paymentId}:
+    get:
+      tags: [Payments]
+      operationId: getPayment
+      summary: Poll a payment session
+      description: |
+        The kiosk polls at most once per second while `PENDING`. Go learns the outcome from
+        Mercado Pago (webhook or query) and moves the session to APPROVED, DECLINED, EXPIRED
+        or CANCELLED. A Pix still PENDING at `expiresAt` becomes EXPIRED.
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      responses:
+        '200':
+          description: The session.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentSession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v2/payments/{paymentId}/cancel:
+    post:
+      tags: [Payments]
+      operationId: cancelPayment
+      summary: Cancel a session that is still PENDING
+      description: Go cancels the Pix charge or the Point order on Mercado Pago. The basket is kept.
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      responses:
+        '200':
+          description: Cancelled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentSession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Already final (`PAYMENT_NOT_CANCELLABLE`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /v2/payments/{paymentId}/simulate:
+    post:
+      tags: [Payments]
+      operationId: simulatePayment
+      summary: Force the outcome of a session (mock and dev only)
+      description: |
+        Only where Mercado Pago is simulated (the mock, local dev). Returns
+        `404 SIMULATION_DISABLED` against a real Mercado Pago account. Approving a session that
+        already EXPIRED is `409 PAYMENT_EXPIRED`, and that session is flagged for refund (a
+        Pix paid late). Any other final session is `409 INVALID_STATUS_TRANSITION`.
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SimulatePaymentRequest'
+      responses:
+        '200':
+          description: Outcome applied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentSession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: '`PAYMENT_EXPIRED` or `INVALID_STATUS_TRANSITION`.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /v2/orders:
+    post:
+      tags: [Payments]
+      operationId: submitOrder
+      summary: Place the paid basket as an order (SubmitOrderRequest → SubmitOrderResponse)
+      description: |
+        Placed only with an approved payment (SPEC 4.6):
+
+        - `payments` holds one `Payment` copied from the APPROVED session (`tenderId`
+          `MP_PIX` or `MP_POINT`, `tenderRef` = the Mercado Pago payment id, `amount`, and the
+          card fields when the terminal returned them). Go checks it against its own session:
+          PENDING or CANCELLED is `409 PAYMENT_NOT_APPROVED`, DECLINED is
+          `409 PAYMENT_DECLINED`, EXPIRED is `409 PAYMENT_EXPIRED`.
+        - The approved amount must equal the basket total, else `409 BASKET_CHANGED`.
+        - **A paid basket always becomes exactly one order.** This call is idempotent on
+          `basketId` as well as on `Idempotency-Key`: a second call for the same basket (a
+          retry, or after the webhook placed it) returns the existing order with `200`.
+        - **Requirement for Go:** if the kiosk never calls this (crash, network), Go places
+          the order itself from the Mercado Pago webhook of the approved payment, with a
+          history entry `by: SYSTEM`.
+        - `orderType` must be `DINEIN` (`422 ORDER_TYPE_UNAVAILABLE` otherwise).
+        - Go assigns `number` (the order id in this API) and `customerCheckNumber` (the short
+          number on the success screen, a sequence per business day from
+          `businessDayCutoff`), sets `status: PAID`, records the lines in pt-BR (the kitchen's
+          language) and notifies the kitchen (`order.paid`).
+        - `invoiceCpfCnpj` is ignored in the pilot (no NFC-e).
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitOrderRequest'
+            example:
+              basketId: B-55501
+              orderType: DINEIN
+              items:
+                - id: '1001'
+                  quantity: 1
+                  uniqueId: 1
+              payments:
+                - tenderId: MP_PIX
+                  tenderRef: '1319876543'
+                  amount: 9.5
+      responses:
+        '200':
+          description: This basket was already placed; the existing order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitOrderResponse'
+        '201':
+          description: Order placed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitOrderResponse'
+              examples:
+                paid:
+                  $ref: '#/components/examples/PlacedOrder'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/BasketNotFound'
+        '409':
+          description: |
+            `PAYMENT_NOT_APPROVED`, `PAYMENT_DECLINED`, `PAYMENT_EXPIRED`, `BASKET_CHANGED` or
+            `IDEMPOTENCY_KEY_REUSED`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: /problems/payment-not-approved
+                title: The payment is not approved
+                status: 409
+                code: PAYMENT_NOT_APPROVED
+        '422':
+          $ref: '#/components/responses/BasketRejected'
+
+  /v2/orders/{number}:
+    get:
+      tags: [Payments]
+      operationId: getOrder
+      summary: Read a placed order
+      x-phase: 2
+      security:
+        - deviceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderNumber'
+      responses:
+        '200':
+          description: The order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitOrderResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ---------------------------------------------------------------- Kitchen
+  /v2/kitchen/orders:
+    get:
+      tags: [Kitchen]
+      operationId: listKitchenOrders
+      summary: Open orders oldest first, or today's collected orders newest first
+      description: |
+        `open` (default): PAID, PREPARING and READY orders, oldest `placedAt` first.
+        `collected`: COLLECTED orders of the current business day, newest change first, so
+        the kitchen can find one and move it back to READY. Lines are `orderItems`
+        (`CheckItem` with nested `modifiers`), in pt-BR.
+      x-phase: 4
+      security:
+        - deviceAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [open, collected]
+            default: open
+      responses:
+        '200':
+          description: Orders.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SubmitOrderResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v2/kitchen/stream:
+    get:
+      tags: [Kitchen]
+      operationId: streamKitchenEvents
+      summary: Server-Sent Events for the kitchen screen
+      description: |
+        One event per change. `event: order.paid` and `event: order.status_changed`, each
+        with a `SubmitOrderResponse` as JSON in `data`; a cancelled or not-collected order is
+        an `order.status_changed` with that status. `event: store.pace_changed` carries a
+        `StorePace` whenever the pace changes, including the automatic resume after a pause.
+        A `: ping` comment every 15 s keeps the connection open. If the stream drops, the
+        kitchen polls `GET /v2/kitchen/orders` every 2 s.
+
+        Events can arrive late or twice. Clients keep the order with the highest `version`.
+      x-phase: 4
+      security:
+        - deviceAuth: []
+      responses:
+        '200':
+          description: Event stream.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              example: |
+                event: order.paid
+                data: {"number":"20261110-0042","customerCheckNumber":"42","status":"PAID","version":1}
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v2/kitchen/orders/{number}/status:
+    post:
+      tags: [Kitchen]
+      operationId: updateKitchenOrderStatus
+      summary: Move an order to PREPARING, READY or COLLECTED, forward or one step back
+      description: |
+        Forward: PAID → PREPARING → READY → COLLECTED (PAID → READY is allowed too).
+        Back one step ("Desfazer", "Voltar uma etapa"): READY → PREPARING and
+        COLLECTED → READY, only while the order's business day is the current one. Anything
+        else is `409 INVALID_STATUS_TRANSITION`.
+
+        Each change adds a `history` entry and increments `version`. With `expectedVersion`,
+        Go applies the move only if the order is still at that version, else
+        `409 STALE_ORDER_VERSION`.
+      x-phase: 4
+      security:
+        - deviceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderNumber'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KitchenStatusUpdate'
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitOrderResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: '`INVALID_STATUS_TRANSITION` or `STALE_ORDER_VERSION`.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /v2/kitchen/availability:
+    put:
+      tags: [Kitchen]
+      operationId: setKitchenAvailability
+      summary: '"Acabou": set a product, option or size unavailable, or back'
+      description: |
+        The kitchen marks what ran out without leaving its screen. `id` is a `CheckItem.id`
+        from an order line (any `ITEM`, `SIZED_ITEM` or `COMBO_MEAL`). Sets `available` on that
+        entity until changed (no "unavailable until"); `available: true` is the undo. Orders
+        already placed stay open. Go changes the menu ETag, so the next journey loads the new
+        menu. Answers the entity's current price and availability.
+      x-phase: 4
+      security:
+        - deviceAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KitchenAvailabilityUpdate'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LightMenuResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v2/kitchen/close-day:
+    post:
+      tags: [Kitchen]
+      operationId: closeKitchenDay
+      summary: '"Encerrar o dia": every open order of today becomes NOT_COLLECTED'
+      description: |
+        Moves every PAID, PREPARING and READY order of the current business day to
+        NOT_COLLECTED, with a history entry, and sends one `order.status_changed` per order.
+        Calling it again with nothing open returns `count: 0`.
+      x-phase: 4
+      security:
+        - deviceAuth: []
+      responses:
+        '200':
+          description: Closed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CloseDayResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v2/kitchen/pace:
+    get:
+      tags: [Kitchen]
+      operationId: getKitchenPace
+      summary: The store's pace (Normal, Movimentado, Pausado)
+      x-phase: 4
+      security:
+        - deviceAuth: []
+      responses:
+        '200':
+          description: Current pace.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StorePace'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      tags: [Kitchen]
+      operationId: setKitchenPace
+      summary: Set the store's pace from the kitchen
+      description: One store-level pace, set from the kitchen or the back office. Never blocks the kiosk beyond PAUSED.
+      x-phase: 4
+      security:
+        - deviceAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StorePaceUpdate'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StorePace'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  # ---------------------------------------------------------------- Admin
+  /v2/admin/auth/login:
+    post:
+      tags: [Admin]
+      operationId: ownerLogin
+      summary: Owner sign-in
+      description: The back-office BFF keeps the token in an HttpOnly session cookie; the browser never sees it.
+      x-phase: 3
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OwnerLoginRequest'
+      responses:
+        '200':
+          description: Signed in.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnerToken'
+        '401':
+          $ref: '#/components/responses/InvalidCredentials'
+
+  /v2/admin/store:
+    get:
+      tags: [Admin]
+      operationId: getStore
+      summary: Store settings
+      x-phase: 4
+      security:
+        - ownerAuth: []
+      responses:
+        '200':
+          description: Settings.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoreConfigurationResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      tags: [Admin]
+      operationId: replaceStore
+      summary: Replace store settings
+      description: '`pace` and `waitMinutes` are ignored here; they change through the pace endpoints.'
+      x-phase: 4
+      security:
+        - ownerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StoreConfigurationResponse'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoreConfigurationResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v2/admin/media:
+    post:
+      tags: [Admin]
+      operationId: uploadMedia
+      summary: Upload a picture; it becomes an IMAGE entity
+      description: |
+        The Go API stores the original and creates an `IMAGE` entity with a new id; link it
+        from a section, item or group as `{ "type": "IMAGE", "id": <id> }`. The Next.js image
+        optimizer resizes it for the kiosk.
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                altText:
+                  type: string
+                  description: Short description for screen readers.
+      responses:
+        '201':
+          description: Stored.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaAsset'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v2/admin/images:
+    get:
+      tags: [Admin]
+      operationId: listImages
+      summary: Every uploaded picture (IMAGE entities)
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      responses:
+        '200':
+          description: Pictures.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MediaAsset'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v2/admin/devices:
+    get:
+      tags: [Admin]
+      operationId: listDevices
+      summary: Devices with their health
+      x-phase: 4
+      security:
+        - ownerAuth: []
+      responses:
+        '200':
+          description: Devices.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminDevice'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Admin]
+      operationId: createDevice
+      summary: Register a device and get its secret once
+      x-phase: 4
+      security:
+        - ownerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceInput'
+      responses:
+        '201':
+          description: Created. `deviceSecret` is shown only in this response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceCredentials'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v2/admin/devices/{deviceId}:
+    put:
+      tags: [Admin]
+      operationId: replaceDevice
+      summary: Rename, enable or disable a device, change its settings and Point terminal
+      x-phase: 4
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceInput'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDevice'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v2/admin/devices/{deviceId}/secret:
+    post:
+      tags: [Admin]
+      operationId: rotateDeviceSecret
+      summary: Issue a new secret; the old one stops working
+      x-phase: 4
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      responses:
+        '200':
+          description: New secret, shown only in this response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceCredentials'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v2/admin/menus:
+    get:
+      tags: [Admin]
+      operationId: listMenus
+      summary: Menus (scheduled entry points into the shared catalogue)
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      responses:
+        '200':
+          description: Menus.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminMenu'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v2/admin/menus/{menuId}:
+    put:
+      tags: [Admin]
+      operationId: putMenu
+      summary: Create or replace a menu
+      description: |
+        A menu is a name and a `root`: its top `CATEGORY` links, in display order. Sections,
+        items and groups are a shared catalogue, so two menus may reuse the same sections.
+        Saving publishes (no draft). A root link to a missing section is `422 MENU_INVALID`.
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MenuId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminMenu'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminMenu'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/MenuInvalid'
+    delete:
+      tags: [Admin]
+      operationId: deleteMenu
+      summary: Delete a menu and its schedules
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MenuId'
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v2/admin/menus/{menuId}/schedules:
+    get:
+      tags: [Admin]
+      operationId: listMenuSchedules
+      summary: Opening windows of a menu
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MenuId'
+      responses:
+        '200':
+          description: Windows.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PosEntitySectionHours'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Admin]
+      operationId: replaceMenuSchedules
+      summary: Replace all opening windows of a menu
+      description: |
+        Same shape as section hours, in the store's timezone; `close` before `open` runs past
+        midnight. Rejected with `409 SCHEDULE_OVERLAP` when a window overlaps another menu's,
+        so at most one menu is active.
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MenuId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/PosEntitySectionHours'
+            example:
+              - dayOfWeek: MONDAY
+                open: '06:00:00'
+                close: '11:00:00'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PosEntitySectionHours'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Overlaps another menu (`SCHEDULE_OVERLAP`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v2/admin/menus/{menuId}/force:
+    post:
+      tags: [Admin]
+      operationId: forceMenu
+      summary: Make this menu active now, until a given time
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MenuId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForceMenuRequest'
+      responses:
+        '200':
+          description: Forced.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminMenu'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Admin]
+      operationId: clearForcedMenu
+      summary: Return to the normal schedule
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MenuId'
+      responses:
+        '204':
+          description: Back on schedule.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v2/admin/sections:
+    get:
+      tags: [Admin]
+      operationId: listSections
+      summary: Every CATEGORY section of the catalogue
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      responses:
+        '200':
+          description: Sections, with `translations`.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PosEntitySection'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v2/admin/sections/{sectionId}:
+    put:
+      tags: [Admin]
+      operationId: putSection
+      summary: Create or replace a section
+      description: |
+        `links` hold sub-sections (`CATEGORY`), products (`ITEM`, `SIZED_ITEM`, `COMBO_MEAL`)
+        and pictures (`IMAGE`), in display order. Go validates the whole catalogue as it
+        would be after the save (see `MenuInvalid`).
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SectionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PosEntitySection'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PosEntitySection'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/MenuInvalid'
+    delete:
+      tags: [Admin]
+      operationId: deleteSection
+      summary: Delete a section
+      description: Refused with `422 MENU_INVALID` while a menu root or another section links it.
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SectionId'
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/MenuInvalid'
+
+  /v2/admin/items:
+    get:
+      tags: [Admin]
+      operationId: listItems
+      summary: Products, options and sizes (ITEM, SIZED_ITEM, COMBO_MEAL)
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      parameters:
+        - name: type
+          in: query
+          required: false
+          description: Only this entity type.
+          schema:
+            type: string
+            enum: [ITEM, SIZED_ITEM, COMBO_MEAL]
+      responses:
+        '200':
+          description: Items, with `translations`.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v2/admin/items/{itemId}:
+    put:
+      tags: [Admin]
+      operationId: putItem
+      summary: Create or replace a product, option, size, sized item or combo meal
+      description: |
+        Same shape as in the menu. A `SIZED_ITEM` links its sizes as `ITEM`s and its own
+        `price` is `0`; a `COMBO_MEAL` links one `COMBO_MAIN` and at least one `COMBO_SIDE`.
+        `displayPrice` is computed by Go and ignored on save. Go validates the whole catalogue
+        as it would be after the save (see `MenuInvalid`).
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ItemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminItem'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/MenuInvalid'
+    delete:
+      tags: [Admin]
+      operationId: deleteItem
+      summary: Delete an item
+      description: Refused with `422 MENU_INVALID` while anything links it. Past orders keep its id and name.
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ItemId'
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/MenuInvalid'
+
+  /v2/admin/items/{itemId}/availability:
+    put:
+      tags: [Admin]
+      operationId: setItemAvailability
+      summary: Turn a product, option or size on or off ("Disponibilidade")
+      description: |
+        Sets `available` on the item until changed (SPEC D-12: plain on/off, no "until").
+        Options and sizes are `ITEM`s in v2, so this one path covers them. Go changes the menu
+        ETag. Answers the item's current price and availability.
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ItemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AvailabilityUpdate'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LightMenuResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v2/admin/modifier-groups:
+    get:
+      tags: [Admin]
+      operationId: listModifierGroups
+      summary: Modifier groups (MODIFIERS, COMBO_MAIN, COMBO_SIDE)
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      responses:
+        '200':
+          description: Groups, with `translations`.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PosEntityModifier'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v2/admin/modifier-groups/{modifierGroupId}:
+    put:
+      tags: [Admin]
+      operationId: putModifierGroup
+      summary: Create or replace a modifier group
+      description: |
+        `links` hold the options (`ITEM` or `SIZED_ITEM`, at least one) and pictures. An option
+        may link its own `MODIFIERS` (a nested group). Go validates the whole catalogue as it
+        would be after the save (see `MenuInvalid`).
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ModifierGroupId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PosEntityModifier'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PosEntityModifier'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/MenuInvalid'
+    delete:
+      tags: [Admin]
+      operationId: deleteModifierGroup
+      summary: Delete a modifier group
+      description: Refused with `422 MENU_INVALID` while anything links it.
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ModifierGroupId'
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/MenuInvalid'
+
+  /v2/admin/swap-sells:
+    get:
+      tags: [Admin]
+      operationId: listSwapSells
+      summary: Upgrade offers (SWAP_SELL)
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      responses:
+        '200':
+          description: Swap sells, with `translations`.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PosEntitySwapSell'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v2/admin/swap-sells/{swapSellId}:
+    put:
+      tags: [Admin]
+      operationId: putSwapSell
+      summary: Create or replace an upgrade offer
+      description: '`links` hold the products the guest can swap to (at least one). See `MenuInvalid`.'
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SwapSellId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PosEntitySwapSell'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PosEntitySwapSell'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/MenuInvalid'
+    delete:
+      tags: [Admin]
+      operationId: deleteSwapSell
+      summary: Delete an upgrade offer
+      description: Refused with `422 MENU_INVALID` while an item links it.
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SwapSellId'
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/MenuInvalid'
+
+  /v2/admin/badges:
+    get:
+      tags: [Admin]
+      operationId: listBadges
+      summary: Item badges ("Selos")
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      responses:
+        '200':
+          description: Badges, with `translations`.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Badge'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v2/admin/badges/{badgeId}:
+    put:
+      tags: [Admin]
+      operationId: putBadge
+      summary: Create or replace a badge
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/BadgeId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Badge'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Badge'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+    delete:
+      tags: [Admin]
+      operationId: deleteBadge
+      summary: Delete a badge
+      description: Refused with `422 MENU_INVALID` while an item lists it in `badgeIds`.
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/BadgeId'
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/MenuInvalid'
+
+  /v2/admin/discount-rules:
+    get:
+      tags: [Admin]
+      operationId: listDiscountRules
+      summary: Coupons
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      responses:
+        '200':
+          description: Coupons.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DiscountRule'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v2/admin/discount-rules/{discountRuleId}:
+    put:
+      tags: [Admin]
+      operationId: putDiscountRule
+      summary: Create or replace a coupon
+      description: '`usesCount` is kept by Go and ignored on save. A code another coupon uses is `409 DISCOUNT_CODE_TAKEN`.'
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DiscountRuleId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiscountRule'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscountRule'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Code already used by another coupon (`DISCOUNT_CODE_TAKEN`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+    delete:
+      tags: [Admin]
+      operationId: deleteDiscountRule
+      summary: Delete a coupon
+      x-phase: 3
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DiscountRuleId'
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v2/admin/orders/{number}/cancel:
+    post:
+      tags: [Admin]
+      operationId: cancelOrder
+      summary: Cancel a paid order that cannot be made
+      description: |
+        Confirmed with the owner's login. Allowed from PAID, PREPARING and READY; anything else
+        is `409 INVALID_STATUS_TRANSITION`. Sets CANCELLED with a history entry by OWNER and
+        sends `order.status_changed`. The refund is done in the Mercado Pago panel, outside
+        Comanda. Cancelled orders count on their own line in the report, never in revenue.
+      x-phase: 4
+      security:
+        - ownerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderNumber'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCancelRequest'
+      responses:
+        '200':
+          description: Cancelled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitOrderResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Already collected, cancelled or not collected (`INVALID_STATUS_TRANSITION`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /v2/admin/pace:
+    get:
+      tags: [Admin]
+      operationId: getStorePace
+      summary: The store's pace, for the back office home
+      x-phase: 4
+      security:
+        - ownerAuth: []
+      responses:
+        '200':
+          description: Current pace.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StorePace'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      tags: [Admin]
+      operationId: setStorePace
+      summary: Set the store's pace from the back office
+      x-phase: 4
+      security:
+        - ownerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StorePaceUpdate'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StorePace'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v2/admin/pace/wait-minutes:
+    put:
+      tags: [Admin]
+      operationId: setPaceWaitMinutes
+      summary: Minutes shown to the guest for each pace level
+      description: Defaults NORMAL 8, BUSY 15. The success screen shows `store.waitMinutes` for the current pace.
+      x-phase: 4
+      security:
+        - ownerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaceWaitMinutes'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StorePace'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /v2/admin/reports/daily:
+    get:
+      tags: [Admin]
+      operationId: getDailyReport
+      summary: Orders, revenue, best sellers and average ticket for one business day
+      x-phase: 4
+      security:
+        - ownerAuth: []
+      parameters:
+        - name: date
+          in: query
+          required: true
+          description: Business date in the store's timezone (days start at `businessDayCutoff`).
+          schema:
+            type: string
+            format: date
+          example: '2026-11-10'
+      responses:
+        '200':
+          description: Report.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyReport'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+components:
+  securitySchemes:
+    deviceAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token from `POST /v2/devices/auth`. Kiosk and kitchen devices.
+    ownerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token from `POST /v2/admin/auth/login`. Held by the back-office BFF.
+
+  headers:
+    ETag:
+      description: Version of the representation. Send it back in `If-None-Match`.
+      schema:
+        type: string
+      example: '"menu-mnu-tarde-v17-pt-BR"'
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: A UUID per logical attempt. Retrying with the same key and body returns the first result.
+      schema:
+        type: string
+        format: uuid
+      example: 6d1f2c9e-3b4a-4e5f-8a7b-9c0d1e2f3a4b
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      required: false
+      schema:
+        type: string
+    Language:
+      name: language
+      in: query
+      required: true
+      schema:
+        $ref: '#/components/schemas/LanguageCode'
+    OrderNonce:
+      name: orderNonce
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    OrderNumber:
+      name: number
+      in: path
+      required: true
+      description: '`SubmitOrderResponse.number`.'
+      schema:
+        type: string
+    PaymentId:
+      name: paymentId
+      in: path
+      required: true
+      schema:
+        type: string
+    DeviceId:
+      name: deviceId
+      in: path
+      required: true
+      schema:
+        type: string
+    MenuId:
+      name: menuId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/EntityId'
+    SectionId:
+      name: sectionId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/EntityId'
+    ItemId:
+      name: itemId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/EntityId'
+    ModifierGroupId:
+      name: modifierGroupId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/EntityId'
+    SwapSellId:
+      name: swapSellId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/EntityId'
+    BadgeId:
+      name: badgeId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/EntityId'
+    DiscountRuleId:
+      name: discountRuleId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/EntityId'
+
+  responses:
+    NotModified:
+      description: The client's copy is current (matching `If-None-Match`).
+    Unauthorized:
+      description: Missing, expired or invalid token (`UNAUTHORIZED`).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/unauthorized
+            title: Unauthorized
+            status: 401
+            code: UNAUTHORIZED
+    InvalidCredentials:
+      description: Wrong id, secret, email or password (`INVALID_CREDENTIALS`).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/invalid-credentials
+            title: Invalid credentials
+            status: 401
+            code: INVALID_CREDENTIALS
+    DeviceDisabled:
+      description: The device was disabled in the back office (`DEVICE_DISABLED`).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/device-disabled
+            title: Device disabled
+            status: 403
+            code: DEVICE_DISABLED
+    NotFound:
+      description: No such resource (`NOT_FOUND`).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/not-found
+            title: Not found
+            status: 404
+            code: NOT_FOUND
+    BasketNotFound:
+      description: No basket with this `basketId` (`NOT_FOUND`); price the basket again without it.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/not-found
+            title: Basket not found
+            status: 404
+            code: NOT_FOUND
+    ValidationFailed:
+      description: The body breaks a field rule (`VALIDATION_FAILED`); `errors` lists each field.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/validation-failed
+            title: Validation failed
+            status: 422
+            code: VALIDATION_FAILED
+            errors:
+              - field: items[0].quantity
+                message: must be at least 1
+    BasketRejected:
+      description: |
+        The basket cannot be priced: `ITEM_UNAVAILABLE` (unavailable, unknown or not on the
+        active menu; `detail` names it), `ORDER_TYPE_UNAVAILABLE` (anything but DINEIN),
+        `BASKET_ITEM_LIMIT_EXCEEDED`, `NO_ACTIVE_MENU` or `VALIDATION_FAILED` (an option
+        outside its parent's groups, or a group's `min`/`max` or an option's
+        `minChoices`/`maxChoices` broken).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/item-unavailable
+            title: An item is unavailable
+            status: 422
+            code: ITEM_UNAVAILABLE
+            detail: X-BACON
+    MenuInvalid:
+      description: |
+        The catalogue would be broken after this save (`MENU_INVALID`). Comanda refuses what
+        v2 would drop silently. Each problem is one `errors` entry with its `rule` and the
+        `entity` it is about:
+        `MISSING_LINK` (a link to an entity that does not exist), `EMPTY_GROUP` (a
+        `MODIFIERS`, `COMBO_MAIN` or `COMBO_SIDE` with no option), `EMPTY_SWAP_SELL`, `LOOP`
+        (an entity leads back to itself), `INVALID_ID` (empty, `::`, or outside the id
+        pattern), `DUPLICATE_PRODUCT_ID` (the same id on two of `ITEM`, `SIZED_ITEM`,
+        `COMBO_MEAL`), `COMBO_INCOMPLETE` (a combo without one `COMBO_MAIN` and at least one
+        `COMBO_SIDE`), `LINK_NOT_ALLOWED` (a link MODELS 5.4 does not follow, or an option
+        linked from two groups of the same parent) and `ID_MISMATCH` (body id ≠ path id).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/menu-invalid
+            title: The menu would be broken
+            status: 422
+            code: MENU_INVALID
+            errors:
+              - field: links[3]
+                message: ITEM X-NOPE does not exist
+                rule: MISSING_LINK
+                entity:
+                  type: MODIFIERS
+                  id: M-EXTRAS
+
+  examples:
+    ReferenceMenu:
+      summary: MODELS.md 5.20 complete menu, without tax
+      value: {
+          "root": [
+            {
+              "id": "100",
+              "type": "CATEGORY"
+            },
+            {
+              "id": "200",
+              "type": "CATEGORY"
+            },
+            {
+              "id": "300",
+              "type": "CATEGORY"
+            }
+          ],
+          "entities": [
+            {
+              "id": "100",
+              "name": "Burgers",
+              "type": "CATEGORY",
+              "description": "Flame-grilled burgers served in a brioche bun",
+              "available": true,
+              "availableHours": [
+                {
+                  "dayOfWeek": "MONDAY",
+                  "open": "11:00:00",
+                  "close": "22:00:00"
+                },
+                {
+                  "dayOfWeek": "TUESDAY",
+                  "open": "11:00:00",
+                  "close": "22:00:00"
+                },
+                {
+                  "dayOfWeek": "WEDNESDAY",
+                  "open": "11:00:00",
+                  "close": "22:00:00"
+                },
+                {
+                  "dayOfWeek": "THURSDAY",
+                  "open": "11:00:00",
+                  "close": "22:00:00"
+                },
+                {
+                  "dayOfWeek": "FRIDAY",
+                  "open": "11:00:00",
+                  "close": "23:00:00"
+                },
+                {
+                  "dayOfWeek": "SATURDAY",
+                  "open": "12:00:00",
+                  "close": "23:00:00"
+                },
+                {
+                  "dayOfWeek": "SUNDAY",
+                  "open": "12:00:00",
+                  "close": "21:00:00"
+                }
+              ],
+              "links": [
+                {
+                  "id": "100",
+                  "type": "IMAGE"
+                },
+                {
+                  "id": "110",
+                  "type": "CATEGORY"
+                },
+                {
+                  "id": "1001",
+                  "type": "ITEM"
+                }
+              ]
+            },
+            {
+              "id": "110",
+              "name": "Veggie",
+              "type": "CATEGORY",
+              "available": true,
+              "links": [
+                {
+                  "id": "1002",
+                  "type": "ITEM"
+                }
+              ]
+            },
+            {
+              "id": "200",
+              "name": "Drinks",
+              "type": "CATEGORY",
+              "available": true,
+              "links": [
+                {
+                  "id": "2001",
+                  "type": "SIZED_ITEM"
+                },
+                {
+                  "id": "2010",
+                  "type": "ITEM"
+                }
+              ]
+            },
+            {
+              "id": "300",
+              "name": "Meal deals",
+              "type": "CATEGORY",
+              "available": true,
+              "links": [
+                {
+                  "id": "3001",
+                  "type": "COMBO_MEAL"
+                }
+              ]
+            },
+            {
+              "id": "1001",
+              "name": "Classic Burger",
+              "type": "ITEM",
+              "price": 9.5,
+              "deliveryPriceOverride": 10.5,
+              "description": "Beef patty, lettuce, tomato and house sauce",
+              "available": true,
+              "alcoholic": false,
+              "plu": "1001",
+              "internalName": "CLASSIC BRGR",
+              "calories": "650",
+              "allergens": [
+                "GLUTEN",
+                "MILK",
+                "SESAME"
+              ],
+              "barcodes": [
+                "5012345678900"
+              ],
+              "deliveryFlag": 1,
+              "pickupFlag": 1,
+              "seatFlag": 1,
+              "dineinFlag": 1,
+              "takeoutFlag": 1,
+              "links": [
+                {
+                  "id": "M-ING-1001",
+                  "type": "MODIFIERS"
+                },
+                {
+                  "id": "M-EXTRAS",
+                  "type": "MODIFIERS"
+                },
+                {
+                  "id": "1001",
+                  "type": "IMAGE"
+                },
+                {
+                  "id": "SS-1001",
+                  "type": "SWAP_SELL"
+                }
+              ],
+              "posMetadata": {
+                "kitchenPrinter": "grill"
+              },
+              "allergensDeclared": true,
+              "badgeIds": [
+                "NOVO"
+              ],
+              "crossSellIds": [
+                "2001"
+              ]
+            },
+            {
+              "id": "1002",
+              "name": "Veggie Burger",
+              "type": "ITEM",
+              "price": 8.95,
+              "description": "Plant-based patty with avocado",
+              "available": true,
+              "plu": "1002",
+              "calories": "520",
+              "allergens": [
+                "GLUTEN",
+                "SOYA",
+                "VEGAN"
+              ],
+              "links": [
+                {
+                  "id": "M-EXTRAS",
+                  "type": "MODIFIERS"
+                }
+              ]
+            },
+            {
+              "id": "1003",
+              "name": "Double Burger",
+              "type": "ITEM",
+              "price": 11.5,
+              "description": "Two beef patties, double cheese",
+              "available": true,
+              "plu": "1003",
+              "calories": "980",
+              "allergens": [
+                "GLUTEN",
+                "MILK",
+                "SESAME"
+              ],
+              "links": [
+                {
+                  "id": "M-EXTRAS",
+                  "type": "MODIFIERS"
+                }
+              ]
+            },
+            {
+              "id": "2001",
+              "name": "Cola",
+              "type": "SIZED_ITEM",
+              "price": 0,
+              "description": "Ice-cold cola",
+              "available": true,
+              "plu": "2001",
+              "allergens": [
+                "SOFT",
+                "SUGARED"
+              ],
+              "links": [
+                {
+                  "id": "2001-S",
+                  "type": "ITEM"
+                },
+                {
+                  "id": "2001-L",
+                  "type": "ITEM"
+                },
+                {
+                  "id": "2001",
+                  "type": "IMAGE"
+                }
+              ],
+              "displayPrice": 2.5
+            },
+            {
+              "id": "2001-S",
+              "name": "Small",
+              "type": "ITEM",
+              "price": 2.5,
+              "available": true,
+              "plu": "2001-S",
+              "links": []
+            },
+            {
+              "id": "2001-L",
+              "name": "Large",
+              "type": "ITEM",
+              "price": 3.2,
+              "available": true,
+              "plu": "2001-L",
+              "links": []
+            },
+            {
+              "id": "2010",
+              "name": "Lager (pint)",
+              "type": "ITEM",
+              "price": 5.2,
+              "available": true,
+              "alcoholic": true,
+              "ageRestriction": 18,
+              "plu": "2010",
+              "allergens": [
+                "BARLEY"
+              ],
+              "deliveryFlag": 0,
+              "pickupFlag": 1,
+              "seatFlag": 1,
+              "dineinFlag": 1,
+              "takeoutFlag": 0,
+              "links": []
+            },
+            {
+              "id": "3001",
+              "name": "Burger Meal",
+              "type": "COMBO_MEAL",
+              "comboMealId": 7,
+              "price": 12.95,
+              "description": "Any burger with a side and a drink",
+              "available": true,
+              "plu": "3001",
+              "links": [
+                {
+                  "id": "3001-MAIN",
+                  "type": "COMBO_MAIN"
+                },
+                {
+                  "id": "3001-SIDE-1",
+                  "type": "COMBO_SIDE"
+                },
+                {
+                  "id": "3001-SIDE-2",
+                  "type": "COMBO_SIDE"
+                },
+                {
+                  "id": "3001",
+                  "type": "IMAGE"
+                }
+              ]
+            },
+            {
+              "id": "M-ING-1001",
+              "name": "Ingredients",
+              "type": "MODIFIERS",
+              "min": 0,
+              "max": 2,
+              "modifierType": "INGR",
+              "links": [
+                {
+                  "id": "I-LETTUCE",
+                  "type": "ITEM"
+                },
+                {
+                  "id": "I-TOMATO",
+                  "type": "ITEM"
+                }
+              ]
+            },
+            {
+              "id": "M-EXTRAS",
+              "name": "Add extras",
+              "type": "MODIFIERS",
+              "min": 0,
+              "max": 3,
+              "included": 1,
+              "modifierType": "MODI",
+              "links": [
+                {
+                  "id": "X-CHEESE",
+                  "type": "ITEM"
+                },
+                {
+                  "id": "X-BACON",
+                  "type": "ITEM"
+                },
+                {
+                  "id": "X-SAUCE",
+                  "type": "ITEM"
+                }
+              ]
+            },
+            {
+              "id": "M-SAUCE",
+              "name": "Choose a sauce",
+              "type": "MODIFIERS",
+              "min": 1,
+              "max": 1,
+              "modifierType": "MODI",
+              "links": [
+                {
+                  "id": "S-BBQ",
+                  "type": "ITEM"
+                },
+                {
+                  "id": "S-MAYO",
+                  "type": "ITEM"
+                }
+              ]
+            },
+            {
+              "id": "3001-MAIN",
+              "name": "Choose your burger",
+              "type": "COMBO_MAIN",
+              "min": 1,
+              "max": 1,
+              "modifierType": "MODI",
+              "links": [
+                {
+                  "id": "C-1001",
+                  "type": "ITEM"
+                },
+                {
+                  "id": "C-1002",
+                  "type": "ITEM"
+                }
+              ]
+            },
+            {
+              "id": "3001-SIDE-1",
+              "name": "Choose your side",
+              "type": "COMBO_SIDE",
+              "min": 1,
+              "max": 1,
+              "modifierType": "MODI",
+              "links": [
+                {
+                  "id": "C-FRIES",
+                  "type": "ITEM"
+                },
+                {
+                  "id": "C-SALAD",
+                  "type": "ITEM"
+                }
+              ]
+            },
+            {
+              "id": "3001-SIDE-2",
+              "name": "Choose your drink",
+              "type": "COMBO_SIDE",
+              "min": 1,
+              "max": 1,
+              "modifierType": "MODI",
+              "links": [
+                {
+                  "id": "C-COLA",
+                  "type": "ITEM"
+                },
+                {
+                  "id": "C-WATER",
+                  "type": "ITEM"
+                }
+              ]
+            },
+            {
+              "id": "I-LETTUCE",
+              "name": "Lettuce",
+              "type": "ITEM",
+              "price": 0,
+              "available": true,
+              "plu": "8001",
+              "defaultQuantity": 1,
+              "minChoices": 0,
+              "maxChoices": 1,
+              "links": []
+            },
+            {
+              "id": "I-TOMATO",
+              "name": "Tomato",
+              "type": "ITEM",
+              "price": 0,
+              "available": true,
+              "plu": "8002",
+              "defaultQuantity": 1,
+              "minChoices": 0,
+              "maxChoices": 1,
+              "links": []
+            },
+            {
+              "id": "X-CHEESE",
+              "name": "Extra cheese",
+              "type": "ITEM",
+              "price": 1,
+              "available": true,
+              "plu": "9001",
+              "allergens": [
+                "MILK"
+              ],
+              "minChoices": 0,
+              "maxChoices": 2,
+              "links": []
+            },
+            {
+              "id": "X-BACON",
+              "name": "Bacon",
+              "type": "ITEM",
+              "price": 1.5,
+              "available": false,
+              "plu": "9002",
+              "allergens": [
+                "PORK"
+              ],
+              "minChoices": 0,
+              "maxChoices": 1,
+              "links": []
+            },
+            {
+              "id": "X-SAUCE",
+              "name": "Add a sauce",
+              "type": "ITEM",
+              "price": 0,
+              "available": true,
+              "plu": "9003",
+              "links": [
+                {
+                  "id": "M-SAUCE",
+                  "type": "MODIFIERS"
+                }
+              ]
+            },
+            {
+              "id": "S-BBQ",
+              "name": "BBQ sauce",
+              "type": "ITEM",
+              "price": 0,
+              "available": true,
+              "plu": "9101",
+              "links": []
+            },
+            {
+              "id": "S-MAYO",
+              "name": "Mayonnaise",
+              "type": "ITEM",
+              "price": 0,
+              "available": true,
+              "plu": "9102",
+              "allergens": [
+                "EGGS"
+              ],
+              "links": []
+            },
+            {
+              "id": "C-1001",
+              "name": "Classic Burger",
+              "type": "ITEM",
+              "price": 0,
+              "available": true,
+              "plu": "1001",
+              "links": []
+            },
+            {
+              "id": "C-1002",
+              "name": "Veggie Burger",
+              "type": "ITEM",
+              "price": 0,
+              "available": true,
+              "plu": "1002",
+              "links": []
+            },
+            {
+              "id": "C-FRIES",
+              "name": "Fries",
+              "type": "ITEM",
+              "price": 0,
+              "available": true,
+              "plu": "4001",
+              "links": []
+            },
+            {
+              "id": "C-SALAD",
+              "name": "Side salad",
+              "type": "ITEM",
+              "price": 0.5,
+              "available": true,
+              "plu": "4002",
+              "links": []
+            },
+            {
+              "id": "C-COLA",
+              "name": "Cola (regular)",
+              "type": "ITEM",
+              "price": 0,
+              "available": true,
+              "plu": "2001-S",
+              "links": []
+            },
+            {
+              "id": "C-WATER",
+              "name": "Still water",
+              "type": "ITEM",
+              "price": 0,
+              "available": true,
+              "plu": "5001",
+              "links": []
+            },
+            {
+              "id": "SS-1001",
+              "name": "Upgrade your burger",
+              "type": "SWAP_SELL",
+              "links": [
+                {
+                  "id": "1003",
+                  "type": "ITEM"
+                }
+              ]
+            },
+            {
+              "id": "100",
+              "name": "Burgers",
+              "type": "IMAGE",
+              "url": "https://images.example.com/menu/burgers-section.jpg",
+              "altText": "A selection of burgers",
+              "links": []
+            },
+            {
+              "id": "1001",
+              "name": "Classic Burger",
+              "type": "IMAGE",
+              "url": "https://images.example.com/menu/classic-burger.jpg",
+              "altText": "A beef burger with lettuce and tomato",
+              "links": []
+            },
+            {
+              "id": "2001",
+              "name": "Cola",
+              "type": "IMAGE",
+              "url": "https://images.example.com/menu/cola.jpg",
+              "links": []
+            },
+            {
+              "id": "3001",
+              "name": "Burger Meal",
+              "type": "IMAGE",
+              "url": "https://images.example.com/menu/burger-meal.jpg",
+              "links": []
+            }
+          ],
+          "menuId": "mnu-tarde",
+          "validUntil": "2026-11-10T23:00:00Z",
+          "badges": [
+            {
+              "id": "NOVO",
+              "name": "New",
+              "textColour": "#FAF6F0",
+              "backgroundColour": "#4E3426"
+            }
+          ]
+        }
+    PlacedOrder:
+      summary: A paid Pix order
+      value:
+        number: 20261110-0042
+        customerCheckNumber: '42'
+        displayText: Pedido 42
+        orderType: DINEIN
+        basketId: B-55501
+        subTotal: 9.5
+        discount: 0
+        serviceChargeTotal: 0
+        tax: 0
+        total: 9.5
+        orderItems:
+          - id: '1001'
+            name: Classic Burger
+            quantity: 1
+            price: 9.5
+            netTotal: 9.5
+            taxTotal: 0
+            total: 9.5
+            modifiers: []
+            taxes: []
+        taxes: []
+        discounts: []
+        status: PAID
+        version: 1
+        placedAt: '2026-11-10T12:04:10Z'
+        history:
+          - status: PAID
+            at: '2026-11-10T12:04:10Z'
+            by: KIOSK
+
+  schemas:
+    # ------------------------------------------------------------ Common
+    Problem:
+      type: object
+      x-comanda: true
+      description: RFC 9457 problem details with a stable `code` the clients switch on.
+      required: [type, title, status, code]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+        code:
+          $ref: '#/components/schemas/ProblemCode'
+        errors:
+          type: array
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+              rule:
+                $ref: '#/components/schemas/MenuRule'
+              entity:
+                $ref: '#/components/schemas/Link'
+    ProblemCode:
+      type: string
+      x-comanda: true
+      description: |
+        v1 codes that still apply, plus the pilot's payment and menu codes (SPEC 4.7). Each
+        has pt-BR and en copy in the kiosk.
+      enum:
+        - UNAUTHORIZED
+        - INVALID_CREDENTIALS
+        - DEVICE_DISABLED
+        - NOT_FOUND
+        - VALIDATION_FAILED
+        - IDEMPOTENCY_KEY_REUSED
+        - NO_ACTIVE_MENU
+        - ITEM_UNAVAILABLE
+        - ORDER_TYPE_UNAVAILABLE
+        - BASKET_ITEM_LIMIT_EXCEEDED
+        - INVALID_COUPON
+        - COUPON_ALREADY_APPLIED
+        - ORDER_NOT_AWAITING_PAYMENT
+        - PAYMENT_IN_PROGRESS
+        - PAYMENT_NOT_CANCELLABLE
+        - PAYMENT_NOT_AUTHORISED
+        - SIMULATION_DISABLED
+        - INVALID_STATUS_TRANSITION
+        - SCHEDULE_OVERLAP
+        - DISCOUNT_CODE_TAKEN
+        - STALE_ORDER_VERSION
+        - BASKET_CHANGED
+        - BASKET_ALREADY_PAID
+        - DISCOUNT_INVALID
+        - DISCOUNT_LIMIT_REACHED
+        - PAYMENT_DECLINED
+        - PAYMENT_EXPIRED
+        - PAYMENT_NOT_APPROVED
+        - PAYMENT_TERMINAL_UNAVAILABLE
+        - MENU_INVALID
+    MenuRule:
+      type: string
+      x-comanda: true
+      description: Which catalogue rule an entry of `MENU_INVALID` breaks (see the `MenuInvalid` response).
+      enum:
+        - MISSING_LINK
+        - EMPTY_GROUP
+        - EMPTY_SWAP_SELL
+        - LOOP
+        - INVALID_ID
+        - DUPLICATE_PRODUCT_ID
+        - COMBO_INCOMPLETE
+        - LINK_NOT_ALLOWED
+        - ID_MISMATCH
+    Money:
+      type: number
+      format: double
+      minimum: 0
+      description: |
+        BRL in the main currency unit with at most 2 decimals (MODELS 2.3, SPEC D-3).
+        `9.50` = R$ 9,50. Never cents. Format for display with
+        `Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })`.
+      example: 9.5
+    Fraction:
+      type: number
+      format: double
+      minimum: 0
+      maximum: 1
+      description: A rate written as a fraction. `0.10` is 10%.
+      example: 0.1
+    Flag:
+      type: integer
+      enum: [0, 1]
+      description: '`1` yes, `0` no (MODELS 2.3).'
+    EntityId:
+      type: string
+      x-comanda: true
+      pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$'
+      description: An id the back office may write. No `:` at all, so never `::` (SPEC D-4).
+      example: M-EXTRAS
+    LanguageCode:
+      type: string
+      enum: [pt-BR, en]
+    LocalizedText:
+      type: object
+      x-comanda: true
+      required: [pt-BR]
+      properties:
+        pt-BR:
+          type: string
+        en:
+          type: string
+      example:
+        pt-BR: Se quiser nota fiscal, dirija-se ao caixa.
+        en: If you need an invoice, please go to the counter.
+    LocalTime:
+      type: string
+      pattern: '^([01][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$'
+      description: Local time of day, `HH:mm:ss` (MODELS 2.3); `HH:mm` is accepted when reading.
+      example: '11:00:00'
+    DayOfWeek:
+      type: string
+      enum: [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY]
+
+    # ------------------------------------------------------------ Menu (MODELS 5)
+    MenuResponse:
+      type: object
+      description: |
+        MODELS 5.1. `root` lists the top-level sections in display order; `entities` holds
+        every entity of the menu in one flat list; entities point at each other with `links`.
+      required: [root, entities, menuId, validUntil, badges]
+      properties:
+        root:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+        entities:
+          type: array
+          items:
+            $ref: '#/components/schemas/PosEntity'
+        menuId:
+          type: string
+          x-comanda: true
+          description: Which scheduled menu (`AdminMenu.id`) this is.
+          example: mnu-tarde
+        validUntil:
+          type: string
+          format: date-time
+          nullable: true
+          x-comanda: true
+          description: When the active menu next switches (end of its window or of the owner's force).
+          example: '2026-11-10T23:00:00Z'
+        badges:
+          type: array
+          x-comanda: true
+          description: The badges `badgeIds` point at, names resolved to `language`.
+          items:
+            $ref: '#/components/schemas/Badge'
+    Link:
+      type: object
+      description: MODELS 5.6 (`PosEntityLink`). Points at the entity with this `type` and `id`.
+      required: [id, type]
+      properties:
+        id:
+          type: string
+        type:
+          $ref: '#/components/schemas/PosEntityType'
+      example:
+        id: M-EXTRAS
+        type: MODIFIERS
+    PosEntityType:
+      type: string
+      description: |
+        MODELS 5.3. `CROSS_SELLS`, `INGREDIENTS` and `COMBO_ITEM` exist in the enum but are not
+        used in menus; `TAX` is not used in the pilot.
+      enum: [CATEGORY, ITEM, SIZED_ITEM, MODIFIERS, COMBO_MEAL, COMBO_MAIN, COMBO_SIDE, IMAGE, TAX, SWAP_SELL, CROSS_SELLS, INGREDIENTS, COMBO_ITEM]
+    PosEntity:
+      description: One entity of the menu graph; its `type` decides its shape (MODELS 5.3).
+      oneOf:
+        - $ref: '#/components/schemas/PosEntitySection'
+        - $ref: '#/components/schemas/PosEntityItem'
+        - $ref: '#/components/schemas/PosEntityComboMeal'
+        - $ref: '#/components/schemas/PosEntityModifier'
+        - $ref: '#/components/schemas/PosEntityImage'
+        - $ref: '#/components/schemas/PosEntitySwapSell'
+        - $ref: '#/components/schemas/PosEntityTaxGroup'
+      discriminator:
+        propertyName: type
+        mapping:
+          CATEGORY: '#/components/schemas/PosEntitySection'
+          ITEM: '#/components/schemas/PosEntityItem'
+          SIZED_ITEM: '#/components/schemas/PosEntityItem'
+          CROSS_SELLS: '#/components/schemas/PosEntityItem'
+          COMBO_MEAL: '#/components/schemas/PosEntityComboMeal'
+          MODIFIERS: '#/components/schemas/PosEntityModifier'
+          COMBO_MAIN: '#/components/schemas/PosEntityModifier'
+          COMBO_SIDE: '#/components/schemas/PosEntityModifier'
+          IMAGE: '#/components/schemas/PosEntityImage'
+          SWAP_SELL: '#/components/schemas/PosEntitySwapSell'
+          TAX: '#/components/schemas/PosEntityTaxGroup'
+    PosEntityCommon:
+      type: object
+      description: MODELS 5.5 (`IPosEntity`), the fields every entity has.
+      required: [id, name, type, links]
+      properties:
+        id:
+          type: string
+          description: Unique within its type. Never contains `::`. Sent back in orders.
+        name:
+          type: string
+          description: The name guests see. Resolved to `language` on guest endpoints; pt-BR in the back office.
+        type:
+          $ref: '#/components/schemas/PosEntityType'
+        gfcId:
+          type: integer
+          nullable: true
+        links:
+          type: array
+          description: Arrows to other entities (MODELS 5.4), in display order. `[]` when none.
+          items:
+            $ref: '#/components/schemas/Link'
+        posMetadata:
+          type: object
+          nullable: true
+          additionalProperties:
+            type: string
+        translations:
+          $ref: '#/components/schemas/Translations'
+    Translations:
+      type: object
+      x-comanda: true
+      description: |
+        Back office only: the English text of an entity whose `name`/`description` are pt-BR.
+        Never sent on guest endpoints, which resolve `name`/`description` to `language`.
+      properties:
+        en:
+          type: object
+          properties:
+            name:
+              type: string
+            description:
+              type: string
+      example:
+        en:
+          name: Extra cheese
+    PosEntitySection:
+      description: MODELS 5.7, `CATEGORY`. Links sub-sections, products and pictures.
+      allOf:
+        - $ref: '#/components/schemas/PosEntityCommon'
+        - type: object
+          properties:
+            type:
+              type: string
+              enum: [CATEGORY]
+            description:
+              type: string
+              nullable: true
+            available:
+              type: boolean
+              description: '`true` (default) shows the section, `false` hides it.'
+            availableHours:
+              type: array
+              description: When present and not empty, the section is shown only in these windows.
+              items:
+                $ref: '#/components/schemas/PosEntitySectionHours'
+    PosEntitySectionHours:
+      type: object
+      description: |
+        MODELS 5.8. One window, local store time. `close` before `open` runs past midnight;
+        the closing minute is closed. Also the shape of menu schedules.
+      required: [dayOfWeek, open, close]
+      properties:
+        dayOfWeek:
+          $ref: '#/components/schemas/DayOfWeek'
+        open:
+          $ref: '#/components/schemas/LocalTime'
+        close:
+          $ref: '#/components/schemas/LocalTime'
+    PosEntityItemFields:
+      type: object
+      description: MODELS 5.9, the item shape shared by `ITEM`, `SIZED_ITEM` and `COMBO_MEAL`.
+      required: [price, available]
+      properties:
+        price:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Base price. For an option, the extra amount (`0` when free). `0` on a `SIZED_ITEM` (its sizes carry the price).
+        dineInPriceOverride:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+          description: Price for dine-in orders; `price` when absent. The only override the pilot uses.
+        takeOutPriceOverride:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+          description: Not used in the pilot.
+        deliveryPriceOverride:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+          description: Not used in the pilot.
+        description:
+          type: string
+          nullable: true
+        available:
+          type: boolean
+          description: '`false` = shown grey ("Indisponível" / "Unavailable") and cannot be added.'
+        alcoholic:
+          type: boolean
+          nullable: true
+        ageRestriction:
+          type: integer
+          nullable: true
+        plu:
+          type: string
+          nullable: true
+        internalName:
+          type: string
+          nullable: true
+          description: Short name for kitchen tickets; `name` when empty.
+        calories:
+          type: string
+          nullable: true
+        allergens:
+          type: array
+          items:
+            $ref: '#/components/schemas/Allergen'
+        barcodes:
+          type: array
+          nullable: true
+          items:
+            type: string
+        factor:
+          type: number
+          nullable: true
+        deliveryFlag:
+          $ref: '#/components/schemas/Flag'
+        pickupFlag:
+          $ref: '#/components/schemas/Flag'
+        seatFlag:
+          $ref: '#/components/schemas/Flag'
+        dineinFlag:
+          $ref: '#/components/schemas/Flag'
+        takeoutFlag:
+          $ref: '#/components/schemas/Flag'
+        defaultQuantity:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: Options only. How many are pre-selected (`1` for an `INGR` ingredient). Default `0`.
+        minChoices:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: Options only. Fewest of this option. Default `0`.
+        maxChoices:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: Options only. Most of this option. Default `1`.
+        displayPrice:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          x-comanda: true
+          description: |
+            "A partir de R$ X" for products with sizes or required options, computed by Go
+            (cheapest size, or `price` plus the cheapest required choices). The front end never
+            computes it. Ignored on back-office saves.
+        allergenTraces:
+          type: array
+          x-comanda: true
+          description: '"Pode conter" (may contain), same values as `allergens`.'
+          items:
+            $ref: '#/components/schemas/Allergen'
+        allergensDeclared:
+          type: boolean
+          x-comanda: true
+          description: '`false` = allergens "não informado"; an empty `allergens` list never reads as safe.'
+        badgeIds:
+          type: array
+          x-comanda: true
+          description: Ids of `Badge`s shown on the item (`MenuResponse.badges`).
+          items:
+            type: string
+        crossSellIds:
+          type: array
+          x-comanda: true
+          description: |
+            Products suggested after this one is added (`ITEM`, `SIZED_ITEM` or `COMBO_MEAL`
+            ids; Comanda keeps those ids unique across the three types). They must exist in
+            `entities`.
+          items:
+            type: string
+    PosEntityItem:
+      description: |
+        MODELS 5.9 and 5.10. `ITEM` is a product, an option inside a group, a size of a
+        `SIZED_ITEM`, or a swap-sell target. `SIZED_ITEM` links its sizes as `ITEM`s; Go
+        creates the size group (`min` 1, `max` 1, type `SIZE`).
+      allOf:
+        - $ref: '#/components/schemas/PosEntityCommon'
+        - $ref: '#/components/schemas/PosEntityItemFields'
+        - type: object
+          properties:
+            type:
+              type: string
+              enum: [ITEM, SIZED_ITEM, CROSS_SELLS]
+    PosEntityComboMeal:
+      description: MODELS 5.14, `COMBO_MEAL`. Links one `COMBO_MAIN`, one or more `COMBO_SIDE`.
+      allOf:
+        - $ref: '#/components/schemas/PosEntityCommon'
+        - $ref: '#/components/schemas/PosEntityItemFields'
+        - type: object
+          required: [comboMealId]
+          properties:
+            type:
+              type: string
+              enum: [COMBO_MEAL]
+            comboMealId:
+              type: integer
+    PosEntityModifier:
+      description: |
+        MODELS 5.12 and 5.14: `MODIFIERS`, `COMBO_MAIN` and `COMBO_SIDE` share this shape.
+        `min`/`max` count picks across the group; `minChoices`/`maxChoices` on each option limit
+        that option. Links options (`ITEM`/`SIZED_ITEM`, at least one) and pictures.
+      allOf:
+        - $ref: '#/components/schemas/PosEntityCommon'
+        - type: object
+          required: [min, max]
+          properties:
+            type:
+              type: string
+              enum: [MODIFIERS, COMBO_MAIN, COMBO_SIDE]
+            min:
+              type: integer
+              minimum: 0
+            max:
+              type: integer
+              minimum: 0
+            included:
+              type: integer
+              minimum: 0
+              nullable: true
+              description: Picks included in the price. Ignored by Go in the pilot.
+            modifierType:
+              $ref: '#/components/schemas/ModifierType'
+            internalName:
+              type: string
+              nullable: true
+    ModifierType:
+      type: string
+      description: MODELS 5.13. `SIZE` groups are shown first; `INGR` options start selected and can be removed.
+      enum: [MODI, SIZE, INGR, SURC, INGM]
+    PosEntityImage:
+      description: 'MODELS 5.15, `IMAGE`. A leaf (`links: []`).'
+      allOf:
+        - $ref: '#/components/schemas/PosEntityCommon'
+        - type: object
+          required: [url]
+          properties:
+            type:
+              type: string
+              enum: [IMAGE]
+            url:
+              type: string
+              description: Address of the picture (absolute, or a path the BFF resolves against the Core API).
+            altText:
+              type: string
+              nullable: true
+    PosEntitySwapSell:
+      description: MODELS 5.17, `SWAP_SELL`. Only the common fields; `links` point at the products the guest can swap to.
+      allOf:
+        - $ref: '#/components/schemas/PosEntityCommon'
+        - type: object
+          properties:
+            type:
+              type: string
+              enum: [SWAP_SELL]
+    PosEntityTaxGroup:
+      description: MODELS 5.16, `TAX`. In the schema for completeness; never sent in the pilot (SPEC D-9).
+      allOf:
+        - $ref: '#/components/schemas/PosEntityCommon'
+        - type: object
+          required: [taxRates]
+          properties:
+            type:
+              type: string
+              enum: [TAX]
+            taxRates:
+              type: array
+              items:
+                $ref: '#/components/schemas/PosEntityTaxRate'
+    PosEntityTaxRate:
+      type: object
+      description: MODELS 5.16. Not used in the pilot.
+      required: [id, name, pickupTax, deliveryTax, seatTax, voucherTax, bookingTax]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        pickupTax:
+          $ref: '#/components/schemas/Fraction'
+        deliveryTax:
+          $ref: '#/components/schemas/Fraction'
+        seatTax:
+          $ref: '#/components/schemas/Fraction'
+        voucherTax:
+          $ref: '#/components/schemas/Fraction'
+        bookingTax:
+          $ref: '#/components/schemas/Fraction'
+    Allergen:
+      type: string
+      description: |
+        MODELS 5.11, upper case. `NATURAL_LATEX` is a Comanda addition (`x-comanda`): an ANVISA
+        group with no v2 value.
+      x-comanda-values: [NATURAL_LATEX]
+      enum:
+        - CELERY
+        - GLUTEN
+        - GRAINS_GLUTEN
+        - CRUSTACEANS
+        - EGGS
+        - FISH
+        - LUPIN
+        - MILK
+        - MOLLUSCS
+        - MUSTARD
+        - NUTS
+        - PEANUTS
+        - SHELLFISH
+        - SOYA
+        - SULPHUR
+        - SESAME
+        - SULPHITES
+        - CEREALS
+        - DAIRY
+        - ALMONDS
+        - BARLEY
+        - BRAZIL_NUT
+        - CASHEW
+        - HAZELNUTS
+        - KAMUT
+        - MACADAMIA
+        - OATS
+        - PECAN
+        - PISTACHIOS
+        - RYE
+        - SPELT
+        - WALNUTS
+        - WHEAT
+        - GLUTEN_FREE
+        - DAIRY_FREE
+        - LACTOSE_FREE
+        - SUGAR_FREE
+        - VEGETARIAN
+        - VEGAN
+        - PLANT_BASED
+        - HALAL
+        - KOSHER
+        - ORGANIC
+        - NATURAL
+        - KETO
+        - PALEO
+        - PORK
+        - MILD
+        - MEDIUM
+        - HOT
+        - VERY_HOT
+        - SOFT
+        - SUGARED
+        - NGCI
+        - NATURAL_LATEX
+    Badge:
+      type: object
+      x-comanda: true
+      description: An item badge ("Selo"). `name` resolved to `language` on guest endpoints.
+      required: [id, name, textColour, backgroundColour]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          example: Novidade
+        textColour:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          example: '#FAF6F0'
+        backgroundColour:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          example: '#4E3426'
+        translations:
+          $ref: '#/components/schemas/Translations'
+    LightMenuResponse:
+      type: object
+      description: |
+        MODELS 6: current price and availability only. Comanda answers it from the
+        availability endpoints, with the entities they changed.
+      required: [posItems]
+      properties:
+        posItems:
+          type: array
+          items:
+            $ref: '#/components/schemas/LightMenuItem'
+    LightMenuItem:
+      type: object
+      description: MODELS 6, the item shape with only the fields that matter there.
+      required: [id, price, available]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          $ref: '#/components/schemas/PosEntityType'
+        price:
+          $ref: '#/components/schemas/Money'
+        dineInPriceOverride:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        available:
+          type: boolean
+    AvailabilityUpdate:
+      type: object
+      x-comanda: true
+      required: [available]
+      properties:
+        available:
+          type: boolean
+    KitchenAvailabilityUpdate:
+      type: object
+      x-comanda: true
+      required: [id, available]
+      properties:
+        id:
+          type: string
+          description: A `CheckItem.id` (an `ITEM`, `SIZED_ITEM` or `COMBO_MEAL`).
+        available:
+          type: boolean
+
+    # ------------------------------------------------------------ Store and devices
+    StoreConfigurationResponse:
+      type: object
+      description: |
+        MODELS 9.10 plus the store settings the kiosk and kitchen need (`x-comanda`). The
+        dine-in / take-out toggles are gone (dine-in only). Opening is driven by menu schedules;
+        `hours` is optional and informative.
+      required: [locationName, languages, defaultLanguage, closedMessage, invoiceNotice, timezone, businessDayCutoff]
+      properties:
+        locationName:
+          type: string
+          example: Padaria do Pai do Brunera
+        email:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        liveFlag:
+          $ref: '#/components/schemas/Flag'
+        deliveryCharge:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+          description: Not used in the pilot.
+        hours:
+          type: array
+          items:
+            $ref: '#/components/schemas/Hours'
+        logo:
+          type: string
+          nullable: true
+          x-comanda: true
+          description: Address of the store logo (an uploaded `MediaAsset.url`).
+        languages:
+          type: array
+          x-comanda: true
+          description: Languages the kiosk offers.
+          items:
+            $ref: '#/components/schemas/LanguageCode'
+        defaultLanguage:
+          allOf:
+            - $ref: '#/components/schemas/LanguageCode'
+          x-comanda: true
+        closedMessage:
+          allOf:
+            - $ref: '#/components/schemas/ClosedMessage'
+          x-comanda: true
+        invoiceNotice:
+          allOf:
+            - $ref: '#/components/schemas/LocalizedText'
+          x-comanda: true
+          description: |
+            Shown on the success screen (no NFC-e in the pilot). Default pt-BR "Se quiser nota
+            fiscal, dirija-se ao caixa." / en "If you need an invoice, please go to the counter."
+        pace:
+          allOf:
+            - $ref: '#/components/schemas/StorePace'
+          x-comanda: true
+          description: Current pace. Read only; ignored by `replaceStore`.
+        waitMinutes:
+          allOf:
+            - $ref: '#/components/schemas/PaceWaitMinutes'
+          x-comanda: true
+          description: Minutes told to the guest per pace level. Read only; ignored by `replaceStore`.
+        timezone:
+          type: string
+          x-comanda: true
+          example: America/Sao_Paulo
+        businessDayCutoff:
+          type: string
+          x-comanda: true
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+          description: Local time a business day starts (order numbers reset, report days). `HH:mm`.
+          example: '04:00'
+    Hours:
+      type: object
+      description: MODELS 9.10. Day `1` Sunday … `7` Saturday; times `HH:mm:ss.SSS`.
+      required: [day, open, close]
+      properties:
+        day:
+          type: integer
+          minimum: 1
+          maximum: 7
+        open:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]\.[0-9]{3}$'
+          example: '06:00:00.000'
+        close:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]\.[0-9]{3}$'
+          example: '20:00:00.000'
+        pickup:
+          $ref: '#/components/schemas/Flag'
+        delivery:
+          $ref: '#/components/schemas/Flag'
+        seat:
+          $ref: '#/components/schemas/Flag'
+        opening:
+          $ref: '#/components/schemas/Flag'
+    ClosedMessage:
+      type: object
+      x-comanda: true
+      description: Both languages, so the kiosk can switch without a call.
+      required: [title, description]
+      properties:
+        title:
+          $ref: '#/components/schemas/LocalizedText'
+        description:
+          $ref: '#/components/schemas/LocalizedText'
+    DeviceAuthRequest:
+      type: object
+      x-comanda: true
+      required: [deviceId, deviceSecret]
+      properties:
+        deviceId:
+          type: string
+          example: KIOSK-TBT-001
+        deviceSecret:
+          type: string
+          example: s3cr3t-from-provisioning
+    DeviceToken:
+      type: object
+      x-comanda: true
+      required: [accessToken, tokenType, expiresIn]
+      properties:
+        accessToken:
+          type: string
+        tokenType:
+          type: string
+          enum: [Bearer]
+        expiresIn:
+          type: integer
+          description: Seconds.
+          example: 900
+    DeviceKind:
+      type: string
+      enum: [KIOSK, KITCHEN]
+    DeviceConfig:
+      type: object
+      x-comanda: true
+      description: The calling device's settings plus the store (`StoreConfigurationResponse`, with `pace` and `waitMinutes`).
+      required: [kioskID, kind, idleTimerIntervalMilliseconds, printerEnabled, maintenanceMode, atCapacityMode, isOpen, store, activeMenu, nextOpeningAt, serverTime, paymentTerminalId]
+      properties:
+        kioskID:
+          type: string
+          example: KIOSK-TBT-001
+        kind:
+          $ref: '#/components/schemas/DeviceKind'
+        idleTimerIntervalMilliseconds:
+          type: integer
+          description: Idle reset; 0 disables it. Pilot default 45000.
+          example: 45000
+        printerEnabled:
+          type: boolean
+          description: False until the hardware phase.
+        maintenanceMode:
+          type: boolean
+        atCapacityMode:
+          type: boolean
+          description: True while this device is at capacity, or while the store's pace is PAUSED.
+        isOpen:
+          type: boolean
+          description: True when a menu is active now.
+        store:
+          $ref: '#/components/schemas/StoreConfigurationResponse'
+        activeMenu:
+          $ref: '#/components/schemas/ActiveMenuRef'
+        nextOpeningAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the next menu starts, if closed.
+        serverTime:
+          type: string
+          format: date-time
+        paymentTerminalId:
+          type: string
+          nullable: true
+          x-comanda: true
+          description: The Mercado Pago Point terminal next to this kiosk; null = card payment unavailable.
+          example: PAX_A910__SMARTPOS1495357742
+    ActiveMenuRef:
+      type: object
+      x-comanda: true
+      nullable: true
+      required: [menuId, name, validUntil]
+      properties:
+        menuId:
+          type: string
+          example: mnu-tarde
+        name:
+          type: string
+          example: Tarde
+        validUntil:
+          type: string
+          format: date-time
+          description: When this menu stops being active.
+    Heartbeat:
+      type: object
+      x-comanda: true
+      required: [appVersion, screenResolution]
+      properties:
+        appVersion:
+          type: string
+          example: 0.4.0+3f9c2a1
+        screenResolution:
+          type: string
+          example: 1080x1920
+        ip:
+          type: string
+          description: LAN address if the device knows it; the server also records the source IP.
+    DeviceReport:
+      x-comanda: true
+      oneOf:
+        - $ref: '#/components/schemas/DeviceStatusReport'
+        - $ref: '#/components/schemas/DeviceKeyActionReport'
+      discriminator:
+        propertyName: kind
+        mapping:
+          STATUS: '#/components/schemas/DeviceStatusReport'
+          KEY_ACTION: '#/components/schemas/DeviceKeyActionReport'
+    KioskStatusType:
+      type: string
+      enum: [APPLICATION_STARTING, APPLICATION_START_FAILED, TRADING, UNAVAILABLE]
+    DeviceStatusReport:
+      type: object
+      required: [kind, statusType, category]
+      properties:
+        kind:
+          type: string
+          enum: [STATUS]
+        statusType:
+          $ref: '#/components/schemas/KioskStatusType'
+        reason:
+          type: string
+          enum: [MAINTENANCE, AT_CAPACITY, STORE_CLOSED, UNKNOWN]
+        category:
+          type: string
+          enum: [APPLICATION_STATUS, DISPLAYING_SCREEN]
+        message:
+          type: string
+    DeviceKeyActionReport:
+      type: object
+      required: [kind, type, kioskStatusType]
+      properties:
+        kind:
+          type: string
+          enum: [KEY_ACTION]
+        type:
+          type: string
+          enum: [START_JOURNEY_SUCCESS, START_JOURNEY_FAILED, APPLICATION_START_FAILED]
+        kioskStatusType:
+          $ref: '#/components/schemas/KioskStatusType'
+        reason:
+          type: string
+          enum: [FAILED_START_JOURNEY, FAILED_LOAD_MENU]
+        message:
+          type: string
+    LanguagePack:
+      type: object
+      x-comanda: true
+      required: [code, name, strings]
+      properties:
+        code:
+          $ref: '#/components/schemas/LanguageCode'
+        name:
+          type: string
+        strings:
+          type: object
+          additionalProperties:
+            type: string
+          example:
+            attract.cta: Toque para começar
+    StartJourneyRequest:
+      type: object
+      x-comanda: true
+      required: [orderNonce, language]
+      properties:
+        orderNonce:
+          type: string
+          format: uuid
+          description: Generated by the kiosk at journey start.
+        language:
+          $ref: '#/components/schemas/LanguageCode'
+    JourneyStarted:
+      type: object
+      x-comanda: true
+      required: [journeyStartedTimestamp]
+      properties:
+        journeyStartedTimestamp:
+          type: string
+          format: date-time
+    JourneyEvent:
+      type: object
+      x-comanda: true
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [RESET, IDLE_TIMEOUT, CANCELLED_BY_GUEST]
+        orderTotal:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Basket total at the moment of the event, as last priced by Go.
+
+    # ------------------------------------------------------------ Pace
+    Pace:
+      type: string
+      enum: [NORMAL, BUSY, PAUSED]
+      description: |
+        NORMAL: the kiosk sells, wait = NORMAL minutes. BUSY ("Movimentado"): the kiosk sells,
+        wait = BUSY minutes. PAUSED: every kiosk shows the at-capacity screen until
+        `pausedUntil`, when Go returns to NORMAL by itself.
+    StorePace:
+      type: object
+      x-comanda: true
+      required: [pace, pausedUntil, changedAt, changedBy, waitMinutes]
+      properties:
+        pace:
+          $ref: '#/components/schemas/Pace'
+        pausedUntil:
+          type: string
+          format: date-time
+          nullable: true
+        changedAt:
+          type: string
+          format: date-time
+        changedBy:
+          type: string
+          enum: [KITCHEN, OWNER, SYSTEM]
+        waitMinutes:
+          $ref: '#/components/schemas/PaceWaitMinutes'
+    StorePaceUpdate:
+      type: object
+      x-comanda: true
+      required: [pace]
+      properties:
+        pace:
+          $ref: '#/components/schemas/Pace'
+        pauseMinutes:
+          type: integer
+          enum: [15, 30]
+          description: Required when `pace` is PAUSED, ignored otherwise.
+    PaceWaitMinutes:
+      type: object
+      x-comanda: true
+      required: [NORMAL, BUSY]
+      properties:
+        NORMAL:
+          type: integer
+          minimum: 1
+          maximum: 120
+          example: 8
+        BUSY:
+          type: integer
+          minimum: 1
+          maximum: 120
+          example: 15
+
+    # ------------------------------------------------------------ Orders (MODELS 8 and 9)
+    OrderType:
+      type: string
+      description: MODELS 8.1. The pilot accepts only `DINEIN` (SPEC D-7).
+      enum: [DINEIN, TAKE_OUT, PICKUP, DELIVERY, PAY_AT_TABLE, DRIVE_THRU, DELIVEROO]
+    OrderItem:
+      type: object
+      description: |
+        MODELS 8.2. One basket line; option lines go in the product line's `modifiers`
+        (nested options included), the tree given by `parentId` → `uniqueId`. The kiosk sends
+        one product line per unit (`quantity: 1`). Comanda difference: the price fields are
+        optional on requests (MODELS marks `itemPrice` required) because the kiosk sends ids
+        only; Go ignores any price or total a client sends.
+      required: [id, quantity, uniqueId]
+      properties:
+        id:
+          type: string
+          description: The menu entity id of the product, option or size.
+        name:
+          type: string
+          nullable: true
+        plu:
+          type: string
+          nullable: true
+        quantity:
+          type: integer
+          minimum: 1
+        itemPrice:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        itemDiscount:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        itemTax:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        itemNet:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        itemTotal:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        discountRate:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+          nullable: true
+        totalPrice:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        totalDiscount:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        totalTax:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        totalNet:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        total:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        factor:
+          type: number
+          nullable: true
+        specialNotes:
+          type: string
+          nullable: true
+          maxLength: 140
+          description: The guest's note for this line (the kiosk's item note).
+        modifierType:
+          $ref: '#/components/schemas/ModifierType'
+        uniqueId:
+          type: integer
+          description: Identifies the line within the basket.
+        parentId:
+          type: integer
+          nullable: true
+          description: Option lines only. `uniqueId` of the line this option belongs to (the parent option for a nested one).
+        position:
+          type: integer
+          nullable: true
+          description: Option lines only. The option's position inside its group (1-based, link order).
+        modifiers:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        taxes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tax'
+        discounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Discount'
+    Tax:
+      type: object
+      description: MODELS 8.3 (also `ITax`). Always empty lists in the pilot.
+      required: [id, taxTotal]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        taxRate:
+          $ref: '#/components/schemas/Fraction'
+        taxTotal:
+          $ref: '#/components/schemas/Money'
+        netTotal:
+          $ref: '#/components/schemas/Money'
+        quantity:
+          type: integer
+    Discount:
+      type: object
+      description: MODELS 8.4, a discount in requests.
+      required: [id]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        rate:
+          $ref: '#/components/schemas/Fraction'
+        value:
+          $ref: '#/components/schemas/Money'
+        providerType:
+          type: string
+        uniqueItemId:
+          type: integer
+    ServiceCharge:
+      type: object
+      description: MODELS 8.5. Not used in the pilot.
+      required: [id, value]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        value:
+          $ref: '#/components/schemas/Money'
+    Customer:
+      type: object
+      description: MODELS 8.6. Personal data; never logged. Not collected by the kiosk in the pilot.
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        phoneNumber:
+          type: string
+    Address:
+      type: object
+      description: MODELS 8.7. Not used in the pilot (dine-in only).
+      properties:
+        line1:
+          type: string
+        line2:
+          type: string
+        city:
+          type: string
+        stateOrProvince:
+          type: string
+        postCode:
+          type: string
+        country:
+          type: string
+    Payment:
+      type: object
+      description: |
+        MODELS 8.8. In the pilot, copied from the APPROVED `PaymentSession`: `tenderId`
+        `MP_PIX` or `MP_POINT`, `tenderRef` = the Mercado Pago payment id.
+      required: [tenderId, amount]
+      properties:
+        tenderId:
+          type: string
+          example: MP_PIX
+        tenderRef:
+          type: string
+          nullable: true
+          example: '1319876543'
+        amount:
+          $ref: '#/components/schemas/Money'
+        tipAmount:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        donationAmount:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        customer:
+          $ref: '#/components/schemas/Customer'
+        collectPaymentOnDelivery:
+          type: boolean
+          nullable: true
+        authCode:
+          type: string
+          nullable: true
+        cardScheme:
+          type: string
+          nullable: true
+          example: VISA
+        cardLast4Digits:
+          type: string
+          nullable: true
+          pattern: '^[0-9]{4}$'
+    ExternalUserId:
+      type: object
+      description: MODELS 8.9. Not used in the pilot.
+      required: [externalId, system]
+      properties:
+        externalId:
+          type: string
+        system:
+          type: string
+    Award:
+      type: object
+      description: |
+        MODELS 8.10. A coupon is an award with `type: CODE` and `id` = the code; Go answers
+        it with `description` and `discountAmount`.
+      required: [id]
+      properties:
+        id:
+          type: string
+        posId:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        type:
+          type: string
+          description: '`PSEUDO_CURRENCY`, `CODE`, `PROMOTION` or `ITEM`. The pilot uses `CODE`.'
+          example: CODE
+        source:
+          type: string
+          nullable: true
+        isExternal:
+          type: boolean
+          nullable: true
+        sourceExternalId:
+          type: string
+          nullable: true
+        discountAmount:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+    OrderRequest:
+      type: object
+      description: |
+        MODELS 8.11 without `config` (SPEC D-5). The totals a client sends are ignored: Go
+        prices the basket itself.
+      required: [orderType, items]
+      properties:
+        orderId:
+          type: integer
+          nullable: true
+        basketId:
+          type: string
+          nullable: true
+          description: The basket from an earlier `POST /v2/totals`. Required by discounts, payments and orders.
+        orderType:
+          $ref: '#/components/schemas/OrderType'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        subTotal:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        discountTotal:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        serviceChargeTotal:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        taxTotal:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        total:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        discounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Discount'
+        taxes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tax'
+        serviceCharges:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceCharge'
+    TotalsRequest:
+      description: MODELS 8.11. Adds nothing to `OrderRequest`.
+      allOf:
+        - $ref: '#/components/schemas/OrderRequest'
+    SubmitOrderRequest:
+      description: MODELS 8.12. `payments` holds the approved payment; delivery, pickup and fiscal fields are not used in the pilot.
+      allOf:
+        - $ref: '#/components/schemas/OrderRequest'
+        - type: object
+          properties:
+            payments:
+              type: array
+              items:
+                $ref: '#/components/schemas/Payment'
+            customer:
+              $ref: '#/components/schemas/Customer'
+            address:
+              $ref: '#/components/schemas/Address'
+            externalUserIds:
+              type: array
+              items:
+                $ref: '#/components/schemas/ExternalUserId'
+            specialNotes:
+              type: string
+              nullable: true
+            notes:
+              type: string
+              nullable: true
+            dateToFire:
+              type: string
+              nullable: true
+            pickupTime:
+              type: string
+              nullable: true
+            dateCreated:
+              type: string
+              nullable: true
+            openCheck:
+              type: boolean
+              nullable: true
+            invoiceCpfCnpj:
+              type: string
+              nullable: true
+              description: Ignored in the pilot (no NFC-e).
+    DiscountRequest:
+      description: MODELS 8.13. The basket the coupon is for, plus the codes to apply or remove.
+      allOf:
+        - $ref: '#/components/schemas/OrderRequest'
+        - type: object
+          properties:
+            awards:
+              type: array
+              items:
+                $ref: '#/components/schemas/Award'
+            codesToRemove:
+              type: array
+              items:
+                type: string
+    DiscountResponse:
+      type: object
+      description: MODELS 9.8.
+      required: [awards]
+      properties:
+        awards:
+          type: array
+          items:
+            $ref: '#/components/schemas/Award'
+    CheckItem:
+      type: object
+      description: |
+        MODELS 9.1. One priced line. A product line's `total` includes its options; option lines
+        in `modifiers` carry their own share for display. Lines are named in `language` on totals
+        and in pt-BR on orders.
+      required: [id, quantity]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        quantity:
+          type: integer
+        price:
+          $ref: '#/components/schemas/Money'
+        netTotal:
+          $ref: '#/components/schemas/Money'
+        taxTotal:
+          $ref: '#/components/schemas/Money'
+        total:
+          $ref: '#/components/schemas/Money'
+        modifiers:
+          type: array
+          items:
+            $ref: '#/components/schemas/CheckItem'
+        taxes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tax'
+        specialNotes:
+          type: string
+          nullable: true
+          x-comanda: true
+          description: The guest's note for this line, shown in the kitchen.
+    ResponseDiscount:
+      type: object
+      description: MODELS 9.2 (`IDiscount`), a discount in responses. A coupon has `id` = its code.
+      required: [id]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        rate:
+          $ref: '#/components/schemas/Fraction'
+        value:
+          $ref: '#/components/schemas/Money'
+        locked:
+          type: boolean
+    TotalsResponse:
+      type: object
+      description: MODELS 9.4. `tax` is `0` and `taxes` is `[]` in the pilot. Comanda always returns `basketId`.
+      required: [basketId, subTotal, tax, total]
+      properties:
+        basketId:
+          type: string
+        subTotal:
+          $ref: '#/components/schemas/Money'
+        discount:
+          $ref: '#/components/schemas/Money'
+        serviceChargeTotal:
+          $ref: '#/components/schemas/Money'
+        tax:
+          $ref: '#/components/schemas/Money'
+        total:
+          $ref: '#/components/schemas/Money'
+        orderItems:
+          type: array
+          items:
+            $ref: '#/components/schemas/CheckItem'
+        taxes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tax'
+        discounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResponseDiscount'
+    SubmitOrderResponse:
+      description: |
+        MODELS 9.5 plus the kitchen lifecycle (`x-comanda`). `number` is the order id in this
+        API; `customerCheckNumber` is the short number on the success screen. Also the kitchen's
+        order. Fiscal fields stay empty in the pilot.
+      allOf:
+        - $ref: '#/components/schemas/TotalsResponse'
+        - type: object
+          required: [number, customerCheckNumber, orderType, status, version, placedAt, history]
+          properties:
+            number:
+              type: string
+              example: 20261110-0042
+            customerCheckNumber:
+              type: string
+              example: '42'
+            displayText:
+              type: string
+              nullable: true
+            text:
+              type: string
+              nullable: true
+            orderType:
+              $ref: '#/components/schemas/OrderType'
+            externalUserIds:
+              type: array
+              items:
+                $ref: '#/components/schemas/ExternalUserId'
+            fiscalQrCodeData:
+              type: string
+              nullable: true
+            fiscalAccessKey:
+              type: string
+              nullable: true
+            status:
+              allOf:
+                - $ref: '#/components/schemas/OrderStatus'
+              x-comanda: true
+            version:
+              type: integer
+              minimum: 1
+              x-comanda: true
+              description: 1 when placed, +1 on every status change. Clients keep the highest.
+            placedAt:
+              type: string
+              format: date-time
+              x-comanda: true
+            history:
+              type: array
+              x-comanda: true
+              description: Every status the order had, oldest first. Starts with PAID.
+              items:
+                $ref: '#/components/schemas/OrderStatusChange'
+    OrderStatus:
+      type: string
+      x-comanda: true
+      description: |
+        An order exists only once paid. NOT_COLLECTED: still open when the kitchen closed the
+        day. CANCELLED: cancelled by the owner (refund in the Mercado Pago panel).
+      enum: [PAID, PREPARING, READY, COLLECTED, NOT_COLLECTED, CANCELLED]
+    OrderStatusChange:
+      type: object
+      x-comanda: true
+      required: [status, at, by]
+      properties:
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        at:
+          type: string
+          format: date-time
+        by:
+          type: string
+          enum: [KIOSK, KITCHEN, OWNER, SYSTEM]
+          description: KIOSK for the payment, SYSTEM for automatic changes (webhook placement, resume).
+    KitchenStatusUpdate:
+      type: object
+      x-comanda: true
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [PREPARING, READY, COLLECTED]
+        expectedVersion:
+          type: integer
+          minimum: 1
+    CloseDayResult:
+      type: object
+      x-comanda: true
+      required: [count]
+      properties:
+        count:
+          type: integer
+          description: Orders moved to NOT_COLLECTED.
+          example: 2
+    OrderCancelRequest:
+      type: object
+      x-comanda: true
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          enum: [ITEM_SOLD_OUT, CANNOT_PREPARE, OTHER]
+        note:
+          type: string
+          maxLength: 140
+          nullable: true
+
+    # ------------------------------------------------------------ Payments
+    PaymentMethod:
+      type: string
+      x-comanda: true
+      enum: [PIX, CARD]
+    PaymentSessionStatus:
+      type: string
+      x-comanda: true
+      enum: [PENDING, APPROVED, DECLINED, EXPIRED, CANCELLED]
+    CreatePaymentRequest:
+      type: object
+      x-comanda: true
+      required: [basketId, method, amount]
+      properties:
+        basketId:
+          type: string
+        method:
+          $ref: '#/components/schemas/PaymentMethod'
+        amount:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Must equal the basket's current total (`BASKET_CHANGED` otherwise).
+    PaymentSession:
+      type: object
+      x-comanda: true
+      description: One Mercado Pago attempt for a basket (SPEC 4.6).
+      required: [id, basketId, method, amount, status, tenderId, tenderRef, qrCode, copyPaste, expiresAt, terminalId, createdAt]
+      properties:
+        id:
+          type: string
+          example: pay-8f2c
+        basketId:
+          type: string
+        method:
+          $ref: '#/components/schemas/PaymentMethod'
+        amount:
+          $ref: '#/components/schemas/Money'
+        status:
+          $ref: '#/components/schemas/PaymentSessionStatus'
+        tenderId:
+          type: string
+          enum: [MP_PIX, MP_POINT]
+          description: Copy into `Payment.tenderId`.
+        tenderRef:
+          type: string
+          nullable: true
+          description: The Mercado Pago payment id once known. Copy into `Payment.tenderRef`.
+        qrCode:
+          type: string
+          nullable: true
+          description: PIX only. The QR image as a `data:image/png;base64,…` URL.
+        copyPaste:
+          type: string
+          nullable: true
+          description: PIX only. The "copia e cola" text.
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: PIX only. 5 minutes after creation; still PENDING then = EXPIRED.
+        terminalId:
+          type: string
+          nullable: true
+          description: CARD only. The Point terminal the charge was sent to.
+        createdAt:
+          type: string
+          format: date-time
+        cardScheme:
+          type: string
+          nullable: true
+        cardLast4Digits:
+          type: string
+          nullable: true
+        authCode:
+          type: string
+          nullable: true
+    SimulatePaymentRequest:
+      type: object
+      x-comanda: true
+      required: [outcome]
+      properties:
+        outcome:
+          type: string
+          enum: [APPROVED, DECLINED, EXPIRED]
+
+    # ------------------------------------------------------------ Admin
+    OwnerLoginRequest:
+      type: object
+      x-comanda: true
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+    OwnerToken:
+      type: object
+      x-comanda: true
+      required: [accessToken, tokenType, expiresIn]
+      properties:
+        accessToken:
+          type: string
+        tokenType:
+          type: string
+          enum: [Bearer]
+        expiresIn:
+          type: integer
+          description: Seconds.
+    MediaAsset:
+      description: An uploaded picture, as the `IMAGE` entity it became, plus its size.
+      allOf:
+        - $ref: '#/components/schemas/PosEntityImage'
+        - type: object
+          required: [width, height]
+          properties:
+            width:
+              type: integer
+              x-comanda: true
+            height:
+              type: integer
+              x-comanda: true
+    DeviceStatus:
+      type: string
+      enum: [ACTIVE, DISABLED]
+    DeviceInput:
+      type: object
+      x-comanda: true
+      required: [name, kind, status, idleTimerIntervalMilliseconds, printerEnabled, maintenanceMode, atCapacityMode, paymentTerminalId]
+      properties:
+        name:
+          type: string
+          example: Totem da entrada
+        kind:
+          $ref: '#/components/schemas/DeviceKind'
+        status:
+          $ref: '#/components/schemas/DeviceStatus'
+        idleTimerIntervalMilliseconds:
+          type: integer
+          minimum: 0
+          example: 45000
+        printerEnabled:
+          type: boolean
+        maintenanceMode:
+          type: boolean
+        atCapacityMode:
+          type: boolean
+        paymentTerminalId:
+          type: string
+          nullable: true
+          description: The Mercado Pago Point terminal next to this kiosk.
+    AdminDevice:
+      allOf:
+        - $ref: '#/components/schemas/DeviceInput'
+        - type: object
+          required: [id, online, appVersion, lastSeenAt, ip, screenResolution]
+          properties:
+            id:
+              type: string
+              example: KIOSK-TBT-001
+            online:
+              type: boolean
+              description: A heartbeat arrived in the last 3 minutes.
+            appVersion:
+              type: string
+              nullable: true
+            lastSeenAt:
+              type: string
+              format: date-time
+              nullable: true
+            ip:
+              type: string
+              nullable: true
+            screenResolution:
+              type: string
+              nullable: true
+    DeviceCredentials:
+      type: object
+      x-comanda: true
+      required: [device, deviceSecret]
+      properties:
+        device:
+          $ref: '#/components/schemas/AdminDevice'
+        deviceSecret:
+          type: string
+          description: Shown once. The Go API stores only its hash.
+    AdminMenu:
+      type: object
+      x-comanda: true
+      description: A scheduled menu. `isActive` and `forcedUntil` are kept by Go and ignored on save.
+      required: [id, name, root]
+      properties:
+        id:
+          type: string
+          example: mnu-tarde
+        name:
+          type: string
+          example: Tarde
+        translations:
+          $ref: '#/components/schemas/Translations'
+        root:
+          type: array
+          description: Top-level `CATEGORY` links, in display order.
+          items:
+            $ref: '#/components/schemas/Link'
+        isActive:
+          type: boolean
+        forcedUntil:
+          type: string
+          format: date-time
+          nullable: true
+    ForceMenuRequest:
+      type: object
+      x-comanda: true
+      required: [until]
+      properties:
+        until:
+          type: string
+          format: date-time
+    AdminItem:
+      description: A product, option, size, sized item or combo meal, with `translations`.
+      oneOf:
+        - $ref: '#/components/schemas/PosEntityItem'
+        - $ref: '#/components/schemas/PosEntityComboMeal'
+      discriminator:
+        propertyName: type
+        mapping:
+          ITEM: '#/components/schemas/PosEntityItem'
+          SIZED_ITEM: '#/components/schemas/PosEntityItem'
+          COMBO_MEAL: '#/components/schemas/PosEntityComboMeal'
+    DiscountRule:
+      type: object
+      x-comanda: true
+      description: |
+        A coupon (SPEC 4.5), applied to a basket as an `Award` of type `CODE`. One per order.
+        PERCENT: `value` is whole percent 1–100, applied per line and rounded half up to the
+        cent. FIXED: `value` is an amount in BRL, never more than the basket. `maxDiscount` caps
+        the discount; `minOrderTotal` is checked against the subtotal.
+      required: [id, code, name, type, value, active]
+      properties:
+        id:
+          type: string
+        code:
+          type: string
+          pattern: '^[A-Z0-9]{3,20}$'
+          example: BEMVINDO10
+        name:
+          type: string
+          description: Shown to the guest as the award `description` (pt-BR).
+          example: 10% de boas-vindas
+        translations:
+          $ref: '#/components/schemas/Translations'
+        type:
+          type: string
+          enum: [PERCENT, FIXED]
+        value:
+          type: number
+          minimum: 0.01
+          example: 10
+        minOrderTotal:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        maxDiscount:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+        maxUses:
+          type: integer
+          minimum: 1
+          nullable: true
+        usesCount:
+          type: integer
+          minimum: 0
+          description: Orders placed with this coupon. Kept by Go; ignored on save.
+        validFrom:
+          type: string
+          format: date-time
+          nullable: true
+        validTo:
+          type: string
+          format: date-time
+          nullable: true
+        active:
+          type: boolean
+    DailyReport:
+      type: object
+      x-comanda: true
+      description: One business day, amounts in BRL. Cancelled orders count only in `cancelledCount`.
+      required: [date, ordersCount, revenue, averageTicket, discountTotal, cancelledCount, notCollectedCount, bestSellers]
+      properties:
+        date:
+          type: string
+          format: date
+        ordersCount:
+          type: integer
+        revenue:
+          $ref: '#/components/schemas/Money'
+        averageTicket:
+          $ref: '#/components/schemas/Money'
+        discountTotal:
+          $ref: '#/components/schemas/Money'
+        cancelledCount:
+          type: integer
+        notCollectedCount:
+          type: integer
+        bestSellers:
+          type: array
+          items:
+            type: object
+            required: [id, name, quantity, revenue]
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              quantity:
+                type: integer
+              revenue:
+                $ref: '#/components/schemas/Money'
