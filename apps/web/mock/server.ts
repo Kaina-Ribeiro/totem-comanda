@@ -16,6 +16,12 @@
 //   POST /__mock/clock     {"minutes": 16} moves the mock's clock forward (a pause's automatic resume)
 //   GET  /__mock/device-credentials?kind=KITCHEN  id and secret of a seeded device, for the
 //                           dev index to pair a browser as the kiosk or the kitchen (COM-139)
+//   POST /__mock/payments/{id} {"outcome": "APPROVED" | "DECLINED" | "EXPIRED"}  decides a v2
+//                           Mercado Pago session; a late approval is listed under v2.refunds
+//
+// Contract v2 (pilot, COM-145): a second Prism on PRISM_V2_PORT (4011) checks /v2 calls
+// against contract/openapi.v2.yaml and proxies to this same mock (routes in ./v2).
+// MOCK_PAYMENT_OUTCOME, MOCK_PAYMENT_DELAY_MS and MOCK_WEBHOOK_PLACE_MS: see v2/payments.ts.
 
 import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
@@ -34,6 +40,11 @@ import { optionRoutes } from "./routes-options.ts";
 import { kioskRoutes } from "./routes-kiosk.ts";
 import { orderRoutes } from "./routes-orders.ts";
 import { activeMenu, nextOpening } from "./schedule.ts";
+import { forceOutcome, publicSession, sweep } from "./v2/payments.ts";
+import { adminRoutesV2 } from "./v2/routes-admin.ts";
+import { guestRoutes } from "./v2/routes-guest.ts";
+import { kitchenRoutesV2, serveKitchenStreamV2 } from "./v2/routes-kitchen.ts";
+import { v2 } from "./v2/state.ts";
 import {
   applyScenario,
   isScenario,
@@ -46,6 +57,7 @@ import {
 
 const MOCK_PORT = Number(process.env.MOCK_PORT ?? 4020);
 const PRISM_PORT = Number(process.env.PRISM_PORT ?? 4010);
+const PRISM_V2_PORT = Number(process.env.PRISM_V2_PORT ?? 4011);
 const TOKEN_TTL_S = Number(process.env.MOCK_TOKEN_TTL ?? 900);
 const ASSETS = new URL("../../../docs/prototype/assets/", import.meta.url);
 
@@ -95,6 +107,9 @@ function deviceConfig(device: (typeof state.devices)[number]): Schemas["DeviceCo
 }
 
 const routes: Route[] = [
+  ...guestRoutes,
+  ...kitchenRoutesV2,
+  ...adminRoutesV2,
   ...kioskRoutes,
   ...orderRoutes,
   ...adminRoutes,
@@ -173,8 +188,21 @@ const routes: Route[] = [
         mockTime: now().toISOString(),
         devices: state.devices.map(({ secret: _, ...d }) => d),
         statusReports: state.statusReports.slice(-10),
+        v2: {
+          refunds: v2().refunds,
+          payments: [...v2().payments.values()].slice(-10).map(publicSession),
+        },
       },
     }),
+  ],
+  [
+    "POST",
+    /^\/__mock\/payments\/([^/]+)$/,
+    (req, [paymentId]) => {
+      const session = v2().payments.get(paymentId);
+      if (!session) return { status: 404, body: { error: "payment" } };
+      return forceOutcome(session, (req.body as { outcome?: unknown } | null)?.outcome);
+    },
   ],
   [
     "POST",
@@ -350,6 +378,8 @@ const server = createServer({ insecureHTTPParser: true }, async (incoming, res) 
   };
   if (await applyFault(req, res)) return;
   if (serveKitchenStream(req, res)) return;
+  if (serveKitchenStreamV2(req, res)) return;
+  if (req.path.startsWith("/v2/")) sweep();
   for (const [method, pattern, handler] of routes) {
     const match = pattern.exec(req.path);
     if (match && method === req.method) return send(res, handler(req, match.slice(1)));
@@ -370,30 +400,36 @@ server.listen(MOCK_PORT, () => {
   console.log(
     `[mock] Core API mock on http://localhost:${MOCK_PORT} (scenario: ${state.scenario})`,
   );
+  // v2 Mercado Pago sessions move on with the clock (expiry, outcome, webhook placement).
+  setInterval(() => sweep(), 1000).unref();
   if (process.env.MOCK_NO_PRISM) return;
-  // Prism validates every request and response against the contract.
+  // Prism validates every request and response against the contract: v1 and v2 side by side.
   const prismCli = fileURLToPath(
     new URL("../node_modules/@stoplight/prism-cli/dist/index.js", import.meta.url),
   );
-  const contract = fileURLToPath(new URL("../../../contract/openapi.yaml", import.meta.url));
-  const prism = spawn(
-    process.execPath,
-    [
-      prismCli,
-      "proxy",
-      contract,
-      `http://localhost:${MOCK_PORT}`,
-      "-p",
-      String(PRISM_PORT),
-      // 0.0.0.0 when the BFF runs in another container (deploy/cubeship).
-      "-h",
-      process.env.PRISM_HOST ?? "127.0.0.1",
-      "--errors",
-    ],
-    { stdio: "inherit" },
-  );
+  const startPrism = (file: string, port: number) =>
+    spawn(
+      process.execPath,
+      [
+        prismCli,
+        "proxy",
+        fileURLToPath(new URL(`../../../contract/${file}`, import.meta.url)),
+        `http://localhost:${MOCK_PORT}`,
+        "-p",
+        String(port),
+        // 0.0.0.0 when the BFF runs in another container (deploy/cubeship).
+        "-h",
+        process.env.PRISM_HOST ?? "127.0.0.1",
+        "--errors",
+      ],
+      { stdio: "inherit" },
+    );
+  const prisms = [
+    startPrism("openapi.yaml", PRISM_PORT),
+    startPrism("openapi.v2.yaml", PRISM_V2_PORT),
+  ];
   const stop = () => {
-    prism.kill();
+    for (const prism of prisms) prism.kill();
     process.exit(0);
   };
   process.on("SIGINT", stop);

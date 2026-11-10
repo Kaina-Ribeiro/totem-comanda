@@ -162,3 +162,79 @@ fields to fill and new operations to implement.
 Not in 0.2.0 (later waves): availability with a duration and `visible` (G-A4), special dates
 (G-A5), owner orders list (G-A2), item fields, kiosk content, coupon rules, change password,
 report by period, store phone and "close now".
+
+## v2 (pilot) — `openapi.v2.yaml`, 2.0.0 (proposal, COM-145)
+
+The dine-in pilot (`docs/pilot-v2/SPEC.md`) moves every data model to the v2 models of
+`docs/v2-research/MODELS.md`. `openapi.v2.yaml` holds the new contract under `/v2`; `/v1` stays
+untouched while the app moves over (pilot plan phases 1–4). In phase 5 `/v1` is removed and
+`openapi.v2.yaml` becomes `openapi.yaml`.
+
+### Rules that change from v1
+
+| Rule | v1 | v2 |
+|:--|:--|:--|
+| Money | integer cents (`2800`) | JSON number in BRL, 2 decimals (`28.00`); Go rounds discounts per line, half up, to the cent |
+| Shapes | Comanda's own | MODELS.md names and fields, without the Java `I` prefix |
+| Menu | nested categories → items → option groups | one `MenuResponse`: `root` + flat `entities` + `links` (MODELS 5) |
+| Order types | DINEIN, TAKE_OUT | DINEIN only (`ORDER_TYPE_UNAVAILABLE` otherwise) |
+| Payment | simulated, anchored on an order | Mercado Pago Pix and Point, anchored on `basketId`; the order is placed after approval |
+| Order id | `orderId` + `posCheckNumber` | `number` (id) + `customerCheckNumber` (short daily number) |
+| Sold out | today only (`soldOutDate`) | `available` on/off, kept until changed |
+| Tax, NFC-e, CPF | planned | none in the pilot (`tax: 0`, `taxes: []`) |
+
+Kept: `application/problem+json` with `code`, `Idempotency-Key` on `POST /v2/payments` and
+`POST /v2/orders`, `ETag` on config and active menu, `language` on guest endpoints, the kitchen
+lifecycle (statuses, history, `version`, undo, pace, close the day).
+
+### Reading the file
+
+- `x-comanda: true` on a property = a field Comanda adds inside a v2 model (SPEC D-2). On a schema =
+  a schema that is Comanda's own (`PaymentSession`, `DeviceConfig`, `DiscountRule`, `Problem`, …).
+  `Allergen` lists its one addition in `x-comanda-values` (`NATURAL_LATEX`).
+- `x-phase` = the pilot plan phase that moves the app onto the operation: 2 kiosk, 3 menu editor,
+  4 kitchen, store, devices, orders, report.
+- `PosEntity` is a `oneOf` with a `type` discriminator; each member pins its `type` values, so a
+  validator and the generated TypeScript union both tell the shapes apart.
+- The `getActiveMenu` example is the complete MODELS 5.20 menu without the `TAX` entity and links.
+
+### Decisions in this proposal (for the partner's review)
+
+1. **Catalogue is shared, menus are roots.** Sections, items, groups, swap sells and images are one
+   catalogue; a menu is `name` + `root` + schedules (`PosEntitySectionHours`). The guest menu is
+   the graph reachable from the active menu's `root`.
+2. **Back-office writes are `PUT …/{id}` upserts** with ids the BFF chooses (v2 ids are POS ids),
+   pattern `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`. Every catalogue save is validated as a whole:
+   `422 MENU_INVALID` lists each broken link, empty group, empty swap sell, loop, bad id,
+   incomplete combo or link MODELS 5.4 does not follow (`Problem.errors[].rule` + `.entity`).
+3. **Product ids are unique across `ITEM`, `SIZED_ITEM`, `COMBO_MEAL`**, so `crossSellIds` and
+   `/v2/admin/items/{itemId}` are unambiguous. Cross-sells are edited on the item.
+4. **An option is linked from at most one group of the same parent**, so Go finds an order line's
+   group from its parent (`OrderItem` has no group id).
+5. **`OrderItem.itemPrice` is optional on requests**: the kiosk sends ids only; Go prices every line
+   and ignores client prices and totals.
+6. **Section hours are resolved by Go**: outside its `availableHours` a section is sent with
+   `available: false`. `included` on groups is ignored in the pilot.
+7. **Exactly one order per paid basket**: `POST /v2/orders` is idempotent on `basketId`, and Go must
+   place the order from the Mercado Pago webhook when the kiosk never calls it.
+8. **Availability**: one path for products, options and sizes
+   (`PUT /v2/admin/items/{itemId}/availability`) and the kitchen's `PUT /v2/kitchen/availability`;
+   both answer a `LightMenuResponse`.
+
+### Front end
+
+```bash
+# In apps/web
+npm run mock               # v1 Prism on :4010, v2 Prism on :4011, both in front of the mock on :4020
+npm run mock:smoke:v2      # with the mock running: every v2 operation through Prism
+npm run gen:api:v2         # contract/openapi.v2.yaml → src/lib/core-api-v2.d.ts
+npm run lint:contract:v2
+```
+
+The BFF reaches v2 at `CORE_API_V2_URL` (`http://localhost:4011` with the mock).
+
+### Back end
+
+Generate the Go server from `openapi.v2.yaml` the same way as v1 (see "Back end" above). Run Prism
+in front of the Go API on another port to check it: `npx @stoplight/prism-cli proxy
+contract/openapi.v2.yaml http://localhost:8080 -p 4011 --errors`.
