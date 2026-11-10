@@ -36,6 +36,16 @@ export function localNow(now: Date, timeZone: string) {
   };
 }
 
+/**
+ * The business date at `now` (YYYY-MM-DD): days start at the store's
+ * `businessDayCutoff` ("04:00"), so 01:30 still belongs to the day before.
+ * The same rule Go uses for order numbers and the daily report.
+ */
+export function businessDate(now: Date, timeZone: string, cutoff: string): string {
+  const [hours, minutes] = cutoff.split(":").map(Number);
+  return localNow(new Date(now.getTime() - (hours * 60 + minutes) * 60_000), timeZone).date;
+}
+
 /** "Bom dia", "Boa tarde", "Boa noite" by the restaurant's clock (fixes COM-67). */
 export function greeting(hour: number): string {
   if (hour >= 5 && hour < 12) return "Bom dia";
