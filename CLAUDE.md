@@ -123,7 +123,8 @@ the waiter and QR apps are outside the MVP. A desktop screen and its phone versi
 ```bash
 # Stateful mock Core API (apps/web/mock) behind Prism, which validates every call against the
 # contract. Front end and BFF are built against it until the Go API exists. In apps/web:
-npm run mock        # CORE_API_URL=http://localhost:4010, MOCK_CONTROL_URL=http://localhost:4020/__mock
+npm run mock        # CORE_API_URL=http://localhost:4010, CORE_API_V2_URL=http://localhost:4011 (contract v2,
+                    # src/lib/core/client-v2.ts), MOCK_CONTROL_URL=http://localhost:4020/__mock
 npm run mock:orders -- 3                # with the mock running: 3 paid kiosk orders now
 npm run mock:orders -- 3 --days-ago 7   # ...on the same weekday last week (Início, Relatório)
 # A browser is one device and opens only its area (a kiosk browser sent to /kitchen lands on
