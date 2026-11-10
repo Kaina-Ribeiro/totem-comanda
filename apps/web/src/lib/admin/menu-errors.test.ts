@@ -16,7 +16,7 @@ const problem = (rule: MenuProblem["rule"], type: string, id: string, field = "l
   field,
   message,
   rule,
-  entity: { type: type as MenuProblem["entity"]["type"], id },
+  entity: { type: type as NonNullable<MenuProblem["entity"]>["type"], id },
 });
 
 describe("describeMenuErrors (MENU_INVALID, Review Focus 3)", () => {
