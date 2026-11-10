@@ -1,5 +1,16 @@
 # Data model and cloud API
 
+> **Pilot update (Nov 2026).** The entities and operations below describe the first contract (`/v1`,
+> integer cents, Comanda's own shapes), removed in pilot phase 5 (COM-149). The pilot runs on
+> [`docs/pilot-v2/SPEC.md`](pilot-v2/SPEC.md) and the single contract `contract/openapi.yaml`
+> (v2 models of `docs/v2-research/MODELS.md`, every path under `/v2`), which win where this file
+> disagrees: money is decimal BRL; the menu is one `MenuResponse` (`root` + flat `entities` +
+> `links`); orders are `DINEIN` only, keyed by `number` with a daily `customerCheckNumber`; payment is
+> a Mercado Pago session anchored on `basketId`, and the order is placed after approval; `available`
+> on/off replaces `soldOutDate`; no fiscal fields, NFC-e or CPF in the pilot. The open questions at
+> the end still stand, except those the SPEC settles in section 9 (order number reset, offline,
+> device pairing).
+
 The Go API is the source of truth for menus, orders, payments and discounts. The kiosk is a **thin client**: Chromium on the board shows the Next.js app, and the Next.js server side (the **BFF**) answers the kiosk contract from the specs (the `OP-...` operations in `data-and-integrations.md`) by calling the Go API. As in the specs, the basket lives on the kiosk until payment starts.
 
 ## Who owns what

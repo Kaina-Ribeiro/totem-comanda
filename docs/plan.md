@@ -2,6 +2,15 @@
 
 Oct 29, 2026 · @Kai
 
+> **Pilot update (Nov 2026).** The pilot is defined by [`docs/pilot-v2/SPEC.md`](pilot-v2/SPEC.md),
+> which wins where this plan disagrees. In short: one contract, `contract/openapi.yaml`, on the v2
+> models, every path under `/v2` (no `/v1`); money is decimal BRL, never cents; **dine-in only** (no
+> "Comer aqui / Para viagem"); payment is Mercado Pago Pix + Point through Go (no simulated payment
+> on the kiosk); **no NFC-e and no CPF step** in the pilot (the success screen shows the invoice
+> notice); no tax; availability is on/off, kept until changed (no "sold out today"); the waiter app,
+> tables and the table QR menu come after the pilot. Hardware (board, terminal, printers) is still
+> the last phase (CLAUDE.md, Phases).
+
 ## MVP scope
 
 The MVP is a self-service kiosk for **a single bakery**, with **one visual template** (the "Café e trigo" theme from the prototype), plus a kitchen screen and a back office for the owner. The bakery is the first real test. The payment terminal, the receipt printer and NFC-e come last, in the same phase. "Restaurant" in the specs and the data model means the store.

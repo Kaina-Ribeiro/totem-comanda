@@ -1,34 +1,22 @@
-// v2 kitchen routes: board, Server-Sent Events, status moves, "Acabou",
-// close the day and the store pace. The pace itself is v1's (one store pace);
-// v2 streams hear the changes made through v2 routes.
+// Kitchen routes: board, Server-Sent Events, status moves, "Acabou",
+// close the day and the store pace (../pace.ts, which tells the streams).
 
 import type { ServerResponse } from "node:http";
 
 import { authDevice, ok, type Reply, type Request, type Route } from "../http.ts";
-import { paceRoutes } from "../pace.ts";
+import { kitchenPaceRoutes } from "../pace.ts";
 import { problem, type S } from "./http.ts";
-import { addKitchenListenerV2, broadcastV2, closeDay, collectedToday, moveOrder, openOrders, setAvailability } from "./orders.ts";
+import { addKitchenListener, closeDay, collectedToday, moveOrder, openOrders, setAvailability } from "./orders.ts";
 import { sweep } from "./payments.ts";
 
 const PING_MS = 15_000;
-
-/** The v1 pace handler for `method` + `path` (the store has one pace for both versions). */
-export const v1Pace = (method: string, path: string) =>
-  paceRoutes.find(([m, p]) => m === method && p.test(path))![2];
-
-/** Runs a v1 pace handler and tells the v2 streams when the pace changed. */
-export function paceVia(method: string, path: string, req: Request): Reply {
-  const reply = v1Pace(method, path)(req, []);
-  if (method === "PUT" && reply.status === 200) broadcastV2("store.pace_changed", reply.body);
-  return reply;
-}
 
 const device =
   (handler: (req: Request, params: string[]) => Reply) => (req: Request, params: string[]) =>
     authDevice(req).error ?? handler(req, params);
 
 /** GET /v2/kitchen/stream, answered outside the Reply routes because it never ends. */
-export function serveKitchenStreamV2(req: Request, res: ServerResponse): boolean {
+export function serveKitchenStream(req: Request, res: ServerResponse): boolean {
   if (req.method !== "GET" || req.path !== "/v2/kitchen/stream") return false;
   const { error } = authDevice(req);
   if (error) {
@@ -38,7 +26,7 @@ export function serveKitchenStreamV2(req: Request, res: ServerResponse): boolean
   }
   res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
   res.write(": connected\n\n");
-  const remove = addKitchenListenerV2(res);
+  const remove = addKitchenListener(res);
   const ping = setInterval(() => res.write(": ping\n\n"), PING_MS);
   res.on("close", () => {
     clearInterval(ping);
@@ -47,7 +35,7 @@ export function serveKitchenStreamV2(req: Request, res: ServerResponse): boolean
   return true;
 }
 
-export const kitchenRoutesV2: Route[] = [
+export const kitchenRoutes: Route[] = [
   [
     "GET",
     /^\/v2\/kitchen\/orders$/,
@@ -73,6 +61,5 @@ export const kitchenRoutesV2: Route[] = [
     }),
   ],
   ["POST", /^\/v2\/kitchen\/close-day$/, device(() => ok({ count: closeDay() } satisfies S["CloseDayResult"]))],
-  ["GET", /^\/v2\/kitchen\/pace$/, (req) => paceVia("GET", "/v1/kitchen/pace", req)],
-  ["PUT", /^\/v2\/kitchen\/pace$/, (req) => paceVia("PUT", "/v1/kitchen/pace", req)],
+  ...kitchenPaceRoutes,
 ];

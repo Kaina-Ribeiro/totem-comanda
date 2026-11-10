@@ -3,12 +3,14 @@ import { describe, expect, it } from "vitest";
 import {
   businessDate,
   dayIsOver,
+  fromSectionHours,
   greeting,
   kioskState,
   localNow,
   nextOpening,
   signalLabel,
   totalVersusLastWeek,
+  unavailable,
   versusLastWeek,
   weekBefore,
   whenLabel,
@@ -131,5 +133,28 @@ describe("businessDate", () => {
 
   it("is the calendar date with a 00:00 cutoff", () => {
     expect(businessDate(new Date("2026-11-10T04:30:00Z"), "America/Sao_Paulo", "00:00")).toBe("2026-11-10");
+  });
+});
+
+describe("contract v2 shapes on the home", () => {
+  it("reads a v2 menu window as a schedule, past midnight too", () => {
+    expect(fromSectionHours({ dayOfWeek: "SUNDAY", open: "22:00", close: "02:00" })).toEqual({
+      weekday: "SUN",
+      timeStart: "22:00",
+      timeEnd: "02:00",
+    });
+    expect(fromSectionHours({ dayOfWeek: "WEDNESDAY", open: "06:00:00", close: "11:00:00" })).toEqual({
+      weekday: "WED",
+      timeStart: "06:00",
+      timeEnd: "11:00",
+    });
+  });
+
+  it("lists the items turned off, by name", () => {
+    const item = (name: string, available: boolean) => ({ id: name, name, available });
+    expect(unavailable([item("Pão", false), item("Bolo", true), item("Café", false)]).map((i) => i.name)).toEqual([
+      "Café",
+      "Pão",
+    ]);
   });
 });

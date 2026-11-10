@@ -26,7 +26,7 @@ import {
 } from "@/lib/admin/catalogue";
 import { type AdminItem, type Item, readItem, readOptionRows } from "@/lib/admin/catalogue-form";
 import { type FormState, saveBoth, text } from "@/lib/admin/form";
-import { uploadImageV2 } from "@/lib/admin/media";
+import { uploadImage } from "@/lib/admin/media";
 
 const reais = (value: number | null | undefined) => (value == null ? "" : value.toFixed(2).replace(".", ","));
 
@@ -39,7 +39,7 @@ async function saveItem(_: FormState, form: FormData): Promise<FormState> {
     const items = byId(catalogue.items);
     const current = itemId ? (items.get(itemId) ?? null) : null;
     if (itemId && !current) return { error: "Esse item não existe mais. Recarregue a página." };
-    const uploaded = await uploadImageV2(form, "imageFile");
+    const uploaded = await uploadImage(form, "imageFile");
     if (uploaded) form.set("image", uploaded);
     const item = readItem(form, current, { nextComboId: nextComboId(catalogue.items) });
     if (item.type === "SIZED_ITEM" && form.has("sizes")) {

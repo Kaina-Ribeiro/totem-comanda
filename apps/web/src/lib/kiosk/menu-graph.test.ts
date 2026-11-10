@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { applyScenario, now } from "../../../mock/state";
 import { guestMenu } from "../../../mock/v2/menu";
-import type { components } from "../core-api-v2";
+import type { components } from "../core-api";
 import { findProduct, type KioskMenu, readMenu } from "./menu-graph";
 
 type MenuResponse = components["schemas"]["MenuResponse"];

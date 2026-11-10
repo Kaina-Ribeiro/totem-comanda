@@ -4,6 +4,10 @@ import createClient, { type Client } from "openapi-fetch";
 
 import type { components, paths } from "@/lib/core-api";
 
+/**
+ * The Core API client for contract/openapi.yaml (pilot, docs/pilot-v2/SPEC.md).
+ * Shared by the kiosk, the kitchen and the back office.
+ */
 export type CoreApi = Client<paths>;
 export type Problem = components["schemas"]["Problem"];
 export type ProblemCode = components["schemas"]["ProblemCode"];
@@ -23,6 +27,13 @@ export function fetchWithTimeout(ms: number): (input: Request) => Promise<Respon
     fetch(input, { signal: AbortSignal.any([input.signal, AbortSignal.timeout(ms)]) });
 }
 
+/** Where the Core API is served, without the /v2 prefix (with the mock: Prism on 4010). */
+export function coreApiUrl(env: Readonly<Record<string, string | undefined>> = process.env): string {
+  const baseUrl = env.CORE_API_URL;
+  if (!baseUrl) throw new Error("CORE_API_URL is not set (see apps/web/.env.example)");
+  return baseUrl;
+}
+
 let client: CoreApi | undefined;
 
 /**
@@ -31,13 +42,7 @@ let client: CoreApi | undefined;
  * request that needs it, not the build.
  */
 export function coreApi(): CoreApi {
-  if (!client) {
-    const baseUrl = process.env.CORE_API_URL;
-    if (!baseUrl) {
-      throw new Error("CORE_API_URL is not set (see apps/web/.env.example)");
-    }
-    client = createClient<paths>({ baseUrl, fetch: fetchWithTimeout(CALL_TIMEOUT_MS) });
-  }
+  client ??= createClient<paths>({ baseUrl: coreApiUrl(), fetch: fetchWithTimeout(CALL_TIMEOUT_MS) });
   return client;
 }
 
@@ -56,15 +61,14 @@ export function problemCode(error: unknown): ProblemCode | undefined {
 let mediaClient: CoreApi | undefined;
 
 /**
- * Client for media: uploads (uploadMedia) and the /media files. Same Core API,
- * but CORE_MEDIA_URL may point past Prism, whose proxy re-encodes binary
- * bodies as UTF-8 and corrupts images. Falls back to CORE_API_URL.
+ * Client for image uploads. Same Core API, but CORE_MEDIA_URL may point past
+ * Prism, whose proxy re-encodes binary bodies as UTF-8 and corrupts images.
+ * Falls back to CORE_API_URL.
  */
 export function coreMediaApi(): CoreApi {
-  if (!mediaClient) {
-    const baseUrl = process.env.CORE_MEDIA_URL ?? process.env.CORE_API_URL;
-    if (!baseUrl) throw new Error("CORE_API_URL is not set (see apps/web/.env.example)");
-    mediaClient = createClient<paths>({ baseUrl, fetch: fetchWithTimeout(MEDIA_TIMEOUT_MS) });
-  }
+  mediaClient ??= createClient<paths>({
+    baseUrl: process.env.CORE_MEDIA_URL ?? coreApiUrl(),
+    fetch: fetchWithTimeout(MEDIA_TIMEOUT_MS),
+  });
   return mediaClient;
 }

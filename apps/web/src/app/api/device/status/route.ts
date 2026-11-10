@@ -14,7 +14,7 @@ export async function POST(request: Request) {
 
   try {
     const { response } = await asDevice((headers) =>
-      coreApi().POST("/v1/devices/status", { headers, body: statusReport(state) }),
+      coreApi().POST("/v2/devices/status", { headers, body: statusReport(state) }),
     );
     if (!response.ok) console.warn(`Status report rejected: HTTP ${response.status}`);
   } catch (error) {

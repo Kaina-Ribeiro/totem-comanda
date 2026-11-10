@@ -1,7 +1,7 @@
 import Image from "next/image";
 
 import { formatMoney } from "@/lib/format/money";
-import { basketUnits } from "@/lib/kiosk/basket-v2";
+import { basketUnits } from "@/lib/kiosk/basket";
 import type { Badge, Product, Section } from "@/lib/kiosk/menu-graph";
 import { format, type Strings } from "@/lib/kiosk/strings";
 

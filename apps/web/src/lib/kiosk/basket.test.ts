@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { applyScenario, now } from "../../../mock/state";
 import { guestMenu } from "../../../mock/v2/menu";
-import { type BasketLine, lineUnits, pickNames, toOrderItems, type TotalsResponse } from "./basket-v2";
+import { type BasketLine, lineUnits, pickNames, toOrderItems, type TotalsResponse } from "./basket";
 import { findProduct, type KioskMenu, readMenu } from "./menu-graph";
 
 let menu: KioskMenu;

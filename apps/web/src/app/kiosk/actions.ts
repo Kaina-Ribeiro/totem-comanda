@@ -2,9 +2,9 @@
 
 import { after } from "next/server";
 
-import { coreApiV2 } from "@/lib/core/client-v2";
+import { coreApi } from "@/lib/core/client";
 import { retryUnknown } from "@/lib/core/retry";
-import type { components } from "@/lib/core-api-v2";
+import type { components } from "@/lib/core-api";
 import {
   deviceCall,
   kioskCall,
@@ -15,7 +15,7 @@ import {
   reportKeyAction,
   type Result,
   success,
-} from "@/lib/kiosk/core-v2";
+} from "@/lib/kiosk/core";
 import { type Language, mergeStrings, type Strings } from "@/lib/kiosk/strings";
 
 // Server Actions of the kiosk journey on Core v2 (pilot, SPEC 4.6 and 5). The
@@ -53,7 +53,7 @@ export async function beginJourney(language: Language): Promise<Result<JourneySt
   const orderNonce = crypto.randomUUID();
 
   const [journey, menu, pack] = await Promise.all([
-    deviceCall((headers) => coreApiV2().POST("/v2/journeys", { headers, body: { orderNonce, language } })),
+    deviceCall((headers) => coreApi().POST("/v2/journeys", { headers, body: { orderNonce, language } })),
     loadActiveMenu(language),
     loadLanguagePack(language),
   ]);
@@ -101,7 +101,7 @@ export async function priceBasket(input: {
 }): Promise<Result<TotalsResponse>> {
   if (!isLanguage(input.language)) return { ok: false, code: "VALIDATION_FAILED" };
   return kioskCall((headers) =>
-    coreApiV2().POST("/v2/totals", {
+    coreApi().POST("/v2/totals", {
       headers,
       params: { query: { language: input.language } },
       body: { basketId: input.basketId, orderType: "DINEIN", items: input.items },
@@ -120,7 +120,7 @@ export async function applyCoupon(input: {
   if (!code) return { ok: false, code: "DISCOUNT_INVALID" };
   if (!isLanguage(input.language)) return { ok: false, code: "VALIDATION_FAILED" };
   return kioskCall((headers) =>
-    coreApiV2().POST("/v2/discounts/apply", {
+    coreApi().POST("/v2/discounts/apply", {
       headers,
       params: { query: { language: input.language } },
       body: {
@@ -140,7 +140,7 @@ export async function removeCoupon(input: {
   code: string;
 }): Promise<Result<unknown>> {
   return kioskCall((headers) =>
-    coreApiV2().POST("/v2/discounts/cancel", {
+    coreApi().POST("/v2/discounts/cancel", {
       headers,
       body: { basketId: input.basketId, orderType: "DINEIN", items: input.items, codesToRemove: [input.code] },
     }),
@@ -158,7 +158,7 @@ export async function recordJourneyEvent(
 ): Promise<void> {
   after(async () => {
     const result = await kioskCall((headers) =>
-      coreApiV2().POST("/v2/journeys/{orderNonce}/events", {
+      coreApi().POST("/v2/journeys/{orderNonce}/events", {
         headers,
         params: { path: { orderNonce } },
         body: orderTotal === null ? { type } : { type, orderTotal },
@@ -179,7 +179,7 @@ export async function startPayment(
 ): Promise<Result<PaymentSession>> {
   if (input.method !== "PIX" && input.method !== "CARD") return { ok: false, code: "VALIDATION_FAILED" };
   return kioskCall((headers) =>
-    coreApiV2().POST("/v2/payments", {
+    coreApi().POST("/v2/payments", {
       headers,
       params: { header: { "Idempotency-Key": idempotencyKey } },
       body: { basketId: input.basketId, method: input.method, amount: input.amount },
@@ -189,13 +189,13 @@ export async function startPayment(
 
 /** Polls a payment session; the kiosk calls it at most once a second while PENDING. */
 export async function pollPayment(paymentId: string): Promise<Result<PaymentSession>> {
-  return kioskCall((headers) => coreApiV2().GET("/v2/payments/{paymentId}", { headers, params: { path: { paymentId } } }));
+  return kioskCall((headers) => coreApi().GET("/v2/payments/{paymentId}", { headers, params: { path: { paymentId } } }));
 }
 
 /** Cancels a session still PENDING; `PAYMENT_NOT_CANCELLABLE` once it is final. */
 export async function cancelPayment(paymentId: string): Promise<Result<PaymentSession>> {
   return kioskCall((headers) =>
-    coreApiV2().POST("/v2/payments/{paymentId}/cancel", { headers, params: { path: { paymentId } } }),
+    coreApi().POST("/v2/payments/{paymentId}/cancel", { headers, params: { path: { paymentId } } }),
   );
 }
 
@@ -228,7 +228,7 @@ export async function submitOrder(
   const payments = input.payment?.status === "APPROVED" ? [paymentOf(input.payment)] : [];
   return retryUnknown((signal) =>
     deviceCall((headers) =>
-      coreApiV2().POST("/v2/orders", {
+      coreApi().POST("/v2/orders", {
         headers,
         signal,
         params: { header: { "Idempotency-Key": idempotencyKey } },

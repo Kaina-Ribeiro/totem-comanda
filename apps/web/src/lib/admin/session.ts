@@ -4,8 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 
-import { coreApi, problemCode, type ProblemCode } from "@/lib/core/client";
-import type { ProblemCodeV2, ProblemV2 } from "@/lib/core/client-v2";
+import { coreApi, type Problem, problemCode, type ProblemCode } from "@/lib/core/client";
 import { sealValue, unsealValue } from "@/lib/device/seal";
 
 // Kept in sync with src/proxy.ts (the proxy stays free of server-only modules).
@@ -49,7 +48,7 @@ export type LoginResult =
 export async function signIn(email: string, password: string): Promise<LoginResult> {
   let result;
   try {
-    result = await coreApi().POST("/v1/admin/auth/login", { body: { email, password } });
+    result = await coreApi().POST("/v2/admin/auth/login", { body: { email, password } });
   } catch {
     return { ok: false, code: "CORE_UNAVAILABLE" };
   }
@@ -85,12 +84,12 @@ export async function signOut(): Promise<void> {
 export type OwnerHeaders = { Authorization: string };
 
 /** One field error of a problem answer (v2 `MENU_INVALID` adds `rule` and `entity`). */
-export type ProblemFieldError = NonNullable<ProblemV2["errors"]>[number];
+export type ProblemFieldError = NonNullable<Problem["errors"]>[number];
 
 /** Thrown for an answer the back office cannot use, with the Core API's `code`. */
 export class AdminApiError extends Error {
   constructor(
-    readonly code: ProblemCode | ProblemCodeV2 | "CORE_UNAVAILABLE",
+    readonly code: ProblemCode | "CORE_UNAVAILABLE",
     readonly detail?: string,
     readonly errors?: ProblemFieldError[],
   ) {

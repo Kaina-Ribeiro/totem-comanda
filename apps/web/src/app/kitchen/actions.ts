@@ -1,8 +1,8 @@
 "use server";
 
-import { coreApiV2 } from "@/lib/core/client-v2";
+import { coreApi } from "@/lib/core/client";
 import { requireDeviceKind } from "@/lib/device/config";
-import { failure } from "@/lib/kiosk/core-v2";
+import { failure } from "@/lib/kiosk/core";
 import {
   type Availability,
   cancelAsOwner,
@@ -28,7 +28,7 @@ export async function moveOrder(
 ): Promise<Result<KitchenOrder>> {
   if (!STATUSES.has(status)) return { ok: false, code: "VALIDATION_FAILED" };
   return deviceCallAs("KITCHEN", (headers) =>
-    coreApiV2().POST("/v2/kitchen/orders/{number}/status", {
+    coreApi().POST("/v2/kitchen/orders/{number}/status", {
       headers,
       params: { path: { number } },
       body: { status, expectedVersion },
@@ -46,7 +46,7 @@ export async function setAvailable(id: string, available: boolean): Promise<Resu
     return { ok: false, code: "VALIDATION_FAILED" };
   }
   return deviceCallAs("KITCHEN", (headers) =>
-    coreApiV2().PUT("/v2/kitchen/availability", { headers, body: { id, available } }),
+    coreApi().PUT("/v2/kitchen/availability", { headers, body: { id, available } }),
   );
 }
 
@@ -93,7 +93,7 @@ export async function setKitchenPace(
     return { ok: false, code: "VALIDATION_FAILED" };
   }
   return deviceCallAs("KITCHEN", (headers) =>
-    coreApiV2().PUT("/v2/kitchen/pace", {
+    coreApi().PUT("/v2/kitchen/pace", {
       headers,
       body: pace === "PAUSED" ? { pace, pauseMinutes } : { pace },
     }),
@@ -105,7 +105,7 @@ export async function setKitchenPace(
  * NOT_COLLECTED and answers how many it moved.
  */
 export async function closeKitchenDay(): Promise<Result<{ count: number }>> {
-  return deviceCallAs("KITCHEN", (headers) => coreApiV2().POST("/v2/kitchen/close-day", { headers }));
+  return deviceCallAs("KITCHEN", (headers) => coreApi().POST("/v2/kitchen/close-day", { headers }));
 }
 
 /** Reads the pace again (the owner may have changed it on Início). */

@@ -7,15 +7,15 @@ import { attemptCatalogue } from "@/lib/admin/catalogue";
 import { type AdminMenu, type Hours, readHours, readMenu, type Section } from "@/lib/admin/catalogue-form";
 import { type FormState, load, saveBoth, text } from "@/lib/admin/form";
 import { asOwner } from "@/lib/admin/session";
-import { coreApiV2 } from "@/lib/core/client-v2";
+import { coreApi } from "@/lib/core/client";
 
 const FORCE_HOURS = [1, 2, 4, 8];
 
 const putMenu = (body: AdminMenu) =>
-  asOwner((headers) => coreApiV2().PUT("/v2/admin/menus/{menuId}", { headers, params: { path: { menuId: body.id } }, body }));
+  asOwner((headers) => coreApi().PUT("/v2/admin/menus/{menuId}", { headers, params: { path: { menuId: body.id } }, body }));
 
 const getMenu = async (menuId: string) => {
-  const menus = await asOwner((headers) => coreApiV2().GET("/v2/admin/menus", { headers }));
+  const menus = await asOwner((headers) => coreApi().GET("/v2/admin/menus", { headers }));
   return menus.find((m) => m.id === menuId) ?? null;
 };
 
@@ -46,7 +46,7 @@ async function saveMenu(_: FormState, form: FormData): Promise<FormState> {
         label: "os horários",
         save: () =>
           asOwner((headers) =>
-            coreApiV2().PUT("/v2/admin/menus/{menuId}/schedules", { headers, params: { path: { menuId } }, body: windows }),
+            coreApi().PUT("/v2/admin/menus/{menuId}/schedules", { headers, params: { path: { menuId } }, body: windows }),
           ),
       },
     );
@@ -61,14 +61,14 @@ async function forceMenu(_: FormState, form: FormData): Promise<FormState> {
   return attemptCatalogue(async () => {
     if (text(form, "intent") === "clear") {
       await asOwner((headers) =>
-        coreApiV2().DELETE("/v2/admin/menus/{menuId}/force", { headers, params: { path: { menuId } } }),
+        coreApi().DELETE("/v2/admin/menus/{menuId}/force", { headers, params: { path: { menuId } } }),
       );
       await refreshAdmin();
       return "De volta ao horário normal.";
     }
     const hours = Number(text(form, "hours")) || 1;
     await asOwner((headers) =>
-      coreApiV2().POST("/v2/admin/menus/{menuId}/force", {
+      coreApi().POST("/v2/admin/menus/{menuId}/force", {
         headers,
         params: { path: { menuId } },
         body: { until: new Date(Date.now() + hours * 3_600_000).toISOString() },
@@ -105,13 +105,13 @@ export default function MenusPage() {
 async function MenuList() {
   const loaded = await load(async () => {
     const [menus, sections] = await Promise.all([
-      asOwner((headers) => coreApiV2().GET("/v2/admin/menus", { headers })),
-      asOwner((headers) => coreApiV2().GET("/v2/admin/sections", { headers })),
+      asOwner((headers) => coreApi().GET("/v2/admin/menus", { headers })),
+      asOwner((headers) => coreApi().GET("/v2/admin/sections", { headers })),
     ]);
     const schedules = await Promise.all(
       menus.map((menu) =>
         asOwner((headers) =>
-          coreApiV2().GET("/v2/admin/menus/{menuId}/schedules", { headers, params: { path: { menuId: menu.id } } }),
+          coreApi().GET("/v2/admin/menus/{menuId}/schedules", { headers, params: { path: { menuId: menu.id } } }),
         ),
       ),
     );

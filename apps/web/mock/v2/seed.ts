@@ -1,6 +1,6 @@
 // The v2 mock's starting data: the complete menu of MODELS.md 5.20 without tax,
 // named in pt-BR with the original English in `translations.en`, two scheduled
-// menus over that catalogue (same hours as the v1 mock), store settings, a
+// menus over that catalogue (06:00–11:00 and 11:00–20:00), store settings, a
 // badge and three coupons.
 
 import type { Entity, S } from "./http.ts";

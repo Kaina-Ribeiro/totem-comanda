@@ -21,17 +21,17 @@ import {
 } from "@/lib/admin/catalogue";
 import { readSection, type Section } from "@/lib/admin/catalogue-form";
 import { type FormState, load, text } from "@/lib/admin/form";
-import { uploadImageV2 } from "@/lib/admin/media";
+import { uploadImage } from "@/lib/admin/media";
 import { asOwner } from "@/lib/admin/session";
-import { coreApiV2 } from "@/lib/core/client-v2";
+import { coreApi } from "@/lib/core/client";
 
 async function saveSection(_: FormState, form: FormData): Promise<FormState> {
   "use server";
   const sectionId = text(form, "sectionId");
   return attemptCatalogue(async () => {
-    const sections = await asOwner((headers) => coreApiV2().GET("/v2/admin/sections", { headers }));
+    const sections = await asOwner((headers) => coreApi().GET("/v2/admin/sections", { headers }));
     const current = sectionId ? (sections.find((s) => s.id === sectionId) ?? null) : null;
-    const uploaded = await uploadImageV2(form, "imageFile");
+    const uploaded = await uploadImage(form, "imageFile");
     if (uploaded) form.set("image", uploaded);
     await putSection(readSection(form, current));
     await refreshAdmin();
@@ -55,7 +55,7 @@ export default function SectionsPage() {
 
 async function SectionList() {
   const loaded = await load(() =>
-    Promise.all([loadCatalogue(), asOwner((headers) => coreApiV2().GET("/v2/admin/menus", { headers }))]),
+    Promise.all([loadCatalogue(), asOwner((headers) => coreApi().GET("/v2/admin/menus", { headers }))]),
   );
   if ("error" in loaded) return <LoadError message={loaded.error} />;
   const [catalogue, menus] = loaded.data;

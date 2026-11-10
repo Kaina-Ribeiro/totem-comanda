@@ -1,7 +1,7 @@
 // Shared helpers of the v2 mock routes: v2 schema types, problems with v2 codes,
 // and money in integer cents so totals never carry float noise.
 
-import type { components } from "../../src/lib/core-api-v2.d.ts";
+import type { components } from "../../src/lib/core-api.d.ts";
 import type { Reply } from "../http.ts";
 
 export type S = components["schemas"];

@@ -17,7 +17,7 @@ export async function POST(request: Request) {
 
   try {
     const { response } = await asDevice((headers) =>
-      coreApi().POST("/v1/devices/heartbeat", {
+      coreApi().POST("/v2/devices/heartbeat", {
         headers,
         body: { appVersion: APP_VERSION, screenResolution },
       }),

@@ -16,7 +16,10 @@ vi.mock("@/lib/device/session", () => ({
     call({ Authorization: "Bearer t" }, "KIOSK-1"),
 }));
 vi.mock("@/lib/core/mock-scenarios", () => ({ isCoreDownSimulated: async () => false }));
-vi.mock("@/lib/core/client-v2", () => ({ coreApiV2: () => core }));
+vi.mock("@/lib/core/client", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/core/client")>()),
+  coreApi: () => core,
+}));
 
 const actions = await import("./actions");
 

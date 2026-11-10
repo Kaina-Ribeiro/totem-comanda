@@ -278,14 +278,14 @@ Session brief: Goal: one contract, one version. Done when: no `/v1` left and doc
 
 ### Task 5.1: Remove v1
 
-**Status:** ⏳ pending
+**Status:** ✅ done (COM-149, plan `pilot-v2-phase-5.md`) — one contract `contract/openapi.yaml`, `client.ts` (`coreApi()`, `CORE_API_URL`), one Prism on 4010, no v1 routes, types, mock code or tests; device sign-in, heartbeat, status, owner login, uploads and the home's off-items card on `/v2`. ⏳ PR waits for the partner's approval. No Cubeship change needed (`CORE_API_URL` already points at 4010); Kai removes the unused `CORE_API_V2_URL` from itodev when he wants.
 **Produces:** `contract/openapi.v2.yaml` → `contract/openapi.yaml`; v1 routes, types, mock code and
 the second Prism removed; `CORE_API_V2_URL` folded back into `CORE_API_URL`; `gen:api` points at the
 single contract; Cubeship `itodev` and prod env updated (Kai's yes first).
 
 ### Task 5.2: Docs
 
-**Status:** ⏳ pending
+**Status:** ✅ done (COM-149) — CLAUDE.md (pilot scope, decimal BRL, `/v2`-only rules, single-Prism commands), `contract/README.md` rewritten for v2, pilot notes on top of `docs/plan.md` and `docs/data-model-and-api.md`.
 **Produces:** `CLAUDE.md` (money is decimal BRL; dine-in only; pilot scope; waiter/QR after the
 pilot; mock commands), `contract/README.md` (v2), `docs/plan.md` and `docs/data-model-and-api.md`
 point to the SPEC where they now disagree.

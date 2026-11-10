@@ -3,7 +3,7 @@ import { Card, inputClass, LoadError, PageHeader } from "@/components/admin/ui";
 import { load } from "@/lib/admin/form";
 import { businessDate } from "@/lib/admin/home";
 import { asOwner } from "@/lib/admin/session";
-import { coreApiV2 } from "@/lib/core/client-v2";
+import { coreApi } from "@/lib/core/client";
 import { formatMoney } from "@/lib/format/money";
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -31,13 +31,13 @@ async function Report({
 }) {
   const { date: asked } = await searchParams;
   const loaded = await load(async () => {
-    const store = await asOwner((headers) => coreApiV2().GET("/v2/admin/store", { headers }));
+    const store = await asOwner((headers) => coreApi().GET("/v2/admin/store", { headers }));
     // The business day in the store's timezone (it starts at the cutoff),
     // unless the owner picked another day.
     const today = businessDate(new Date(), store.timezone, store.businessDayCutoff);
     const date = typeof asked === "string" && DATE.test(asked) ? asked : today;
     const report = await asOwner((headers) =>
-      coreApiV2().GET("/v2/admin/reports/daily", { headers, params: { query: { date } } }),
+      coreApi().GET("/v2/admin/reports/daily", { headers, params: { query: { date } } }),
     );
     return { report, today, cutoff: store.businessDayCutoff };
   });

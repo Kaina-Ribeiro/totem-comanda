@@ -14,7 +14,7 @@ import {
   type Schemas,
 } from "./http.ts";
 import { now } from "./state.ts";
-import { broadcastKitchenEvent } from "./stream.ts";
+import { broadcastKitchenEvent } from "./v2/orders.ts";
 
 const pace: Schemas["StorePace"] = {
   pace: "NORMAL",
@@ -87,22 +87,17 @@ function setPace(req: Request, by: "KITCHEN" | "OWNER"): Reply {
 
 const whole = (n: unknown) => typeof n === "number" && Number.isInteger(n) && n >= 1 && n <= 120;
 
-export const paceRoutes: Route[] = [
-  [
-    "GET",
-    /^\/v1\/kitchen\/pace$/,
-    (req) => authDevice(req).error ?? ok(currentPace()),
-  ],
-  [
-    "PUT",
-    /^\/v1\/kitchen\/pace$/,
-    (req) => authDevice(req).error ?? setPace(req, "KITCHEN"),
-  ],
-  ["GET", /^\/v1\/admin\/pace$/, (req) => authOwner(req) ?? ok(currentPace())],
-  ["PUT", /^\/v1\/admin\/pace$/, (req) => authOwner(req) ?? setPace(req, "OWNER")],
+export const kitchenPaceRoutes: Route[] = [
+  ["GET", /^\/v2\/kitchen\/pace$/, (req) => authDevice(req).error ?? ok(currentPace())],
+  ["PUT", /^\/v2\/kitchen\/pace$/, (req) => authDevice(req).error ?? setPace(req, "KITCHEN")],
+];
+
+export const adminPaceRoutes: Route[] = [
+  ["GET", /^\/v2\/admin\/pace$/, (req) => authOwner(req) ?? ok(currentPace())],
+  ["PUT", /^\/v2\/admin\/pace$/, (req) => authOwner(req) ?? setPace(req, "OWNER")],
   [
     "PUT",
-    /^\/v1\/admin\/pace\/wait-minutes$/,
+    /^\/v2\/admin\/pace\/wait-minutes$/,
     (req) => {
       const denied = authOwner(req);
       if (denied) return denied;

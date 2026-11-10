@@ -10,7 +10,7 @@ import {
   setAvailable,
   setKitchenPace,
 } from "@/app/kitchen/actions";
-import type { components } from "@/lib/core-api-v2";
+import type { components } from "@/lib/core-api";
 import {
   accept,
   applyOrder,

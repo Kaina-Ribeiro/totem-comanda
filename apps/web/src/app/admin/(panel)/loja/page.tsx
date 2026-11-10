@@ -14,8 +14,8 @@ import {
 import { attempt, checked, type FormState, load, text } from "@/lib/admin/form";
 import { uploadImage } from "@/lib/admin/media";
 import { asOwner } from "@/lib/admin/session";
-import { coreApiV2 } from "@/lib/core/client-v2";
-import type { components } from "@/lib/core-api-v2";
+import { coreApi } from "@/lib/core/client";
+import type { components } from "@/lib/core-api";
 
 type Language = components["schemas"]["LanguageCode"];
 type Store = components["schemas"]["StoreConfigurationResponse"];
@@ -33,7 +33,7 @@ async function saveStore(_: FormState, form: FormData): Promise<FormState> {
   if (!CUTOFF.test(cutoff)) return { error: "Use a hora no formato 04:00." };
   if (!text(form, "invoice.pt")) return { error: "Escreva o aviso de nota fiscal em português." };
   return attempt(async () => {
-    const current = await asOwner((headers) => coreApiV2().GET("/v2/admin/store", { headers }));
+    const current = await asOwner((headers) => coreApi().GET("/v2/admin/store", { headers }));
     const logo =
       (await uploadImage(form, "logo")) ?? (checked(form, "removeLogo") ? null : (current.logo ?? null));
     const languages: Language[] = checked(form, "english") ? ["pt-BR", "en"] : ["pt-BR"];
@@ -56,7 +56,7 @@ async function saveStore(_: FormState, form: FormData): Promise<FormState> {
       closedMessage: { title: localized("closedTitle"), description: localized("closedBody") },
       invoiceNotice: localized("invoice"),
     };
-    await asOwner((headers) => coreApiV2().PUT("/v2/admin/store", { headers, body }));
+    await asOwner((headers) => coreApi().PUT("/v2/admin/store", { headers, body }));
     // React resets the form after the action: re-render it with what was saved.
     revalidatePath("/admin", "layout");
     return "Configurações salvas. O totem atualiza em até 45 s.";
@@ -73,7 +73,7 @@ async function saveWaitMinutes(_: FormState, form: FormData): Promise<FormState>
   if (!valid(NORMAL) || !valid(BUSY)) return { error: "Use minutos inteiros de 1 a 120." };
   return attempt(async () => {
     await asOwner((headers) =>
-      coreApiV2().PUT("/v2/admin/pace/wait-minutes", { headers, body: { NORMAL, BUSY } }),
+      coreApi().PUT("/v2/admin/pace/wait-minutes", { headers, body: { NORMAL, BUSY } }),
     );
     // The form resets after the action: re-render it (and Início's hints) with the saved minutes.
     revalidatePath("/admin", "layout");
@@ -100,7 +100,7 @@ export default function StorePage() {
 
 /** "Tempo de espera" per pace level; the kitchen and Início pick the level. */
 async function WaitTimesForm() {
-  const loaded = await load(() => asOwner((headers) => coreApiV2().GET("/v2/admin/pace", { headers })));
+  const loaded = await load(() => asOwner((headers) => coreApi().GET("/v2/admin/pace", { headers })));
   if ("error" in loaded) return <LoadError message={loaded.error} />;
   const { waitMinutes } = loaded.data;
   return (
@@ -145,7 +145,7 @@ async function WaitTimesForm() {
 
 async function StoreForm() {
   const loaded = await load(() =>
-    asOwner((headers) => coreApiV2().GET("/v2/admin/store", { headers })),
+    asOwner((headers) => coreApi().GET("/v2/admin/store", { headers })),
   );
   if ("error" in loaded) return <LoadError message={loaded.error} />;
   const r = loaded.data;

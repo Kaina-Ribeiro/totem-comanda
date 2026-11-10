@@ -10,7 +10,7 @@ import { byId, imageOf, loadCatalogue, optionIds } from "@/lib/admin/catalogue";
 import type { AdminItem } from "@/lib/admin/catalogue-form";
 import { attempt, type FormState, load, text } from "@/lib/admin/form";
 import { asOwner } from "@/lib/admin/session";
-import { coreApiV2 } from "@/lib/core/client-v2";
+import { coreApi } from "@/lib/core/client";
 
 async function setAvailable(_: FormState, form: FormData): Promise<FormState> {
   "use server";
@@ -18,7 +18,7 @@ async function setAvailable(_: FormState, form: FormData): Promise<FormState> {
   const available = text(form, "intent") === "on";
   return attempt(async () => {
     await asOwner((headers) =>
-      coreApiV2().PUT("/v2/admin/items/{itemId}/availability", {
+      coreApi().PUT("/v2/admin/items/{itemId}/availability", {
         headers,
         params: { path: { itemId } },
         body: { available },

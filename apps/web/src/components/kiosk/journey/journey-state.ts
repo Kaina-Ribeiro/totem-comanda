@@ -1,6 +1,6 @@
 import type { SubmitOrderResponse, TotalsResponse } from "@/app/kiosk/actions";
-import type { BasketLine } from "@/lib/kiosk/basket-v2";
-import type { Result } from "@/lib/kiosk/core-v2";
+import type { BasketLine } from "@/lib/kiosk/basket";
+import type { Result } from "@/lib/kiosk/core";
 import { findProduct, type KioskMenu } from "@/lib/kiosk/menu-graph";
 import type { Language, Strings } from "@/lib/kiosk/strings";
 

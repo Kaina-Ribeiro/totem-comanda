@@ -6,7 +6,7 @@ import { Badge, Card, LoadError, PageHeader } from "@/components/admin/ui";
 import { loadCatalogue, parentsOf } from "@/lib/admin/catalogue";
 import { load } from "@/lib/admin/form";
 import { asOwner } from "@/lib/admin/session";
-import { coreApiV2 } from "@/lib/core/client-v2";
+import { coreApi } from "@/lib/core/client";
 
 import { TYPE_LABEL } from "@/components/admin/catalogue-fields";
 
@@ -24,7 +24,7 @@ async function EditItem({ params, searchParams }: PageProps<"/admin/itens/[itemI
   const [{ itemId: rawId }, { novo }] = await Promise.all([params, searchParams]);
   const itemId = decodeURIComponent(rawId);
   const loaded = await load(() =>
-    Promise.all([loadCatalogue(), asOwner((headers) => coreApiV2().GET("/v2/admin/menus", { headers }))]),
+    Promise.all([loadCatalogue(), asOwner((headers) => coreApi().GET("/v2/admin/menus", { headers }))]),
   );
   if ("error" in loaded) return <LoadError message={loaded.error} />;
   const [catalogue, menus] = loaded.data;

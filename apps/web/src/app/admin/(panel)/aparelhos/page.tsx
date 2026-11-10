@@ -13,8 +13,8 @@ import {
 } from "@/components/admin/ui";
 import { attempt, checked, type FormState, load, text } from "@/lib/admin/form";
 import { asOwner } from "@/lib/admin/session";
-import { coreApiV2 } from "@/lib/core/client-v2";
-import type { components } from "@/lib/core-api-v2";
+import { coreApi } from "@/lib/core/client";
+import type { components } from "@/lib/core-api";
 
 type Device = components["schemas"]["AdminDevice"];
 type DeviceInput = components["schemas"]["DeviceInput"];
@@ -44,7 +44,7 @@ async function createDevice(_: FormState, form: FormData): Promise<FormState> {
   "use server";
   return attempt(async () => {
     const created = await asOwner((headers) =>
-      coreApiV2().POST("/v2/admin/devices", {
+      coreApi().POST("/v2/admin/devices", {
         headers,
         body: { ...deviceInput(form), status: "ACTIVE" },
       }),
@@ -62,7 +62,7 @@ async function saveDevice(_: FormState, form: FormData): Promise<FormState> {
   const deviceId = text(form, "deviceId");
   return attempt(async () => {
     await asOwner((headers) =>
-      coreApiV2().PUT("/v2/admin/devices/{deviceId}", {
+      coreApi().PUT("/v2/admin/devices/{deviceId}", {
         headers,
         params: { path: { deviceId } },
         body: deviceInput(form),
@@ -78,7 +78,7 @@ async function rotateSecret(_: FormState, form: FormData): Promise<FormState> {
   const deviceId = text(form, "deviceId");
   return attempt(async () => {
     const rotated = await asOwner((headers) =>
-      coreApiV2().POST("/v2/admin/devices/{deviceId}/secret", {
+      coreApi().POST("/v2/admin/devices/{deviceId}/secret", {
         headers,
         params: { path: { deviceId } },
       }),
@@ -135,7 +135,7 @@ export default function DevicesPage() {
 
 async function DeviceList() {
   const loaded = await load(() =>
-    asOwner((headers) => coreApiV2().GET("/v2/admin/devices", { headers })),
+    asOwner((headers) => coreApi().GET("/v2/admin/devices", { headers })),
   );
   if ("error" in loaded) return <LoadError message={loaded.error} />;
   const devices = loaded.data;

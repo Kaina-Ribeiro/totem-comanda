@@ -6,15 +6,15 @@
 // pt-BR and in English.
 //
 // In process by default (the mock's own route handlers). With the mock running,
-//   MOCK_V2_URL=http://localhost:4011 npx vitest run src/lib/admin/reference-menu.test.ts
+//   MOCK_API_URL=http://localhost:4010 npx vitest run src/lib/admin/reference-menu.test.ts
 // runs the same build through Prism, which validates every call against the contract.
 
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { adminRoutesV2 } from "../../../mock/v2/routes-admin";
+import { adminRoutes } from "../../../mock/v2/routes-admin";
 import { guestRoutes } from "../../../mock/v2/routes-guest";
 import { applyScenario, state } from "../../../mock/state";
-import type { components } from "@/lib/core-api-v2";
+import type { components } from "@/lib/core-api";
 
 import {
   type AdminItem,
@@ -35,7 +35,7 @@ type Entity = components["schemas"]["PosEntity"];
 type Json = any;
 type Call = (method: string, path: string, body?: unknown, token?: string) => Promise<{ status: number; body: Json }>;
 
-const LIVE = process.env.MOCK_V2_URL;
+const LIVE = process.env.MOCK_API_URL;
 const CONTROL = process.env.MOCK_CONTROL_URL ?? "http://localhost:4020/__mock";
 
 // ------------------------------------------------------------ transports
@@ -47,7 +47,7 @@ function inProcess(): { call: Call; owner: string; device: string } {
   state.ownerTokens.set(owner, Date.now() + 3_600_000);
   const kiosk = state.devices.find((d) => d.kind === "KIOSK")!;
   state.tokens.set(device, { deviceId: kiosk.id, expiresAt: Date.now() + 3_600_000 });
-  const routes = [...adminRoutesV2, ...guestRoutes];
+  const routes = [...adminRoutes, ...guestRoutes];
   const call: Call = async (method, path, body, token) => {
     const url = new URL(path, "http://mock");
     for (const [m, pattern, handler] of routes) {
