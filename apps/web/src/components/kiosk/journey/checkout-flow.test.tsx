@@ -32,6 +32,16 @@ function renderCheckout({ cardAvailable = true } = {}) {
 /** Lets pending promises and timers run, so the next screen is on the page. */
 const flush = (ms = 0) => act(() => vi.advanceTimersByTimeAsync(ms));
 const button = (name: RegExp | string) => screen.getByRole("button", { name });
+
+/**
+ * Waits for the Pix or card screen, so the poll timer exists, then runs one
+ * poll. Advancing the clock before that screen is up skips the poll under load.
+ */
+async function pollOnce() {
+  await flush();
+  await screen.findByText(strings["pay.waiting"]);
+  await flush(1_000);
+}
 const user = () => userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
 describe("CheckoutFlow (Mercado Pago on v2)", () => {
@@ -74,11 +84,23 @@ describe("CheckoutFlow (Mercado Pago on v2)", () => {
     expect(screen.getByRole("timer").textContent).toMatch(/Expira em [45]:\d\d/);
   });
 
+  it("counts the Pix down from Go's 5 minutes even when the kiosk clock is off", async () => {
+    const ahead = Date.now() + 10 * 3_600_000;
+    actions.startPayment.mockResolvedValue({
+      ok: true,
+      data: { ...session("PENDING"), createdAt: new Date(ahead).toISOString(), expiresAt: new Date(ahead + 300_000).toISOString() },
+    });
+    renderCheckout();
+    await user().click(button(/^Pix/));
+    await flush();
+    expect(screen.getByRole("timer").textContent).toBe("Expira em 5:00");
+  });
+
   it("an approved Pix places the order with the session and the basket's key", async () => {
     actions.pollPayment.mockResolvedValue({ ok: true, data: session("APPROVED") });
     const on = renderCheckout();
     await user().click(button(/^Pix/));
-    await flush(1_000);
+    await pollOnce();
     await flush();
     expect(actions.submitOrder).toHaveBeenCalledWith(
       {
@@ -95,7 +117,7 @@ describe("CheckoutFlow (Mercado Pago on v2)", () => {
     actions.pollPayment.mockResolvedValue({ ok: true, data: session("DECLINED", "CARD") });
     renderCheckout();
     await user().click(button(/^Cartão/));
-    await flush(1_000);
+    await pollOnce();
     expect(screen.getByText(strings["pay.declinedTag"])).toBeTruthy();
     expect(button(strings["pay.retry"])).toBeTruthy();
     await user().click(button(strings["pay.other"]));
@@ -107,7 +129,7 @@ describe("CheckoutFlow (Mercado Pago on v2)", () => {
     actions.pollPayment.mockResolvedValue({ ok: true, data: session("EXPIRED") });
     const on = renderCheckout();
     await user().click(button(/^Pix/));
-    await flush(1_000);
+    await pollOnce();
     expect(screen.getByText(strings["pix.expiredTag"])).toBeTruthy();
     expect(on.onPlaced).not.toHaveBeenCalled();
     expect(button(strings["pix.new"])).toBeTruthy();
@@ -119,7 +141,7 @@ describe("CheckoutFlow (Mercado Pago on v2)", () => {
       .mockResolvedValueOnce({ ok: true, data: session("PENDING", "PIX", "pay-2") });
     renderCheckout();
     await user().click(button(/^Pix/));
-    await flush(1_000);
+    await pollOnce();
     await user().click(button(strings["pix.new"]));
     await flush();
     const [first, second] = actions.startPayment.mock.calls.map(([, key]) => key);
@@ -176,7 +198,7 @@ describe("CheckoutFlow (Mercado Pago on v2)", () => {
     actions.submitOrder.mockResolvedValueOnce({ ok: false, code: "CORE_UNAVAILABLE" });
     const on = renderCheckout();
     await user().click(button(/^Pix/));
-    await flush(1_000);
+    await pollOnce();
     await flush();
     expect(screen.getByText(strings["pay.verifyingTag"])).toBeTruthy();
     await flush(5_000);
@@ -189,7 +211,7 @@ describe("CheckoutFlow (Mercado Pago on v2)", () => {
     actions.submitOrder.mockResolvedValue({ ok: false, code: "PAYMENT_NOT_APPROVED" });
     renderCheckout();
     await user().click(button(/^Pix/));
-    await flush(1_000);
+    await pollOnce();
     await flush();
     expect(screen.getByText("Código do pagamento: 1319876543")).toBeTruthy();
     // The payment is taken: no other method and no cancel.

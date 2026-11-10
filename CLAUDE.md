@@ -97,7 +97,8 @@ The `x-phase` field on each contract operation says which phase needs it.
 ## Kiosk performance rules (the ARM board is the weakest part)
 
 - Load the menu once at journey start and keep it in memory (spec OP-START-04). Menu, item and
-  cart are one client-side flow with no server round trip until the quote.
+  cart are one client-side flow; the only server call is Go pricing the basket (`POST /v2/totals`,
+  debounced 400 ms after a change), which never blocks a tap.
 - Attract, closed and success screens are Server Components. Client code only for the basket,
   the item builder and the idle timer.
 - Images through `next/image`, sized for 1080x1920; cached by the service worker.
@@ -136,6 +137,11 @@ npm run mock:orders -- 3 --days-ago 7   # ...on the same weekday last week (Iní
 # Mercado Pago is simulated: MOCK_PAYMENT_OUTCOME=APPROVED|DECLINED|EXPIRED|NONE (default APPROVED)
 # after MOCK_PAYMENT_DELAY_MS (3000); POST /__mock/payments/{id} {"outcome": …} decides one session.
 npm run mock:smoke:v2                   # with the mock running: every v2 operation through Prism
+# The kiosk runs on /v2 (COM-146): /kiosk needs CORE_API_V2_URL; back office and kitchen stay on
+# /v1 until COM-147/148. The kiosk never adds prices: Go prices the basket (POST /v2/totals) after
+# every change. To see a Pix or card outcome, run the mock with MOCK_PAYMENT_OUTCOME=NONE and decide
+# the session with POST /__mock/payments/{id}; /dev/mock's payment buttons only affect v1.
+# Ports taken by another worktree? MOCK_PORT, PRISM_PORT and PRISM_V2_PORT move the mock.
 
 # Regenerate API types after any contract change
 npx openapi-typescript contract/openapi.yaml -o apps/web/src/lib/core-api.d.ts

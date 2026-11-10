@@ -42,7 +42,13 @@ export function SwapSellSheet({
               className="flex items-center gap-[36px] rounded-[36px] bg-wheat p-[24px] text-left"
             >
               <span className="relative size-[210px] shrink-0 overflow-hidden rounded-[27px] bg-oat">
-                {target.picture && <Image src={target.picture.url} alt="" fill sizes="210px" className="object-cover" />}
+                {target.picture ? (
+                  <Image src={target.picture.url} alt="" fill sizes="210px" className="object-cover" />
+                ) : (
+                  <span className="flex size-full items-center justify-center font-display text-[90px] font-semibold text-ink/25">
+                    {target.name.charAt(0)}
+                  </span>
+                )}
               </span>
               <span className="flex flex-1 flex-col gap-[12px]">
                 <span className="font-display text-[51px] leading-[1.05] font-semibold">{target.name}</span>

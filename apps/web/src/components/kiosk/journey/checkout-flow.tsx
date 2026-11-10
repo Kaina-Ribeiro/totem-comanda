@@ -191,10 +191,8 @@ export function CheckoutFlow({
     if (!session || !polling) return;
     let live = true;
     let timer: ReturnType<typeof setTimeout>;
-    const deadline =
-      session.method === "PIX" && session.expiresAt
-        ? Date.parse(session.expiresAt) + PIX_GRACE_MS
-        : clock() + CARD_TIMEOUT_MS;
+    const pixLife = pixLifetimeMs(session);
+    const deadline = clock() + (pixLife !== null ? pixLife + PIX_GRACE_MS : CARD_TIMEOUT_MS);
     let cancelAt = deadline;
 
     const tick = async () => {
@@ -484,15 +482,28 @@ function MethodScreen({
   );
 }
 
-/** "Expira em 4:59", counting down to `expiresAt` (Pix lasts 5 minutes). */
-function useCountdown(expiresAt: string | null): string | null {
-  const [now, setNow] = useState(() => Date.now());
+/**
+ * How long a Pix lasts, from Go's own clock (`expiresAt − createdAt`, 5 min).
+ * The kiosk counts that down from when it got the session, so a kiosk clock
+ * that is off never shows a wrong countdown. Null for a card.
+ */
+function pixLifetimeMs(session: PaymentSession): number | null {
+  if (session.method !== "PIX" || !session.expiresAt) return null;
+  const life = Date.parse(session.expiresAt) - Date.parse(session.createdAt);
+  return Number.isFinite(life) && life > 0 ? life : null;
+}
+
+/** "Expira em 4:59", counting the Pix lifetime down from when this screen got the session. */
+function useCountdown(session: PaymentSession): string | null {
+  const [start] = useState(() => Date.now());
+  const [now, setNow] = useState(start);
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1_000);
     return () => clearInterval(timer);
   }, []);
-  if (!expiresAt) return null;
-  const left = Math.max(0, Math.ceil((Date.parse(expiresAt) - now) / 1_000));
+  const life = pixLifetimeMs(session);
+  if (life === null) return null;
+  const left = Math.max(0, Math.ceil((start + life - now) / 1_000));
   return `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
 }
 
@@ -513,7 +524,7 @@ function PixScreen({
   onNew: () => void;
   onOther: () => void;
 }) {
-  const left = useCountdown(session.expiresAt);
+  const left = useCountdown(session);
   return (
     <main className="flex h-full flex-col bg-ground px-[84px] pt-[96px] pb-[72px] text-ink">
       <span className="text-[30px] font-semibold text-muted">

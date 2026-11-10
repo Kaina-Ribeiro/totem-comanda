@@ -65,7 +65,13 @@ export function CrossSellSheet({
                 className={`flex flex-col gap-[18px] rounded-[36px] p-[18px] text-left ${on ? "bg-wheat" : "bg-ground"}`}
               >
                 <div className="relative h-[240px] overflow-hidden rounded-[27px] bg-oat">
-                  {p.picture && <Image src={p.picture.url} alt="" fill sizes="440px" className="object-cover" />}
+                  {p.picture ? (
+                    <Image src={p.picture.url} alt="" fill sizes="440px" className="object-cover" />
+                  ) : (
+                    <span className="flex size-full items-center justify-center font-display text-[96px] font-semibold text-ink/25">
+                      {p.name.charAt(0)}
+                    </span>
+                  )}
                   {on && (
                     <span className="absolute top-[18px] right-[18px] flex size-[60px] items-center justify-center rounded-full bg-accent text-on-accent">
                       <Check size={33} strokeWidth={3} />

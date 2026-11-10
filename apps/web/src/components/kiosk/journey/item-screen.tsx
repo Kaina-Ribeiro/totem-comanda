@@ -138,7 +138,9 @@ function GroupSection({
   return (
     <section className="flex flex-col gap-[27px]">
       <div className="flex items-baseline justify-between gap-6">
-        <h2 className="font-display text-[45px] font-semibold">{group.name}</h2>
+        <h2 className="font-display text-[45px] font-semibold">
+          {group.kind === "SIZE" ? strings["item.size"] : group.name}
+        </h2>
         <span className={`shrink-0 text-[24px] font-bold ${hint.strong ? "text-detail-text" : "text-muted"}`}>{hint.text}</span>
       </div>
 
