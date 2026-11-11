@@ -4,7 +4,6 @@ import { AdminApiError } from "./session";
 import {
   attempt,
   errorMessage,
-  orderTypesError,
   priceField,
   readPrice,
   saveBoth,
@@ -93,18 +92,6 @@ describe("attempt with MENU_INVALID (Review Focus 3)", () => {
       ]);
     }, names);
     expect(state.problems).toEqual(["Grupo “Escolha o molho”: precisa de pelo menos uma opção."]);
-  });
-});
-
-describe("orderTypesError", () => {
-  it("refuses dine-in and take-out both off", () => {
-    expect(orderTypesError(false, false)).toMatch(/pelo menos um/);
-  });
-
-  it("accepts either one on", () => {
-    expect(orderTypesError(true, false)).toBeNull();
-    expect(orderTypesError(false, true)).toBeNull();
-    expect(orderTypesError(true, true)).toBeNull();
   });
 });
 

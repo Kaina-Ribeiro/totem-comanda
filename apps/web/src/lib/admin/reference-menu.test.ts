@@ -38,6 +38,12 @@ type Call = (method: string, path: string, body?: unknown, token?: string) => Pr
 const LIVE = process.env.MOCK_API_URL;
 const CONTROL = process.env.MOCK_CONTROL_URL ?? "http://localhost:4020/__mock";
 
+/**
+ * `until` for a forced menu. The "afternoon" scenario moves the mock's clock to 15:00 store
+ * time, up to a day away from the real clock, so one hour from now may already be past for it.
+ */
+const forceUntil = () => new Date(Date.now() + 2 * 86_400_000).toISOString();
+
 // ------------------------------------------------------------ transports
 
 function inProcess(): { call: Call; owner: string; device: string } {
@@ -272,7 +278,7 @@ async function buildReferenceMenu(call: Call, owner: string): Promise<string> {
     null,
   );
   await ok("PUT", `/v2/admin/menus/${menu.id}`, menu);
-  await ok("POST", `/v2/admin/menus/${menu.id}/force`, { until: new Date(Date.now() + 3_600_000).toISOString() });
+  await ok("POST", `/v2/admin/menus/${menu.id}/force`, { until: forceUntil() });
   return menu.id;
 }
 
@@ -321,7 +327,7 @@ describe.each([LIVE ? "through Prism" : "in process"])("MODELS 5.20 built in the
     return reply.body as MenuResponse;
   };
   const force = (menuId: string) =>
-    api.call("POST", `/v2/admin/menus/${menuId}/force`, { until: new Date(Date.now() + 3_600_000).toISOString() }, api.owner);
+    api.call("POST", `/v2/admin/menus/${menuId}/force`, { until: forceUntil() }, api.owner);
 
   let seed: Record<string, MenuResponse>;
   let built: Record<string, MenuResponse>;

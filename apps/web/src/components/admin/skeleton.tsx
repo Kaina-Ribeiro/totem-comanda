@@ -38,7 +38,7 @@ function Busy({ children }: { children: ReactNode }) {
 
 const H2 = "text-lg font-bold tracking-[-0.01em]";
 
-/** Relatório do dia: date filter, three numbers, dine-in × take-out, best sellers. */
+/** Relatório do dia: date filter, three numbers, coupons and cancellations, best sellers. */
 export function ReportSkeleton() {
   return (
     <Busy>

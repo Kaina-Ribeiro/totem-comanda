@@ -6,14 +6,24 @@ kitchen screen and a back office for the owner.
 
 **The pilot** (`docs/pilot-v2/SPEC.md`, decided by Kai and the partner 5–6 Nov 2026) is a basic
 dine-in kiosk on the v2 data models of `docs/v2-research/MODELS.md`: see the menu, choose, pay with
-Pix or card (Mercado Pago Pix + Point, called only by Go), and the order reaches the kitchen after
+Pix or card (Mercado Pago Pix + Point, called only by the Core API), and the order reaches the kitchen after
 payment. Every order is `DINEIN`. No NFC-e: the success screen shows the invoice notice ("Se quiser
 nota fiscal, dirija-se ao caixa."). No tax. Availability is plain on/off. The waiter app, tables,
 open checks and the table QR menu come **after the pilot**.
 
 Two people build it:
 - **Kai** (you work with him): the Next.js app — kiosk, kitchen and back-office screens, and the BFF.
-- **Partner**: the Go Core API and the PostgreSQL database. Do not write Go unless Kai asks.
+- **Bruno** (the partner): the Core API, in **Java**, and the PostgreSQL database. Do not write
+  back-end code unless Kai asks.
+
+The Core API was planned in Go and Bruno moved it to Java (Kai, 11 Nov 2026), before any of it was
+written. `contract/openapi.yaml`, older docs and code comments still say "Go" for the Core API: read
+it as "the Core API". The contract itself does not depend on the language.
+
+**Where it stands (11 Nov 2026, `v0.4.9` in prod, `release/v0.5` open):** the kiosk, the kitchen screen, the back office and the
+BFF are built and run end to end against the stateful mock, on contract `2.0.0` (64 operations, all
+answered by the mock through Prism). The Core API is not started. Next: Bruno implements the
+contract, then `CORE_API_URL` points at it instead of the mock (`contract/README.md`, "Back end").
 
 Talk to Kai in Brazilian Portuguese, casual and direct. Code, comments, commits and docs in English.
 
@@ -21,7 +31,7 @@ Talk to Kai in Brazilian Portuguese, casual and direct. Code, comments, commits 
 
 1. `docs/pilot-v2/SPEC.md` — the pilot: scope, decisions, what changed from the original plan.
    `docs/plan.md` — original MVP scope, architecture, phases, decisions, risks (the SPEC wins).
-2. `contract/openapi.yaml` and `contract/README.md` — the API contract with the Go side.
+2. `contract/openapi.yaml` and `contract/README.md` — the API contract with the Core API.
 3. `docs/data-model-and-api.md` — entities, business rules, open questions.
 4. `docs/prototype/README.md` and `docs/prototype/screens/*.png` — the approved visual design.
 5. `docs/specs/` — functional specs of the reference kiosk: how each screen behaves.
@@ -41,14 +51,14 @@ Kiosk (Orange Pi, Debian, Chromium --kiosk, 1080x1920 portrait)
 Next.js app (server)  ── BFF: Route Handlers, Server Actions, Server Components
    │ REST/JSON /v2, generated client from contract/openapi.yaml
    ▼
-Go Core API (partner) ── PostgreSQL        all in Docker on one server
+Core API (Java, Bruno) ── PostgreSQL       all in Docker on one server
 ```
 
 - Nothing is installed on the kiosk except Chromium. No Electron, no local service.
 - One Next.js app serves three areas behind three logins: `/kiosk` (device), `/kitchen` (device),
   `/admin` (owner).
 - The BFF formats and combines. **Prices, discounts, menu availability and order numbers are
-  decided only by the Go API.** Never compute them in the front end beyond display.
+  decided only by the Core API.** Never compute them in the front end beyond display.
 - Device and owner tokens stay on the server (HttpOnly cookies). The browser never sees them.
 
 ## Stack
@@ -65,19 +75,26 @@ Go Core API (partner) ── PostgreSQL        all in Docker on one server
 
 ```
 CLAUDE.md
+AGENTS.md                 points other coding agents (Codex …) here; keep every rule in CLAUDE.md
+README.md                 how to run the project locally, from zero
+RELEASING.md              the release flow in full
 contract/openapi.yaml     source of truth for the API; change only by PR, both partners approve
-contract/README.md        how both sides use the contract
+contract/README.md        how both sides use the contract; what the Core API must do
 docs/                     plan, data model, specs, prototype (read-only reference)
-apps/web/                 the Next.js app (create it in phase 0)
+apps/web/                 the Next.js app: kiosk, kitchen, back office and the BFF
   src/lib/core-api.d.ts   generated, never edit by hand
-api/                      Go Core API (partner)
+  mock/                   the stateful mock Core API (routes in mock/v2)
+deploy/cubeship/          Dockerfiles of the `web` and `mock` apps
+infra/kiosk/              kiosk board setup kit (phase 4)
 ```
+
+The Core API's code is not in this repository yet; where it will live is Bruno's call.
 
 ## Phases
 
 | Phase | Goal | Done when |
 |:--|:--|:--|
-| 0 | Foundation: Next.js app, BFF, device auth, config, heartbeat, PWA shell, HTTPS deploy | The kiosk, in a regular browser over the server's HTTPS address, reaches the Go API |
+| 0 | Foundation: Next.js app, BFF, device auth, config, heartbeat, PWA shell, HTTPS deploy | The kiosk, in a regular browser over the server's HTTPS address, reaches the Core API |
 | 1 | Back office and menus: catalogue, schedules, sold out, discounts | The menu switches by itself |
 | 2 | Kiosk ordering: full flow, PT/EN, coupons, simulated payment, number on screen | A real order on the unit |
 | 3 | Kitchen screen (SSE) and daily report | Order in the kitchen in 2 s |
@@ -88,17 +105,19 @@ Everything that is hardware is phase 4, last: the kiosk board itself, the paymen
 printers (Kai, 30 Oct 2026; this overrides `docs/plan.md`, which had the board in phase 0). Until
 then the kiosk is developed and tested in a regular desktop browser at 1080x1920; the board setup
 kit waits in `infra/kiosk/`.
-Payment in the pilot is Mercado Pago Pix + Point through Go (`POST /v2/payments`); the mock
+Payment in the pilot is Mercado Pago Pix + Point through the Core API (`POST /v2/payments`); the mock
 simulates Mercado Pago (`POST /v2/payments/{id}/simulate` and `/__mock/payments/{id}`).
 
-The `x-phase` field on each contract operation says which phase needs it.
+The `x-phase` field on each contract operation is **not** a phase of this table: it is the phase of
+the pilot plan (`docs/plans/pilot-v2.md`) that moved the app onto that operation (2 kiosk, 3 menu
+editor, 4 kitchen, store, devices, orders, report). The Core API needs all 64.
 
 ## Contract rules (short version; full list in `contract/README.md`)
 
 - One contract, `contract/openapi.yaml` (v2 models); every path is under `/v2`. There is no v1.
 - Money is a JSON number in decimal BRL (`9.50` = R$ 9,50), never cents. Display it with
-  `formatMoney()` (`src/lib/format/money.ts`); Go computes every amount.
-- The kiosk sends entity ids, never prices; Go prices the basket (`POST /v2/totals`).
+  `formatMoney()` (`src/lib/format/money.ts`); the Core API computes every amount.
+- The kiosk sends entity ids, never prices; the Core API prices the basket (`POST /v2/totals`).
 - Errors are `application/problem+json`; switch on `code`, never on `title`.
 - `POST /v2/payments` and `POST /v2/orders` need an `Idempotency-Key` (UUID per attempt).
 - Dine-in only: `orderType` is always `DINEIN`; no take-out screen or report split.
@@ -108,10 +127,11 @@ The `x-phase` field on each contract operation says which phase needs it.
 ## Kiosk performance rules (the ARM board is the weakest part)
 
 - Load the menu once at journey start and keep it in memory (spec OP-START-04). Menu, item and
-  cart are one client-side flow; the only server call is Go pricing the basket (`POST /v2/totals`,
+  cart are one client-side flow; the only server call is the Core API pricing the basket (`POST /v2/totals`,
   debounced 400 ms after a change), which never blocks a tap.
-- Attract, closed and success screens are Server Components. Client code only for the basket,
-  the item builder and the idle timer.
+- The attract, closed and unavailable screens are Server Components. Client code only for the
+  journey (menu, item builder, basket, checkout and the success screen with its countdown), the
+  paused screen and the idle timer.
 - Images through `next/image`, sized for 1080x1920; cached by the service worker.
 - CSS transitions only. No blur or heavy shadows in animation.
 - Keep the bundle in check with `npm run analyze` (baseline: ~181 KB gzip of JS on `/kiosk`); the
@@ -132,9 +152,12 @@ the waiter and QR apps come after the pilot. A desktop screen and its phone vers
 
 ## Commands
 
+Running the project from zero (Node version, `.env.local`, the two terminals, test logins) is in
+`README.md`; keep it current when a command or an environment variable changes.
+
 ```bash
 # Stateful mock Core API (apps/web/mock) behind Prism, which validates every call against the
-# contract. Front end and BFF are built against it until the Go API exists. In apps/web:
+# contract. Front end and BFF are built against it until the Core API exists. In apps/web:
 npm run mock        # one Prism on :4010 (contract/openapi.yaml): CORE_API_URL=http://localhost:4010,
                     # MOCK_CONTROL_URL=http://localhost:4020/__mock; routes live in mock/v2
 npm run mock:orders -- 3                # with the mock running: 3 paid kiosk orders now (kitchen, report)
@@ -149,7 +172,7 @@ npm run mock:orders -- 3 --days-ago 7   # ...on the same weekday last week (Iní
 # session from /dev/mock (or POST /__mock/payments/{id}).
 npm run mock:smoke                      # with the mock running: every operation through Prism
 # The kitchen reads order lines through src/lib/kitchen/order.ts (one line per unit merged). The
-# kiosk never adds prices: Go prices the basket (POST /v2/totals) after every change.
+# kiosk never adds prices: the Core API prices the basket (POST /v2/totals) after every change.
 # An ingredient taken out is not on the order: the kiosk tells the kitchen in specialNotes
 # ("sem Tomate", always pt-BR, built in toOrderItems), so every call that sends the basket carries it.
 # Ports taken by another worktree? MOCK_PORT and PRISM_PORT move the mock (then set CORE_API_URL
@@ -160,6 +183,9 @@ npm run gen:api        # contract/openapi.yaml → src/lib/core-api.d.ts
 
 # Lint the contract
 npx @redocly/cli lint contract/openapi.yaml
+
+# Checks, in apps/web. CI (`pr-checks / checks`) runs only lint and typecheck, so run the tests yourself.
+npm run typecheck && npm run lint && npm test
 ```
 
 ## Working agreements
@@ -179,14 +205,20 @@ npx @redocly/cli lint contract/openapi.yaml
   `MENU_INVALID` rule by entity name.
 - Back office loading (COM-140, COM-141): a page part that loads data goes in
   `<Streamed fallback={<…Skeleton />}>` (`components/admin/skeleton.tsx`), never a bare
-  `<Suspense>`. The skeleton has the page's shape with its fixed labels as real text; the
+  `<Suspense>` (only the panel layout's shell and the login page keep one: nothing there has a
+  skeleton). The skeleton has the page's shape with its fixed labels as real text; the
   content then fades in at the same spot, without sliding. `NavProgress` and the page entrance live in
   `app/admin/(panel)/admin.css` + `template.tsx`, admin only. With `cacheComponents`, visited
   pages stay in `<main>` hidden (`display: none`): never rely on `:nth-child` across pages or on
   the URL changing as "the new page is on screen".
-- Open questions in `docs/data-model-and-api.md` (price changed mid-order, `waitTime`, order
-  number reset, offline, fiscal fields, device pairing and secret storage) are not decided.
-  Do not guess an answer into the code; ask Kai, or isolate it behind one clearly named function.
+- Open questions. Settled by the pilot SPEC (section 9) and the contract: order number reset (per
+  business day), offline ("Temporariamente offline" screen), device pairing (id + secret at
+  `/setup`), `waitTime` (the owner's minutes for the pace) and a price changed mid-order
+  (`409 BASKET_CHANGED`, the guest confirms the new total). Still open: where menu pictures are
+  served (the contract has no `GET /media/...`; the BFF reads `CORE_MEDIA_URL`, isolated in
+  `src/app/media/[...path]/route.ts`), where the device secret lives on the Core side, and the
+  fiscal fields (no NFC-e in the pilot). Do not guess an answer into the code; ask Kai, or isolate
+  it behind one clearly named function.
 - Out of scope for the pilot (SPEC D-7, D-10, D-13, D-14): take-out, NFC-e, tax, the waiter app,
   tables and the table QR menu (after the pilot), loyalty, Scan-and-Go and staff age approval,
   split bill, guest walks away, accessibility mode, tips, other payment methods, digital receipts,
@@ -201,14 +233,14 @@ skill (`.claude/skills/linear-backlog`) for any backlog change: types, squads, p
 | Item | Value |
 |:--|:--|
 | Team | Comanda (`COM`); the workspace also holds another product's team (`BOOK`) |
-| Squads | Free plan, so labels in the `Squad` group: `Web` = `apps/web` (Kai), `Core` = `api/` (partner) |
+| Squads | Free plan, so labels in the `Squad` group: `Web` = `apps/web` (Kai), `Core` = the Core API (Bruno) |
 | Epics | Linear projects `E0 · Fundação` … `E5 · Piloto`, one per phase; pass ids (`P-COM-12` = E0) |
 | Types | `Type` group: `Story`, `Bug`, `Tech Debt`, `Spike`; Fibonacci points, split over 8 |
 | Issue language | pt-BR |
 
 Phase 0 stories are COM-5 to COM-13 (former GAB-n, same numbers). Name branches and commits per the
 release flow below (`feat/COM-9-short-name`, `feat(COM-9): summary`), not Linear's suggested branch
-name, and move the issue as work progresses. Issues with the `Core` label are the partner's Go work (e.g. COM-12): do not implement them.
+name, and move the issue as work progresses. Issues with the `Core` label are Bruno's back-end work (e.g. COM-12): do not implement them.
 
 Batch Linear updates to save tokens:
 - At the start of a plan, move its story to In Progress (one call). Nothing else in Linear mid-work.
@@ -226,9 +258,12 @@ Follow these rules exactly. If a request conflicts with them, stop and say which
 **How this repo applies it** (details and setup in `RELEASING.md`):
 - The default/prod branch was renamed `main` → `master` on 31 Oct 2026 (Kai's decision).
 - Automation comes from the release kit (`Kaina-Ribeiro/release-kit`, COM-70), the same in every
-  repo: `.github/workflows/release.yml` + `.github/scripts/release.mjs`, CI jobs `checks` and
-  `conventions` (`.github/workflows/pr-checks.yml`), rulesets in `.github/rulesets/*.json`. Never
-  edit these files here: change the kit and reinstall with its `install.sh`. Rulesets and the
+  repo: `.github/workflows/release.yml` and `.github/workflows/pr-checks.yml` are short callers of
+  the kit's reusable workflows pinned at `@v1`, whose `release.mjs` holds the logic. No copy of it
+  lives in this repo: to run it locally, fetch it into `.git/release.mjs` (command at the top of
+  `RELEASING.md`). CI jobs `pr-checks / checks` and `pr-checks / conventions`, rulesets in
+  `.github/rulesets/*.json`. Never edit these files here: change the kit (a fix under `@v1`
+  arrives without a PR) and reinstall with its `install.sh` when the callers change. Rulesets and the
   `RELEASE_TOKEN` secret are applied only with Kai's yes.
 - Applied rulesets differ from the kit's JSON on purpose (Kai, 4 Nov 2026): **no required
   approval** (Kai merges alone), and the `v*` tag ruleset lets only admins bypass, because GitHub
@@ -242,7 +277,7 @@ Follow these rules exactly. If a request conflicts with them, stop and say which
   On release day prod takes the open line's last rc, with Kai's confirmation: Actions → Release →
   `deploy`, stage `prod` (needs `DEPLOY_PROD_APPS="comanda/production/mock comanda/production/web"`,
   `CUBESHIP_URL` and the `CUBESHIP_TOKEN` secret); then the merge into master tags it final.
-  Without those variables, deploy by hand after `release.mjs deploy-check <rc> --prod` passes.
+  Without those variables, deploy by hand after `node .git/release.mjs deploy-check <rc> --prod` passes.
 - Test stage is the Cubeship environment `itodev` (5 Nov 2026, COM-70): apps `comanda/itodev/mock`
   and `comanda/itodev/web`, same Dockerfiles as prod, at https://comanda-itodev.5-189-167-204.sslip.io.
   `DEPLOY_TEST_APPS="comanda/itodev/mock comanda/itodev/web"`, so every new rc deploys there by
@@ -257,7 +292,7 @@ Follow these rules exactly. If a request conflicts with them, stop and say which
 - Tags follow SemVer: `vX.Y.Z-rc` = release candidate, `vX.Y.Z` = shipped. Every rc takes the
   next patch (`v0.2.0-rc`, `v0.2.1-rc`, …) and the final is the last rc without `-rc`.
   Tags, GitHub releases, new version-line branches and sync PRs are created by
-  automation (`.github/workflows/release.yml` → `.github/scripts/release.mjs`).
+  automation (`.github/workflows/release.yml` → the kit's `release.mjs`).
   **Never create, move or delete a tag by hand.**
 
 ### Naming

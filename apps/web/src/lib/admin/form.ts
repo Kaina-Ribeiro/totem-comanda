@@ -115,18 +115,6 @@ export const optionalText = (form: FormData, name: string) =>
 export const checked = (form: FormData, name: string) =>
   form.get(name) === "on";
 
-/**
- * Why the store's order types cannot be saved, or null when they can. A kiosk
- * with "Comer aqui" and "Para viagem" both off has nothing to sell (BR-041).
- */
-export function orderTypesError(
-  dineIn: boolean,
-  takeOut: boolean,
-): string | null {
-  if (dineIn || takeOut) return null;
-  return "Deixe pelo menos um ligado: Comer aqui ou Para viagem. Sem os dois, o totem não tem o que vender.";
-}
-
 // Reais with an optional "R$", "." between thousands and up to two decimals
 // after "," or ".": "28", "9,5", "1.234,50", "13.90". Anything else is not a
 // price ("1e3", "10,005", "-1"), and is refused rather than guessed (COM-128,
