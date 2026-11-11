@@ -150,6 +150,8 @@ npm run mock:orders -- 3 --days-ago 7   # ...on the same weekday last week (Iní
 npm run mock:smoke                      # with the mock running: every operation through Prism
 # The kitchen reads order lines through src/lib/kitchen/order.ts (one line per unit merged). The
 # kiosk never adds prices: Go prices the basket (POST /v2/totals) after every change.
+# An ingredient taken out is not on the order: the kiosk tells the kitchen in specialNotes
+# ("sem Tomate", always pt-BR, built in toOrderItems), so every call that sends the basket carries it.
 # Ports taken by another worktree? MOCK_PORT and PRISM_PORT move the mock (then set CORE_API_URL
 # and MOCK_CONTROL_URL to match).
 

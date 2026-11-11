@@ -91,6 +91,44 @@ describe("kiosk Server Actions (v2)", () => {
     });
   });
 
+  describe("kitchen names", () => {
+    const menuIn = (name: string) => ({
+      menuId: "m",
+      validUntil: null,
+      root: [],
+      badges: [],
+      entities: [
+        { id: "G", type: "MODIFIERS", name: "G", min: 0, max: 2, modifierType: "INGR", links: [{ type: "ITEM", id: "I-TOMATO" }] },
+        { id: "I-TOMATO", type: "ITEM", name, price: 0, available: true, links: [] },
+      ],
+    });
+    const menuCalls = () => core.GET.mock.calls.filter(([path]) => path === "/v2/menus/active");
+    const answerMenus = (ptBr: () => ReturnType<typeof answer>) =>
+      core.GET.mockImplementation(async (path: string, options: { params: { query: { language: string } } }) => {
+        if (path === "/v2/devices/me/config") return answer(200, { kind });
+        if (path !== "/v2/menus/active") return answer(200, { strings: {} });
+        return options.params.query.language === "en" ? answer(200, menuIn("Tomato")) : ptBr();
+      });
+
+    it("come in pt-BR for a guest in English, at the start and on a switch", async () => {
+      answerMenus(() => answer(200, menuIn("Tomate")));
+      const names = { ok: true, data: { kitchenNames: { "I-TOMATO": "Tomate" } } };
+      expect(await actions.beginJourney("en")).toMatchObject(names);
+      expect(await actions.switchLanguage("en")).toMatchObject(names);
+    });
+
+    it("cost no second menu call for a guest in pt-BR", async () => {
+      answerMenus(() => answer(200, menuIn("Tomate")));
+      expect(await actions.beginJourney("pt-BR")).toMatchObject({ ok: true, data: { kitchenNames: {} } });
+      expect(menuCalls()).toHaveLength(1);
+    });
+
+    it("never stop a journey when they cannot load", async () => {
+      answerMenus(() => answer(500, undefined, { code: "INTERNAL" }));
+      expect(await actions.beginJourney("en")).toMatchObject({ ok: true, data: { kitchenNames: {} } });
+    });
+  });
+
   it("prices a dine-in basket with ids only", async () => {
     await actions.priceBasket({ basketId: "B-1", items, language: "en" });
     expect(posts("/v2/totals")[0][1]).toMatchObject({

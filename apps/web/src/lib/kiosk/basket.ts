@@ -25,12 +25,45 @@ export type BasketLine = {
 
 export const basketUnits = (lines: BasketLine[]) => lines.reduce((n, line) => n + line.quantity, 0);
 
+/** The most `OrderItem.specialNotes` holds (contract). */
+const NOTE_MAX = 140;
+
+/**
+ * Tells the kitchen which default ingredients were taken out ("sem Tomate"): an
+ * order lists only what stays, so the kitchen could not know. Always in the
+ * kitchen's language (`kitchenName`), whatever the guest's. Over the limit it
+ * stops at a whole name. Null when nothing was taken out.
+ */
+function kitchenNote(product: Product, line: BasketLine): string | null {
+  const removed: string[] = [];
+  const walk = (groups: MenuGroup[]) => {
+    for (const group of groups) {
+      for (const option of group.options) {
+        const picked = line.picks.some((p) => p.groupKey === group.key && p.optionId === option.id && p.quantity > 0);
+        if (group.modifierType === "INGR") {
+          if (option.defaultQuantity > 0 && !picked) removed.push(`sem ${option.kitchenName}`);
+        } else if (picked) {
+          walk(option.groups);
+        }
+      }
+    }
+  };
+  walk(product.groups);
+  let note = removed.join(", ");
+  while (note.length > NOTE_MAX && removed.length > 1) {
+    removed.pop();
+    note = `${removed.join(", ")}, …`;
+  }
+  return note ? note.slice(0, NOTE_MAX) : null;
+}
+
 /** The v2 order lines for the basket: one product line per unit, `uniqueId` from 1. */
 export function toOrderItems(menu: KioskMenu, lines: BasketLine[]): OrderItem[] {
   let next = 1;
   const items: OrderItem[] = [];
   for (const line of lines) {
     const product = menu.products[line.productId];
+    const note = product ? kitchenNote(product, line) : null;
     for (let unit = 0; unit < line.quantity; unit++) {
       const uniqueId = next++;
       const modifiers: OrderItem[] = [];
@@ -53,7 +86,7 @@ export function toOrderItems(menu: KioskMenu, lines: BasketLine[]): OrderItem[] 
         }
       };
       if (product) walk(product.groups, uniqueId);
-      items.push({ id: line.productId, quantity: 1, uniqueId, modifiers });
+      items.push({ id: line.productId, quantity: 1, uniqueId, modifiers, ...(note ? { specialNotes: note } : {}) });
     }
   }
   return items;

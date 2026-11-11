@@ -16,6 +16,7 @@ import {
   type Result,
   success,
 } from "@/lib/kiosk/core";
+import { kitchenNames } from "@/lib/kiosk/menu-graph";
 import { type Language, mergeStrings, type Strings } from "@/lib/kiosk/strings";
 
 // Server Actions of the kiosk journey on Core v2 (pilot, SPEC 4.6 and 5). The
@@ -39,8 +40,22 @@ export type JourneyStart = {
   orderNonce: string;
   journeyStartedTimestamp: string | null;
   menu: MenuResponse;
+  /** Ingredient names in the kitchen's language; empty when `menu` already is in it. */
+  kitchenNames: Record<string, string>;
   strings: Strings;
 };
+
+/**
+ * The names the kitchen reads, for a guest in another language. Never blocks
+ * the guest: if they cannot load, the kitchen note uses the guest's names.
+ */
+async function loadKitchenNames(language: Language): Promise<Record<string, string>> {
+  if (language === "pt-BR") return {};
+  const menu = await loadActiveMenu("pt-BR");
+  if (menu.ok) return kitchenNames(menu.data);
+  console.warn(`Kitchen names not loaded: ${menu.code}`);
+  return {};
+}
 
 /**
  * Starts a guest journey: records it, and loads the active menu and language
@@ -52,10 +67,11 @@ export async function beginJourney(language: Language): Promise<Result<JourneySt
   if (refused) return refused;
   const orderNonce = crypto.randomUUID();
 
-  const [journey, menu, pack] = await Promise.all([
+  const [journey, menu, pack, names] = await Promise.all([
     deviceCall((headers) => coreApi().POST("/v2/journeys", { headers, body: { orderNonce, language } })),
     loadActiveMenu(language),
     loadLanguagePack(language),
+    loadKitchenNames(language),
   ]);
 
   if (!journey.ok) console.warn(`Journey start not recorded: ${journey.code}`);
@@ -74,6 +90,7 @@ export async function beginJourney(language: Language): Promise<Result<JourneySt
     orderNonce,
     journeyStartedTimestamp: journey.ok ? journey.data.journeyStartedTimestamp : null,
     menu: menu.data,
+    kitchenNames: names,
     strings: mergeStrings(language, pack),
   });
 }
@@ -81,13 +98,17 @@ export async function beginJourney(language: Language): Promise<Result<JourneySt
 /** Reloads menu and strings in another language mid-journey. */
 export async function switchLanguage(
   language: Language,
-): Promise<Result<{ menu: MenuResponse; strings: Strings }>> {
+): Promise<Result<{ menu: MenuResponse; kitchenNames: Record<string, string>; strings: Strings }>> {
   if (!isLanguage(language)) return { ok: false, code: "VALIDATION_FAILED" };
   const refused = await notKiosk();
   if (refused) return refused;
-  const [menu, pack] = await Promise.all([loadActiveMenu(language), loadLanguagePack(language)]);
+  const [menu, pack, names] = await Promise.all([
+    loadActiveMenu(language),
+    loadLanguagePack(language),
+    loadKitchenNames(language),
+  ]);
   if (!menu.ok) return menu;
-  return success({ menu: menu.data, strings: mergeStrings(language, pack) });
+  return success({ menu: menu.data, kitchenNames: names, strings: mergeStrings(language, pack) });
 }
 
 /**

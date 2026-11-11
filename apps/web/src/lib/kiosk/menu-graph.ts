@@ -25,6 +25,8 @@ export type MenuOption = {
   id: string;
   type: "ITEM" | "SIZED_ITEM";
   name: string;
+  /** The name in the kitchen's language, whatever the guest's (see `kitchenNames`). */
+  kitchenName: string;
   /** The extra this option adds (`0` when free), as Core sent it. */
   price: number;
   available: boolean;
@@ -96,7 +98,24 @@ const isSection = (e: Entity | undefined): e is SectionEntity => !!e && e.type =
 
 const keyOf = (link: Pick<Link, "type" | "id">) => `${link.type}:${link.id}`;
 
-export function readMenu(menu: MenuResponse): KioskMenu {
+/**
+ * The ingredient options (`INGR` groups) of a menu, id → name. Read from the
+ * pt-BR menu, it gives a guest in another language the names the kitchen reads.
+ */
+export function kitchenNames(menu: MenuResponse): Record<string, string> {
+  const items = new Map(menu.entities.filter(isItem).map((e) => [e.id, e.name]));
+  const names: Record<string, string> = {};
+  for (const group of menu.entities.filter(isGroup)) {
+    if (group.modifierType !== "INGR") continue;
+    for (const link of group.links) {
+      const name = items.get(link.id);
+      if (name !== undefined) names[link.id] = name;
+    }
+  }
+  return names;
+}
+
+export function readMenu(menu: MenuResponse, kitchen: Record<string, string> = {}): KioskMenu {
   const index = new Map<string, Entity>(menu.entities.map((e) => [keyOf(e), e]));
   const badges = new Map(menu.badges.map((b) => [b.id, b]));
   const products: Record<string, Product> = {};
@@ -124,6 +143,7 @@ export function readMenu(menu: MenuResponse): KioskMenu {
           id: entity.id,
           type: entity.type as MenuOption["type"],
           name: entity.name,
+          kitchenName: kitchen[entity.id] ?? entity.name,
           price: entity.dineInPriceOverride ?? entity.price,
           available: entity.available,
           defaultQuantity: entity.defaultQuantity ?? 0,

@@ -125,6 +125,22 @@ describe("KioskJourney (v2)", () => {
     expect(screen.getByRole("heading", { name: strings["crossSell.title"] })).toBeTruthy();
   });
 
+  it("tells the kitchen in pt-BR what a guest in English took out", async () => {
+    const menu = guestMenu(now(), "en")!;
+    const burger = menu.entities.find((e) => e.id === "1001" && e.type === "ITEM")!;
+    spies.beginJourney.mockResolvedValue({
+      ok: true,
+      data: { orderNonce: "n", journeyStartedTimestamp: null, menu, strings, kitchenNames: { "I-TOMATO": "Tomate" } },
+    });
+    render(<KioskJourney settings={settings} attract={attract} />);
+    await user().click(button(strings["attract.cta"]));
+    await user().click(await screen.findByRole("button", { name: `Adicionar ${burger.name}` }));
+    await user().click(screen.getByText("Tomato").closest("button")!);
+    await user().click(button(strings["item.addToOrder"]));
+    await flush(400);
+    expect(spies.priceBasket.mock.lastCall![0].items[0].specialNotes).toBe("sem Tomate");
+  });
+
   it("records an abandoned journey with Go's last total", async () => {
     render(<KioskJourney settings={settings} attract={attract} />);
     await user().click(button(strings["attract.cta"]));
