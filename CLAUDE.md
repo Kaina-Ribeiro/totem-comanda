@@ -20,7 +20,7 @@ The Core API was planned in Go and Bruno moved it to Java (Kai, 11 Nov 2026), be
 written. `contract/openapi.yaml`, older docs and code comments still say "Go" for the Core API: read
 it as "the Core API". The contract itself does not depend on the language.
 
-**Where it stands (11 Nov 2026, `v0.4.9`):** the kiosk, the kitchen screen, the back office and the
+**Where it stands (11 Nov 2026, `v0.4.9` in prod, `release/v0.5` open):** the kiosk, the kitchen screen, the back office and the
 BFF are built and run end to end against the stateful mock, on contract `2.0.0` (64 operations, all
 answered by the mock through Prism). The Core API is not started. Next: Bruno implements the
 contract, then `CORE_API_URL` points at it instead of the mock (`contract/README.md`, "Back end").
@@ -94,7 +94,7 @@ The Core API's code is not in this repository yet; where it will live is Bruno's
 
 | Phase | Goal | Done when |
 |:--|:--|:--|
-| 0 | Foundation: Next.js app, BFF, device auth, config, heartbeat, PWA shell, HTTPS deploy | The kiosk, in a regular browser over the server's HTTPS address, reaches the Go API |
+| 0 | Foundation: Next.js app, BFF, device auth, config, heartbeat, PWA shell, HTTPS deploy | The kiosk, in a regular browser over the server's HTTPS address, reaches the Core API |
 | 1 | Back office and menus: catalogue, schedules, sold out, discounts | The menu switches by itself |
 | 2 | Kiosk ordering: full flow, PT/EN, coupons, simulated payment, number on screen | A real order on the unit |
 | 3 | Kitchen screen (SSE) and daily report | Order in the kitchen in 2 s |
@@ -129,8 +129,9 @@ editor, 4 kitchen, store, devices, orders, report). The Core API needs all 64.
 - Load the menu once at journey start and keep it in memory (spec OP-START-04). Menu, item and
   cart are one client-side flow; the only server call is the Core API pricing the basket (`POST /v2/totals`,
   debounced 400 ms after a change), which never blocks a tap.
-- Attract, closed and success screens are Server Components. Client code only for the basket,
-  the item builder and the idle timer.
+- The attract, closed and unavailable screens are Server Components. Client code only for the
+  journey (menu, item builder, basket, checkout and the success screen with its countdown), the
+  paused screen and the idle timer.
 - Images through `next/image`, sized for 1080x1920; cached by the service worker.
 - CSS transitions only. No blur or heavy shadows in animation.
 - Keep the bundle in check with `npm run analyze` (baseline: ~181 KB gzip of JS on `/kiosk`); the
@@ -183,7 +184,7 @@ npm run gen:api        # contract/openapi.yaml → src/lib/core-api.d.ts
 # Lint the contract
 npx @redocly/cli lint contract/openapi.yaml
 
-# Checks, in apps/web. CI (`checks`) runs only lint and typecheck, so run the tests yourself.
+# Checks, in apps/web. CI (`pr-checks / checks`) runs only lint and typecheck, so run the tests yourself.
 npm run typecheck && npm run lint && npm test
 ```
 
@@ -204,7 +205,8 @@ npm run typecheck && npm run lint && npm test
   `MENU_INVALID` rule by entity name.
 - Back office loading (COM-140, COM-141): a page part that loads data goes in
   `<Streamed fallback={<…Skeleton />}>` (`components/admin/skeleton.tsx`), never a bare
-  `<Suspense>`. The skeleton has the page's shape with its fixed labels as real text; the
+  `<Suspense>` (only the panel layout's shell and the login page keep one: nothing there has a
+  skeleton). The skeleton has the page's shape with its fixed labels as real text; the
   content then fades in at the same spot, without sliding. `NavProgress` and the page entrance live in
   `app/admin/(panel)/admin.css` + `template.tsx`, admin only. With `cacheComponents`, visited
   pages stay in `<main>` hidden (`display: none`): never rely on `:nth-child` across pages or on
@@ -256,9 +258,12 @@ Follow these rules exactly. If a request conflicts with them, stop and say which
 **How this repo applies it** (details and setup in `RELEASING.md`):
 - The default/prod branch was renamed `main` → `master` on 31 Oct 2026 (Kai's decision).
 - Automation comes from the release kit (`Kaina-Ribeiro/release-kit`, COM-70), the same in every
-  repo: `.github/workflows/release.yml` + `.github/scripts/release.mjs`, CI jobs `checks` and
-  `conventions` (`.github/workflows/pr-checks.yml`), rulesets in `.github/rulesets/*.json`. Never
-  edit these files here: change the kit and reinstall with its `install.sh`. Rulesets and the
+  repo: `.github/workflows/release.yml` and `.github/workflows/pr-checks.yml` are short callers of
+  the kit's reusable workflows pinned at `@v1`, whose `release.mjs` holds the logic. No copy of it
+  lives in this repo: to run it locally, fetch it into `.git/release.mjs` (command at the top of
+  `RELEASING.md`). CI jobs `pr-checks / checks` and `pr-checks / conventions`, rulesets in
+  `.github/rulesets/*.json`. Never edit these files here: change the kit (a fix under `@v1`
+  arrives without a PR) and reinstall with its `install.sh` when the callers change. Rulesets and the
   `RELEASE_TOKEN` secret are applied only with Kai's yes.
 - Applied rulesets differ from the kit's JSON on purpose (Kai, 4 Nov 2026): **no required
   approval** (Kai merges alone), and the `v*` tag ruleset lets only admins bypass, because GitHub
@@ -272,7 +277,7 @@ Follow these rules exactly. If a request conflicts with them, stop and say which
   On release day prod takes the open line's last rc, with Kai's confirmation: Actions → Release →
   `deploy`, stage `prod` (needs `DEPLOY_PROD_APPS="comanda/production/mock comanda/production/web"`,
   `CUBESHIP_URL` and the `CUBESHIP_TOKEN` secret); then the merge into master tags it final.
-  Without those variables, deploy by hand after `release.mjs deploy-check <rc> --prod` passes.
+  Without those variables, deploy by hand after `node .git/release.mjs deploy-check <rc> --prod` passes.
 - Test stage is the Cubeship environment `itodev` (5 Nov 2026, COM-70): apps `comanda/itodev/mock`
   and `comanda/itodev/web`, same Dockerfiles as prod, at https://comanda-itodev.5-189-167-204.sslip.io.
   `DEPLOY_TEST_APPS="comanda/itodev/mock comanda/itodev/web"`, so every new rc deploys there by
@@ -287,7 +292,7 @@ Follow these rules exactly. If a request conflicts with them, stop and say which
 - Tags follow SemVer: `vX.Y.Z-rc` = release candidate, `vX.Y.Z` = shipped. Every rc takes the
   next patch (`v0.2.0-rc`, `v0.2.1-rc`, …) and the final is the last rc without `-rc`.
   Tags, GitHub releases, new version-line branches and sync PRs are created by
-  automation (`.github/workflows/release.yml` → `.github/scripts/release.mjs`).
+  automation (`.github/workflows/release.yml` → the kit's `release.mjs`).
   **Never create, move or delete a tag by hand.**
 
 ### Naming
