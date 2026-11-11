@@ -75,6 +75,7 @@ Core API (Java, Bruno) ── PostgreSQL       all in Docker on one server
 
 ```
 CLAUDE.md
+AGENTS.md                 points other coding agents (Codex …) here; keep every rule in CLAUDE.md
 README.md                 how to run the project locally, from zero
 RELEASING.md              the release flow in full
 contract/openapi.yaml     source of truth for the API; change only by PR, both partners approve
