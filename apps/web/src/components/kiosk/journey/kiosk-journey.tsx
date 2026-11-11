@@ -110,8 +110,8 @@ export function KioskJourney({ settings, attract }: { settings: KioskSettings; a
     startTransition(async () => {
       const result = await beginJourney(language).catch(() => null);
       if (result?.ok) {
-        const { menu, ...rest } = result.data;
-        dispatch({ type: "started", ...rest, menu: readMenu(menu) });
+        const { menu, kitchenNames, ...rest } = result.data;
+        dispatch({ type: "started", ...rest, menu: readMenu(menu, kitchenNames) });
       } else if (result?.code === "NO_ACTIVE_MENU") {
         // Closed since the last config check: the gate shows the closed screen.
         dispatch({ type: "reset", language: settings.defaultLanguage });
@@ -152,7 +152,8 @@ export function KioskJourney({ settings, attract }: { settings: KioskSettings; a
       // A Server Action that never reached the BFF (kiosk offline) rejects: same as a failure.
       const result = await switchLanguage(next).catch(() => null);
       if (result?.ok) {
-        dispatch({ type: "relocalized", language: next, menu: readMenu(result.data.menu), strings: result.data.strings });
+        const { menu, kitchenNames, strings } = result.data;
+        dispatch({ type: "relocalized", language: next, menu: readMenu(menu, kitchenNames), strings });
       } else {
         setLanguageError({ language: next, phase });
       }

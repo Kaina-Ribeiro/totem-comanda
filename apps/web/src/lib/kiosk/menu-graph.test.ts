@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { applyScenario, now } from "../../../mock/state";
 import { guestMenu } from "../../../mock/v2/menu";
 import type { components } from "../core-api";
-import { findProduct, type KioskMenu, readMenu } from "./menu-graph";
+import { findProduct, kitchenNames, type KioskMenu, readMenu } from "./menu-graph";
 
 type MenuResponse = components["schemas"]["MenuResponse"];
 
@@ -36,6 +36,23 @@ const item = (id: string, links: MenuResponse["entities"][number]["links"] = [],
   price,
   available: true,
   links,
+});
+
+describe("kitchenNames", () => {
+  it("lists only the ingredient options, by id", () => {
+    applyScenario("afternoon");
+    expect(kitchenNames(guestMenu(now(), "pt-BR")!)).toEqual({ "I-LETTUCE": "Alface", "I-TOMATO": "Tomate" });
+  });
+
+  it("gives an option its kitchen name, or its own name when there is none", () => {
+    applyScenario("afternoon");
+    const groups = findProduct(readMenu(guestMenu(now(), "en")!, { "I-TOMATO": "Tomate" }), "1001")!.groups;
+    const options = groups.find((g) => g.modifierType === "INGR")!.options;
+    expect(options.map((o) => [o.name, o.kitchenName])).toEqual([
+      ["Lettuce", "Lettuce"],
+      ["Tomato", "Tomate"],
+    ]);
+  });
 });
 
 describe("readMenu", () => {

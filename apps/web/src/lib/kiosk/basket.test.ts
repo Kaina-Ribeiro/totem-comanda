@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { applyScenario, now } from "../../../mock/state";
 import { guestMenu } from "../../../mock/v2/menu";
 import { type BasketLine, lineUnits, pickNames, toOrderItems, type TotalsResponse } from "./basket";
-import { findProduct, type KioskMenu, readMenu } from "./menu-graph";
+import { findProduct, kitchenNames, type KioskMenu, readMenu } from "./menu-graph";
 
 let menu: KioskMenu;
 beforeEach(() => {
@@ -31,6 +31,7 @@ describe("toOrderItems", () => {
       id: "1001",
       quantity: 1,
       uniqueId: 1,
+      specialNotes: "sem Alface, sem Tomate",
       modifiers: [
         { id: "X-CHEESE", quantity: 2, uniqueId: 2, parentId: 1, position: 1, modifierType: "MODI" },
         { id: "X-SAUCE", quantity: 1, uniqueId: 3, parentId: 1, position: 3, modifierType: "MODI" },
@@ -55,6 +56,49 @@ describe("toOrderItems", () => {
     expect(toOrderItems(menu, [cola])[0].modifiers).toEqual([
       { id: "2001-L", quantity: 1, uniqueId: 2, parentId: 1, position: 2, modifierType: "SIZE" },
     ]);
+  });
+});
+
+describe("the kitchen note for ingredients taken out", () => {
+  const keeping = (...optionIds: string[]): BasketLine => ({
+    guid: "i",
+    productId: "1001",
+    quantity: 1,
+    picks: optionIds.map((optionId) => ({ groupKey: "1001/M-ING-1001", optionId, quantity: 1 })),
+  });
+
+  it("names the ingredient taken out", () => {
+    expect(toOrderItems(menu, [keeping("I-LETTUCE")])[0].specialNotes).toBe("sem Tomate");
+  });
+
+  it("sends no note when every ingredient stays", () => {
+    expect(toOrderItems(menu, [keeping("I-LETTUCE", "I-TOMATO")])[0]).not.toHaveProperty("specialNotes");
+  });
+
+  it("goes on every unit of the line", () => {
+    const items = toOrderItems(menu, [{ ...keeping("I-LETTUCE"), quantity: 2 }]);
+    expect(items.map((item) => item.specialNotes)).toEqual(["sem Tomate", "sem Tomate"]);
+  });
+
+  it("stays in the kitchen's language for a guest in English", () => {
+    const english = readMenu(guestMenu(now(), "en")!, kitchenNames(guestMenu(now(), "pt-BR")!));
+    expect(toOrderItems(english, [keeping("I-LETTUCE")])[0].specialNotes).toBe("sem Tomate");
+  });
+
+  it("fits the contract's limit, cutting between whole names", () => {
+    const options = Array.from({ length: 20 }, (_, i) => ({
+      id: `I-${i}`,
+      name: `Ingrediente ${i}`,
+      kitchenName: `Ingrediente ${i}`,
+      defaultQuantity: 1,
+      groups: [],
+    }));
+    const long = {
+      products: { P: { groups: [{ key: "P/G", modifierType: "INGR", options }] } },
+    } as unknown as KioskMenu;
+    const note = toOrderItems(long, [{ guid: "l", productId: "P", quantity: 1, picks: [] }])[0].specialNotes!;
+    expect(note.length).toBeLessThanOrEqual(140);
+    expect(note).toMatch(/^sem Ingrediente 0, .*sem Ingrediente \d+, …$/);
   });
 });
 
