@@ -1,19 +1,25 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { TYPE_LABEL } from "@/components/admin/catalogue-fields";
 import { ItemListSkeleton, Streamed } from "@/components/admin/skeleton";
 import { Badge, Card, LoadError, PageHeader } from "@/components/admin/ui";
+import { imageOf, loadCatalogue, optionIds } from "@/lib/admin/catalogue";
+import type { AdminItem } from "@/lib/admin/catalogue-form";
 import { load } from "@/lib/admin/form";
-import { asOwner } from "@/lib/admin/session";
-import { coreApi } from "@/lib/core/client";
-import { formatBRL } from "@/lib/format/money";
+import { formatMoney } from "@/lib/format/money";
 
-export default function ItemsPage() {
+const TABS = [
+  ["", "Produtos"],
+  ["opcoes", "Opções e tamanhos"],
+] as const;
+
+export default function ItemsPage({ searchParams }: PageProps<"/admin/itens">) {
   return (
     <>
       <PageHeader
         title="Itens"
-        description="Tudo o que a padaria vende. Um item entra no cardápio pelas categorias."
+        description="Produtos, tamanhos, combos e as opções dos grupos. Um produto entra no cardápio pelas categorias."
         actions={
           <Link
             href="/admin/itens/novo"
@@ -24,47 +30,74 @@ export default function ItemsPage() {
         }
       />
       <Streamed fallback={<ItemListSkeleton />}>
-        <ItemList />
+        <ItemList searchParams={searchParams} />
       </Streamed>
     </>
   );
 }
 
-async function ItemList() {
-  const loaded = await load(() =>
-    asOwner((headers) => coreApi().GET("/v1/admin/items", { headers })),
-  );
+/** What the list shows as the price: Go's "a partir de" when it sent one. */
+function priceLabel(item: AdminItem): string {
+  if (item.type === "SIZED_ITEM") return item.displayPrice ? `a partir de ${formatMoney(item.displayPrice)}` : "por tamanho";
+  return formatMoney(item.dineInPriceOverride ?? item.price);
+}
+
+async function ItemList({ searchParams }: Pick<PageProps<"/admin/itens">, "searchParams">) {
+  const { ver } = await searchParams;
+  const tab = ver === "opcoes" ? "opcoes" : "";
+  const loaded = await load(loadCatalogue);
   if ("error" in loaded) return <LoadError message={loaded.error} />;
-  const items = [...loaded.data].sort((a, b) =>
-    a.name["pt-BR"].localeCompare(b.name["pt-BR"], "pt-BR"),
-  );
+  const catalogue = loaded.data;
+  const options = optionIds(catalogue);
+  const isOption = (i: AdminItem) => i.type === "ITEM" && options.has(i.id);
+  const images = new Map(catalogue.images.map((i) => [i.id, i.url]));
+  const items = catalogue.items
+    .filter((i) => (tab === "opcoes" ? isOption(i) : !isOption(i)))
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   return (
-    <Card className="p-0">
-      <ul className="divide-y divide-line">
-        {items.map((item) => (
-          <li key={item.id}>
-            <Link
-              href={`/admin/itens/${item.id}`}
-              className="flex items-center gap-4 px-5 py-3 hover:bg-ground"
-            >
-              <span className="relative size-12 shrink-0 overflow-hidden rounded-lg bg-wheat">
-                {item.image && (
-                  <Image src={item.image} alt="" fill sizes="48px" className="object-cover" />
-                )}
-              </span>
-              <span className="flex flex-1 flex-col">
-                <span className="font-semibold">{item.name["pt-BR"]}</span>
-                <span className="text-xs text-muted">
-                  {!item.serviceAvailability.DINEIN && "Só para viagem"}
-                  {!item.serviceAvailability.TAKE_OUT && "Só para comer aqui"}
-                </span>
-              </span>
-              {item.soldOutDate && <Badge tone="danger">Esgotado</Badge>}
-              <span className="text-sm font-semibold text-price">{formatBRL(item.price)}</span>
-            </Link>
-          </li>
+    <>
+      <nav aria-label="Tipo de item" className="flex gap-1.5">
+        {TABS.map(([value, label]) => (
+          <Link
+            key={value}
+            href={value ? `/admin/itens?ver=${value}` : "/admin/itens"}
+            aria-current={tab === value ? "page" : undefined}
+            className={`rounded-xl px-3.5 py-2 text-sm font-bold transition-colors ${
+              tab === value ? "bg-accent text-on-accent" : "bg-surface text-ink hover:bg-hover"
+            }`}
+          >
+            {label}
+          </Link>
         ))}
-      </ul>
-    </Card>
+      </nav>
+      {items.length === 0 ? (
+        <Card>
+          <p className="text-sm text-muted">Nada aqui ainda.</p>
+        </Card>
+      ) : (
+        <Card className="p-0">
+          <ul className="divide-y divide-line">
+            {items.map((item) => {
+              const image = images.get(imageOf(item.links) ?? "");
+              return (
+                <li key={item.id}>
+                  <Link href={`/admin/itens/${encodeURIComponent(item.id)}`} className="flex items-center gap-4 px-5 py-3 hover:bg-ground">
+                    <span className="relative size-12 shrink-0 overflow-hidden rounded-lg bg-wheat">
+                      {image && <Image src={image} alt="" fill sizes="48px" className="object-cover" />}
+                    </span>
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate font-semibold">{item.name}</span>
+                      <span className="text-xs text-muted">{TYPE_LABEL[item.type]}</span>
+                    </span>
+                    {!item.available && <Badge tone="danger">Indisponível</Badge>}
+                    <span className="shrink-0 text-sm font-semibold text-price">{priceLabel(item)}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
+    </>
   );
 }

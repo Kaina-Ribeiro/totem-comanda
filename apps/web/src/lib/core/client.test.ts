@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { fetchWithTimeout, problemCode } from "./client";
+import { coreApiUrl, fetchWithTimeout, problemCode } from "./client";
 
 describe("problemCode", () => {
   it("reads the code of a problem body", () => {
@@ -20,10 +20,20 @@ describe("fetchWithTimeout", () => {
         init?.signal?.addEventListener("abort", () => reject(init.signal!.reason)),
       )) as typeof fetch;
     try {
-      const call = fetchWithTimeout(20)(new Request("http://core.test/v1/menus/active"));
+      const call = fetchWithTimeout(20)(new Request("http://core.test/v2/menus/active"));
       await expect(call).rejects.toMatchObject({ name: "TimeoutError" });
     } finally {
       globalThis.fetch = original;
     }
+  });
+});
+
+describe("coreApiUrl", () => {
+  it("reads CORE_API_URL", () => {
+    expect(coreApiUrl({ CORE_API_URL: "http://localhost:4010" })).toBe("http://localhost:4010");
+  });
+
+  it("refuses to guess when it is not set, even with the old CORE_API_V2_URL", () => {
+    expect(() => coreApiUrl({ CORE_API_V2_URL: "http://localhost:4011" })).toThrow(/CORE_API_URL is not set/);
   });
 });

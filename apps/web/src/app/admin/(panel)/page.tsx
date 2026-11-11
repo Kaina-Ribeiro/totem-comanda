@@ -8,32 +8,34 @@ import { HomeSkeleton, Streamed } from "@/components/admin/skeleton";
 import { LoadError } from "@/components/admin/ui";
 import { attempt, type FormState, load, text } from "@/lib/admin/form";
 import {
+  businessDate,
   dayIsOver,
   greeting,
   kioskState,
   localNow,
   signalLabel,
   totalVersusLastWeek,
+  unavailable,
   versusLastWeek,
   weekBefore,
   whenLabel,
 } from "@/lib/admin/home";
 import { asOwner } from "@/lib/admin/session";
 import { loadStoreStatus, type StoreStatus } from "@/lib/admin/store-status";
+import type { AdminItem } from "@/lib/admin/catalogue-form";
 import { coreApi } from "@/lib/core/client";
-import type { components } from "@/lib/core-api";
-import { formatBRL } from "@/lib/format/money";
+import { formatMoney } from "@/lib/format/money";
 
-type Schemas = components["schemas"];
-
-async function releaseItem(_: FormState, form: FormData): Promise<FormState> {
+/** "Ligar" on the home's off-items card: the same switch as Disponibilidade (SPEC 6). */
+async function turnOn(_: FormState, form: FormData): Promise<FormState> {
   "use server";
   const itemId = text(form, "itemId");
   return attempt(async () => {
     await asOwner((headers) =>
-      coreApi().DELETE("/v1/admin/items/{itemId}/sold-out", {
+      coreApi().PUT("/v2/admin/items/{itemId}/availability", {
         headers,
         params: { path: { itemId } },
+        body: { available: true },
       }),
     );
     revalidatePath("/admin");
@@ -50,7 +52,7 @@ async function setPace(_: FormState, form: FormData): Promise<FormState> {
   }
   return attempt(async () => {
     await asOwner((headers) =>
-      coreApi().PUT("/v1/admin/pace", {
+      coreApi().PUT("/v2/admin/pace", {
         headers,
         body: pace === "PAUSED" ? { pace, pauseMinutes: 15 } : { pace },
       }),
@@ -74,39 +76,38 @@ async function Home() {
   await connection();
   const now = new Date();
   const loaded = await load(async () => {
-    const restaurant = await asOwner((headers) =>
-      coreApi().GET("/v1/admin/restaurant", { headers }),
-    );
-    const today = localNow(now, restaurant.timezone).date;
+    const store = await asOwner((headers) => coreApi().GET("/v2/admin/store", { headers }));
+    // Today's report is the business day's (cutoff 04:00): at 01:30 it is still yesterday's.
+    const today = businessDate(now, store.timezone, store.businessDayCutoff);
     const report = (date: string) =>
       asOwner((headers) =>
-        coreApi().GET("/v1/admin/reports/daily", { headers, params: { query: { date } } }),
+        coreApi().GET("/v2/admin/reports/daily", { headers, params: { query: { date } } }),
       );
-    const devices = await asOwner((headers) => coreApi().GET("/v1/admin/devices", { headers }));
+    const devices = await asOwner((headers) => coreApi().GET("/v2/admin/devices", { headers }));
     const [status, todayReport, lastWeek, items] = await Promise.all([
-      loadStoreStatus(now, { restaurant, devices }),
+      loadStoreStatus(now, { store, devices }),
       report(today),
       report(weekBefore(today)),
-      asOwner((headers) => coreApi().GET("/v1/admin/items", { headers })),
+      asOwner((headers) => coreApi().GET("/v2/admin/items", { headers })),
     ]);
-    return { restaurant, status, todayReport, lastWeek, devices, items, today };
+    return { store, status, todayReport, lastWeek, devices, items };
   });
   if ("error" in loaded) return <LoadError message={loaded.error} />;
-  const { restaurant, status, todayReport, lastWeek, devices, items, today } = loaded.data;
-  const clock = localNow(now, restaurant.timezone);
+  const { store, status, todayReport, lastWeek, devices, items } = loaded.data;
+  const clock = localNow(now, store.timezone);
   const dateLabel = new Intl.DateTimeFormat("pt-BR", {
-    timeZone: restaurant.timezone,
+    timeZone: store.timezone,
     weekday: "long",
     day: "numeric",
     month: "long",
   }).format(now);
   const timeLabel = new Intl.DateTimeFormat("pt-BR", {
-    timeZone: restaurant.timezone,
+    timeZone: store.timezone,
     hour: "2-digit",
     minute: "2-digit",
   }).format(now);
   const final = dayIsOver(status);
-  const soldOut = items.filter((item) => item.soldOutDate !== null && item.soldOutDate >= today);
+  const off = unavailable(items);
 
   return (
     <>
@@ -132,13 +133,13 @@ async function Home() {
       >
         <Kpi
           label="Faturamento hoje"
-          value={formatBRL(todayReport.revenue)}
+          value={formatMoney(todayReport.revenue)}
           delta={totalVersusLastWeek(
             todayReport.revenue,
             lastWeek.revenue,
             clock.day,
             final,
-            formatBRL,
+            formatMoney,
           )}
         />
         <Kpi
@@ -155,7 +156,7 @@ async function Home() {
         {/* A ratio, so a partial day compares fairly with a whole one. */}
         <Kpi
           label="Ticket médio"
-          value={formatBRL(todayReport.averageTicket)}
+          value={formatMoney(todayReport.averageTicket)}
           delta={versusLastWeek(todayReport.averageTicket, lastWeek.averageTicket, clock.day)}
         />
       </section>
@@ -196,7 +197,7 @@ async function Home() {
                     ? "desativado"
                     : device.maintenanceMode
                       ? "em manutenção"
-                      : signalLabel(device.online, device.lastSeenAt, now, restaurant.timezone)}
+                      : signalLabel(device.online, device.lastSeenAt, now, store.timezone)}
                 </span>
               </li>
             ))}
@@ -206,18 +207,18 @@ async function Home() {
         <section aria-labelledby="soldout" className={CARD}>
           <div className={CARD_HEAD}>
             <h2 id="soldout" className={H2}>
-              Esgotados hoje
+              Indisponíveis agora
             </h2>
-            <Link href="/admin/esgotados" className={LINK}>
+            <Link href="/admin/disponibilidade?filtro=indisponiveis" className={LINK}>
               Ver todos
             </Link>
           </div>
           <ul className="flex flex-col divide-y divide-line">
-            {soldOut.length === 0 && (
-              <li className="py-2 text-sm text-muted">Nada esgotado. Tudo à venda no totem.</li>
+            {off.length === 0 && (
+              <li className="py-2 text-sm text-muted">Nada desligado. Tudo à venda no totem.</li>
             )}
-            {soldOut.map((item) => (
-              <SoldOutRow key={item.id} item={item} />
+            {off.map((item) => (
+              <OffRow key={item.id} item={item} />
             ))}
           </ul>
         </section>
@@ -314,17 +315,17 @@ function Kpi({ label, value, delta }: { label: string; value: string; delta: str
   );
 }
 
-function SoldOutRow({ item }: { item: Schemas["AdminItem"] }) {
+function OffRow({ item }: { item: AdminItem }) {
   return (
     <li className="flex min-h-14 items-center justify-between gap-3">
       <span className="flex min-w-0 flex-col gap-px">
-        <span className="truncate text-sm font-bold">{item.name["pt-BR"]}</span>
-        <span className="text-[13px] font-medium text-muted">Volta amanhã, sozinho</span>
+        <span className="truncate text-sm font-bold">{item.name}</span>
+        <span className="text-[13px] font-medium text-muted">Desligado até você ligar</span>
       </span>
-      <ActionForm action={releaseItem} className="flex flex-col items-end gap-1">
+      <ActionForm action={turnOn} className="flex flex-col items-end gap-1">
         <input type="hidden" name="itemId" value={item.id} />
-        <SubmitButton variant="secondary" pendingLabel="Liberando…">
-          Liberar
+        <SubmitButton variant="secondary" pendingLabel="Ligando…">
+          Ligar
         </SubmitButton>
       </ActionForm>
     </li>

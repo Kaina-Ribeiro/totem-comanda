@@ -7,18 +7,17 @@ type Line = [number, string, string[], string?];
 
 const order = (number: string, status: string, lines: Line[]) =>
   ({
-    id: `ord-${number}`,
-    posCheckNumber: number,
+    number: `20261104-${number}`,
+    customerCheckNumber: number,
     status,
     orderType: "DINEIN",
     placedAt: "2026-11-04T12:00:00Z",
-    readyAt: null,
-    lines: lines.map(([quantity, name, options, itemId]) => ({
-      itemId: itemId ?? `item-${name}`,
+    history: [],
+    orderItems: lines.map(([quantity, name, options, itemId]) => ({
+      id: itemId ?? `item-${name}`,
       quantity,
       name,
-      options,
-      choices: options.map((o) => ({ optionId: `opt-${o}`, name: o, quantity: 1 })),
+      modifiers: options.map((o) => ({ id: `opt-${o}`, name: o, quantity: 1 })),
     })),
   }) as never;
 

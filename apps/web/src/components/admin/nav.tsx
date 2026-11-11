@@ -6,11 +6,12 @@ import { usePathname } from "next/navigation";
 /** Icon paths from the second canvas (A1), 24 × 24, stroked. */
 const ICON = {
   inicio: "M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z",
-  esgotados: "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM5.6 5.6l12.8 12.8",
+  disponibilidade: "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM5.6 5.6l12.8 12.8",
   relatorio: "M4 20h16M7 16v-5M12 16V7M17 16v-8",
   cardapios: "M5 4h12a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2zM9 8h6M9 12h4",
   categorias: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
   itens: "M3 12V4h8l10 10-8 8zM7.5 7.5h.01",
+  grupos: "M5 6h14M5 12h14M5 18h9M3 6h.01M3 12h.01M3 18h.01",
   selos: "M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z",
   cupons: "M3 7h18v3a2 2 0 0 0 0 4v3H3v-3a2 2 0 0 0 0-4zM14 7v10",
   aparelhos: "M4 5h16v11H4zM9 20h6M12 16v4",
@@ -28,7 +29,7 @@ export const ADMIN_GROUPS: { title: string; sections: Section[] }[] = [
   {
     title: "Operação",
     sections: [
-      { href: "/admin/esgotados", label: "Esgotados", icon: "esgotados" },
+      { href: "/admin/disponibilidade", label: "Disponibilidade", icon: "disponibilidade" },
       { href: "/admin/relatorio", label: "Relatório", icon: "relatorio" },
     ],
   },
@@ -38,6 +39,7 @@ export const ADMIN_GROUPS: { title: string; sections: Section[] }[] = [
       { href: "/admin/cardapios", label: "Cardápios", icon: "cardapios" },
       { href: "/admin/categorias", label: "Categorias", icon: "categorias" },
       { href: "/admin/itens", label: "Itens", icon: "itens" },
+      { href: "/admin/grupos", label: "Grupos de opções", icon: "grupos" },
       { href: "/admin/selos", label: "Selos e sugestões", icon: "selos" },
       { href: "/admin/cupons", label: "Cupons", icon: "cupons" },
     ],

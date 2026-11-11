@@ -11,48 +11,52 @@ import {
   LoadError,
   PageHeader,
 } from "@/components/admin/ui";
-import { attempt, checked, type FormState, load, orderTypesError, text } from "@/lib/admin/form";
+import { attempt, checked, type FormState, load, text } from "@/lib/admin/form";
 import { uploadImage } from "@/lib/admin/media";
 import { asOwner } from "@/lib/admin/session";
 import { coreApi } from "@/lib/core/client";
 import type { components } from "@/lib/core-api";
 
 type Language = components["schemas"]["LanguageCode"];
+type Store = components["schemas"]["StoreConfigurationResponse"];
 
-async function saveRestaurant(_: FormState, form: FormData): Promise<FormState> {
+const CUTOFF = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
+
+/**
+ * Store settings (SPEC 6): name, logo, languages, closed message, invoice
+ * notice, timezone and business-day cutoff. Dine-in only, so no order-type
+ * toggles. Fields of the store this form does not show are sent back as read.
+ */
+async function saveStore(_: FormState, form: FormData): Promise<FormState> {
   "use server";
-  // Both off leaves the kiosk with nothing to sell (dashboard BR-041). Go should refuse it too.
-  const orderTypes = orderTypesError(checked(form, "dineIn"), checked(form, "takeOut"));
-  if (orderTypes) return { error: orderTypes };
+  const cutoff = text(form, "cutoff");
+  if (!CUTOFF.test(cutoff)) return { error: "Use a hora no formato 04:00." };
+  if (!text(form, "invoice.pt")) return { error: "Escreva o aviso de nota fiscal em português." };
   return attempt(async () => {
-    const current = await asOwner((headers) => coreApi().GET("/v1/admin/restaurant", { headers }));
+    const current = await asOwner((headers) => coreApi().GET("/v2/admin/store", { headers }));
     const logo =
-      (await uploadImage(form, "logo")) ?? (checked(form, "removeLogo") ? null : current.logo);
-    const supportedLanguages: Language[] = checked(form, "english") ? ["pt-BR", "en"] : ["pt-BR"];
+      (await uploadImage(form, "logo")) ?? (checked(form, "removeLogo") ? null : (current.logo ?? null));
+    const languages: Language[] = checked(form, "english") ? ["pt-BR", "en"] : ["pt-BR"];
     const defaultLanguage =
-      text(form, "defaultLanguage") === "en" && supportedLanguages.includes("en") ? "en" : "pt-BR";
+      text(form, "defaultLanguage") === "en" && languages.includes("en") ? "en" : "pt-BR";
     const localized = (name: string) => {
       const en = text(form, `${name}.en`);
       return { "pt-BR": text(form, `${name}.pt`), ...(en ? { en } : {}) };
     };
-    await asOwner((headers) =>
-      coreApi().PUT("/v1/admin/restaurant", {
-        headers,
-        body: {
-          name: text(form, "name"),
-          logo,
-          cnpj: text(form, "cnpj").replace(/\D/g, ""),
-          timezone: text(form, "timezone") || current.timezone,
-          defaultLanguage,
-          supportedLanguages,
-          isDineInAvailable: checked(form, "dineIn"),
-          isTakeOutAvailable: checked(form, "takeOut"),
-          closedMessage: { title: localized("closedTitle"), description: localized("closedBody") },
-          posCheckNumberDisplayLength: Number(text(form, "digits")),
-          receiptFooter: localized("footer"),
-        },
-      }),
-    );
+    // Pace and wait minutes are read only here (they have their own endpoints).
+    const { pace: _pace, waitMinutes: _wait, ...kept } = current;
+    const body: Store = {
+      ...kept,
+      locationName: text(form, "name"),
+      logo,
+      languages,
+      defaultLanguage,
+      timezone: text(form, "timezone") || current.timezone,
+      businessDayCutoff: cutoff,
+      closedMessage: { title: localized("closedTitle"), description: localized("closedBody") },
+      invoiceNotice: localized("invoice"),
+    };
+    await asOwner((headers) => coreApi().PUT("/v2/admin/store", { headers, body }));
     // React resets the form after the action: re-render it with what was saved.
     revalidatePath("/admin", "layout");
     return "Configurações salvas. O totem atualiza em até 45 s.";
@@ -69,7 +73,7 @@ async function saveWaitMinutes(_: FormState, form: FormData): Promise<FormState>
   if (!valid(NORMAL) || !valid(BUSY)) return { error: "Use minutos inteiros de 1 a 120." };
   return attempt(async () => {
     await asOwner((headers) =>
-      coreApi().PUT("/v1/admin/pace/wait-minutes", { headers, body: { NORMAL, BUSY } }),
+      coreApi().PUT("/v2/admin/pace/wait-minutes", { headers, body: { NORMAL, BUSY } }),
     );
     // The form resets after the action: re-render it (and Início's hints) with the saved minutes.
     revalidatePath("/admin", "layout");
@@ -82,7 +86,7 @@ export default function StorePage() {
     <>
       <PageHeader
         title="Loja"
-        description="Nome, logo, idiomas e o que o totem mostra quando está fechado."
+        description="Nome, logo, idiomas, o dia de funcionamento e os avisos do totem."
       />
       <Streamed fallback={<FormSkeleton cards={1} />}>
         <StoreForm />
@@ -96,7 +100,7 @@ export default function StorePage() {
 
 /** "Tempo de espera" per pace level; the kitchen and Início pick the level. */
 async function WaitTimesForm() {
-  const loaded = await load(() => asOwner((headers) => coreApi().GET("/v1/admin/pace", { headers })));
+  const loaded = await load(() => asOwner((headers) => coreApi().GET("/v2/admin/pace", { headers })));
   if ("error" in loaded) return <LoadError message={loaded.error} />;
   const { waitMinutes } = loaded.data;
   return (
@@ -141,26 +145,15 @@ async function WaitTimesForm() {
 
 async function StoreForm() {
   const loaded = await load(() =>
-    asOwner((headers) => coreApi().GET("/v1/admin/restaurant", { headers })),
+    asOwner((headers) => coreApi().GET("/v2/admin/store", { headers })),
   );
   if ("error" in loaded) return <LoadError message={loaded.error} />;
-  const restaurant = loaded.data;
-  const r = restaurant;
+  const r = loaded.data;
   return (
-    <ActionForm action={saveRestaurant} className="flex flex-col gap-6">
+    <ActionForm action={saveStore} className="flex flex-col gap-6">
       <Card className="grid gap-5 sm:grid-cols-2">
         <Field label="Nome da loja">
-          <input name="name" defaultValue={r.name} required className={inputClass} />
-        </Field>
-        <Field label="CNPJ" hint="Só números, 14 dígitos.">
-          <input
-            name="cnpj"
-            defaultValue={r.cnpj}
-            required
-            inputMode="numeric"
-            pattern="\d{14}"
-            className={inputClass}
-          />
+          <input name="name" defaultValue={r.locationName} required className={inputClass} />
         </Field>
         <Field label="Logo" hint="PNG ou JPEG até 5 MB. Sem logo, o totem mostra o nome.">
           <div className="flex items-center gap-3">
@@ -173,7 +166,7 @@ async function StoreForm() {
               name="logo"
               type="file"
               accept="image/png,image/jpeg,image/webp"
-              className="text-sm"
+              className="min-w-0 text-sm"
             />
           </div>
           {r.logo && <Checkbox name="removeLogo" label="Tirar o logo" />}
@@ -181,40 +174,59 @@ async function StoreForm() {
         <Field label="Fuso horário">
           <input name="timezone" defaultValue={r.timezone} className={inputClass} />
         </Field>
+        <Field
+          label="O dia começa às"
+          hint="Antes dessa hora, o pedido conta no dia anterior: número e relatório."
+        >
+          <input
+            name="cutoff"
+            type="time"
+            required
+            defaultValue={r.businessDayCutoff}
+            className={inputClass}
+          />
+        </Field>
       </Card>
 
       <Card className="grid gap-5 sm:grid-cols-2">
-        <div className="flex flex-col gap-3">
-          <span className="text-sm font-semibold text-muted">Como o cliente pode pedir</span>
-          <Checkbox name="dineIn" label="Comer aqui" defaultChecked={r.isDineInAvailable} />
-          <Checkbox name="takeOut" label="Para viagem" defaultChecked={r.isTakeOutAvailable} />
-          <span className="text-xs text-muted">Pelo menos um fica ligado.</span>
-        </div>
         <div className="flex flex-col gap-3">
           <span className="text-sm font-semibold text-muted">Idiomas do totem</span>
           <Checkbox
             name="english"
             label="Oferecer inglês"
-            defaultChecked={r.supportedLanguages.includes("en")}
+            defaultChecked={r.languages.includes("en")}
           />
-          <Field label="Idioma padrão">
-            <select name="defaultLanguage" defaultValue={r.defaultLanguage} className={inputClass}>
-              <option value="pt-BR">Português</option>
-              <option value="en">English</option>
-            </select>
-          </Field>
         </div>
-        <Field
-          label="Dígitos do número do pedido"
-          hint="De 1 a 6. Com 2, o pedido 142 aparece como 42."
-        >
-          <input
-            name="digits"
-            type="number"
-            min={1}
-            max={6}
-            defaultValue={r.posCheckNumberDisplayLength}
-            className={inputClass}
+        <Field label="Idioma padrão">
+          <select name="defaultLanguage" defaultValue={r.defaultLanguage} className={inputClass}>
+            <option value="pt-BR">Português</option>
+            <option value="en">English</option>
+          </select>
+        </Field>
+      </Card>
+
+      <Card className="grid gap-5 sm:grid-cols-2">
+        <div className="flex flex-col gap-1 sm:col-span-2">
+          <h2 className="text-lg font-bold tracking-[-0.01em]">Aviso de nota fiscal</h2>
+          <p className="text-sm text-muted">
+            Aparece na tela do número do pedido. O totem não emite nota fiscal no piloto.
+          </p>
+        </div>
+        <Field label="Aviso (PT)">
+          <textarea
+            name="invoice.pt"
+            defaultValue={r.invoiceNotice["pt-BR"]}
+            required
+            rows={2}
+            className={`${inputClass} h-auto py-2`}
+          />
+        </Field>
+        <Field label="Aviso (EN)">
+          <textarea
+            name="invoice.en"
+            defaultValue={r.invoiceNotice.en}
+            rows={2}
+            className={`${inputClass} h-auto py-2`}
           />
         </Field>
       </Card>
@@ -252,20 +264,6 @@ async function StoreForm() {
             rows={2}
             className={`${inputClass} h-auto py-2`}
           />
-        </Field>
-      </Card>
-
-      <Card className="grid gap-5 sm:grid-cols-2">
-        <h2 className="text-lg font-bold tracking-[-0.01em] sm:col-span-2">Rodapé do comprovante</h2>
-        <Field label="Rodapé (PT)" hint="Sai impresso a partir da fase 4.">
-          <input
-            name="footer.pt"
-            defaultValue={r.receiptFooter?.["pt-BR"]}
-            className={inputClass}
-          />
-        </Field>
-        <Field label="Rodapé (EN)">
-          <input name="footer.en" defaultValue={r.receiptFooter?.en} className={inputClass} />
         </Field>
       </Card>
 

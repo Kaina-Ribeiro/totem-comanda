@@ -6,15 +6,14 @@ import { applyCollected, findByNumber } from "./collected";
 /** A kitchen order with what the Retirados list reads. */
 const order = (id: string, status: string, updatedAt: string, version = 1) =>
   ({
-    id,
+    number: id,
+    customerCheckNumber: id,
     status,
     version,
-    updatedAt,
     placedAt: "2026-11-04T12:00:00Z",
-    posCheckNumber: id,
-    orderType: "TAKE_OUT",
-    readyAt: null,
-    lines: [],
+    history: [{ status, at: updatedAt, by: "KITCHEN" }],
+    orderType: "DINEIN",
+    orderItems: [],
   }) as never;
 
 describe("applyCollected", () => {
@@ -22,7 +21,7 @@ describe("applyCollected", () => {
     let list = applyCollected([], order("42", "COLLECTED", "2026-11-04T12:10:00Z"));
     list = applyCollected(list, order("43", "COLLECTED", "2026-11-04T12:20:00Z"));
     list = applyCollected(list, order("41", "COLLECTED", "2026-11-04T12:05:00Z"));
-    expect(list.map((o: { id: string }) => o.id)).toEqual(["43", "42", "41"]);
+    expect(list.map((o: { number: string }) => o.number)).toEqual(["43", "42", "41"]);
   });
 
   it("drops an order that went back to Prontos or anywhere else", () => {
@@ -37,7 +36,7 @@ describe("applyCollected", () => {
 
 describe("findByNumber", () => {
   const list = ["42", "142", "43", "7"].map((n) => order(n, "COLLECTED", "2026-11-04T12:00:00Z"));
-  const ids = (l: { id: string }[]) => l.map((o) => o.id);
+  const ids = (l: { number: string }[]) => l.map((o) => o.number);
 
   it("shows everything while the search is empty", () => {
     expect(ids(findByNumber(list, ""))).toEqual(["42", "142", "43", "7"]);

@@ -1,80 +1,76 @@
 import Image from "next/image";
 import { useState } from "react";
 
-import { formatBRL } from "@/lib/format/money";
-import { draftToLine, initialDraft } from "@/lib/kiosk/item-draft";
-import {
-  type BasketLine,
-  cellPrice,
-  findItem,
-  type Menu,
-  type MenuEntity,
-  type OrderType,
-} from "@/lib/kiosk/menu-view";
+import type { BasketLine } from "@/lib/kiosk/basket";
+import { canAdd, draftToLine, initialDraft } from "@/lib/kiosk/builder";
+import { findProduct, type KioskMenu, type Product } from "@/lib/kiosk/menu-graph";
 import type { Strings } from "@/lib/kiosk/strings";
 
 import { Check } from "../icons";
+import { productPrice } from "./menu-screen";
 
 /**
- * "Que tal um café?" (F-MENU-11). Not drawn in the prototype: a sheet in the
- * 09-Cpf style with the group's items. Picked items go in with their default
- * choices; "No, thanks" stops suggestions for this journey.
+ * "Que tal acompanhar?" after a product is added (`crossSellIds`). Not drawn
+ * in the prototype: a sheet in the 09-Cpf style. Products that need no choice
+ * toggle and go in together; one that needs a choice (a size) opens the
+ * builder. "Não, obrigado" stops suggestions for this journey.
  */
 export function CrossSellSheet({
   menu,
-  groupId,
-  orderType,
+  productId,
+  basket,
   strings,
   onAccept,
+  onChoose,
   onDismiss,
 }: {
-  menu: Menu;
-  groupId: string;
-  orderType: OrderType;
+  menu: KioskMenu;
+  productId: string;
+  basket: BasketLine[];
   strings: Strings;
   onAccept: (lines: BasketLine[]) => void;
+  onChoose: (product: Product) => void;
   onDismiss: () => void;
 }) {
   const [picked, setPicked] = useState<string[]>([]);
-  const group = menu.crossSellGroups.find((g) => g.id === groupId);
-  const items = (group?.crossSells ?? [])
-    .map((id) => findItem(menu, id))
-    .filter(
-      (item): item is MenuEntity => !!item && (item.serviceAvailability?.[orderType] ?? true),
-    );
-  if (!group || items.length === 0) return null;
+  const products = (findProduct(menu, productId)?.crossSellIds ?? [])
+    .map((id) => findProduct(menu, id))
+    .filter((p): p is Product => !!p && p.available && !basket.some((line) => line.productId === p.id));
+  if (products.length === 0) return null;
 
-  const toggle = (id: string) =>
-    setPicked((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
-
+  const ready = (p: Product) => canAdd(p, initialDraft(p));
+  const toggle = (p: Product) => {
+    if (!ready(p)) return onChoose(p);
+    setPicked((ids) => (ids.includes(p.id) ? ids.filter((x) => x !== p.id) : [...ids, p.id]));
+  };
   const accept = () =>
     onAccept(
-      items
-        .filter((item) => picked.includes(item.id))
-        .map((item) => draftToLine(item, initialDraft(item), crypto.randomUUID())),
+      products.filter((p) => picked.includes(p.id)).map((p) => draftToLine(p, initialDraft(p), crypto.randomUUID())),
     );
 
   return (
     <div className="fixed inset-0 z-40 flex items-end bg-[#2b211c]/75" role="dialog" aria-modal>
       <div className="flex w-full flex-col gap-[48px] rounded-t-[60px] bg-surface px-[66px] pt-[72px] pb-12 text-ink">
         <h2 className="font-display text-[72px] leading-none font-semibold tracking-[-0.02em]">
-          {group.name}
+          {strings["crossSell.title"]}
         </h2>
         <div className="grid grid-cols-2 gap-[30px]">
-          {items.map((item) => {
-            const on = picked.includes(item.id);
+          {products.map((p) => {
+            const on = picked.includes(p.id);
             return (
               <button
-                key={item.id}
-                onClick={() => toggle(item.id)}
-                aria-pressed={on}
-                className={`flex flex-col gap-[18px] rounded-[36px] p-[18px] text-left ${
-                  on ? "bg-wheat" : "bg-ground"
-                }`}
+                key={p.id}
+                onClick={() => toggle(p)}
+                aria-pressed={ready(p) ? on : undefined}
+                className={`flex flex-col gap-[18px] rounded-[36px] p-[18px] text-left ${on ? "bg-wheat" : "bg-ground"}`}
               >
                 <div className="relative h-[240px] overflow-hidden rounded-[27px] bg-oat">
-                  {item.image && (
-                    <Image src={item.image} alt="" fill sizes="440px" className="object-cover" />
+                  {p.picture ? (
+                    <Image src={p.picture.url} alt="" fill sizes="440px" className="object-cover" />
+                  ) : (
+                    <span className="flex size-full items-center justify-center font-display text-[96px] font-semibold text-ink/25">
+                      {p.name.charAt(0)}
+                    </span>
                   )}
                   {on && (
                     <span className="absolute top-[18px] right-[18px] flex size-[60px] items-center justify-center rounded-full bg-accent text-on-accent">
@@ -82,19 +78,17 @@ export function CrossSellSheet({
                     </span>
                   )}
                 </div>
-                <span className="px-[9px] text-[30px] font-bold">{item.name}</span>
-                <span className="px-[9px] pb-[9px] text-[28.5px] font-semibold text-price">
-                  + {formatBRL(cellPrice(item, orderType))}
+                <span className="px-[9px] text-[30px] font-bold">{p.name}</span>
+                <span className="flex items-center justify-between px-[9px] pb-[9px] text-[28.5px] font-semibold text-price">
+                  {productPrice(p, strings)}
+                  {!ready(p) && <span className="text-[25.5px] font-bold text-detail-text">{strings["crossSell.choose"]}</span>}
                 </span>
               </button>
             );
           })}
         </div>
         <div className="flex gap-[30px]">
-          <button
-            onClick={onDismiss}
-            className="h-[138px] flex-1 rounded-full bg-ground text-[31.5px] font-bold"
-          >
+          <button onClick={onDismiss} className="h-[138px] flex-1 rounded-full bg-ground text-[31.5px] font-bold">
             {strings["crossSell.skip"]}
           </button>
           <button

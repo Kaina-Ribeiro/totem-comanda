@@ -1,98 +1,91 @@
 // Fixtures for the kiosk journey's component tests (not a test file itself).
-import type { Order, OrderTotal, Payment } from "@/app/kiosk/actions";
-import type { BasketLine } from "@/lib/kiosk/menu-view";
+import type { PaymentSession, SubmitOrderResponse, TotalsResponse } from "@/app/kiosk/actions";
+import type { BasketLine } from "@/lib/kiosk/basket";
+import { readMenu } from "@/lib/kiosk/menu-graph";
 import { BUNDLED } from "@/lib/kiosk/strings";
 
-import { seedCatalogue } from "../../../../mock/catalogue";
-import { resolveMenu } from "../../../../mock/kiosk-menu";
-import {
-  initialJourney,
-  type Journey,
-  type JourneyAction,
-  journeyReducer,
-  quoteKey,
-} from "./journey-state";
+import { applyScenario, now } from "../../../../mock/state";
+import { guestMenu } from "../../../../mock/v2/menu";
+import { initialJourney, type Journey, type JourneyAction, journeyReducer, totalsKey } from "./journey-state";
 
-/** The mock's morning menu, the same shape the Core API returns. */
-export const menu = resolveMenu(
-  { id: "mnu-manha", name: { "pt-BR": "Manhã" }, showCategoriesPrice: false },
-  seedCatalogue(),
-  "pt-BR",
-  "2026-10-30",
-);
+/** The v2 mock's afternoon menu (MODELS 5.20 minus tax), as the kiosk reads it. */
+export function referenceMenu() {
+  applyScenario("afternoon");
+  return readMenu(guestMenu(now(), "pt-BR")!);
+}
+export const menu = referenceMenu();
 
 export const strings = BUNDLED["pt-BR"];
 
-export const line = (itemId: string, quantity = 1, guid = `line-${itemId}`): BasketLine => ({
+/** A basket line of a product with no choices (2010 is the pint, 1002 the veggie burger). */
+export const line = (productId: string, quantity = 1, guid = `line-${productId}`): BasketLine => ({
   guid,
-  itemId,
+  productId,
   quantity,
-  options: [],
+  picks: [],
 });
 
-/** A journey started in pt-BR, take-away, with `actions` applied after the start. */
+/** A journey started in pt-BR on the reference menu, with `actions` applied after the start. */
 export function journeyAt(...actions: JourneyAction[]): Journey {
   const started = [
     { type: "start" },
     {
       type: "started",
       orderNonce: "00000000-0000-4000-8000-000000000001",
-      journeyStartedTimestamp: "2026-10-30T09:00:00Z",
+      journeyStartedTimestamp: "2026-11-10T12:00:00Z",
       menu,
       strings,
-      orderType: "TAKE_OUT",
     },
   ] satisfies JourneyAction[];
   return [...started, ...actions].reduce(journeyReducer, initialJourney("pt-BR"));
 }
 
-export const total = (cents: number): OrderTotal => ({
-  subtotal: cents,
-  discountTotal: 0,
-  total: cents,
-  taxInclusive: true,
-  tax: null,
-  currency: "BRL",
-});
-
-/** The quote the Core API would answer for the journey's basket as it is now. */
-export const quotedAt = (journey: Journey, cents: number): JourneyAction => ({
-  type: "quoted",
-  key: quoteKey(journey),
-  result: { ok: true, data: total(cents) },
-});
-
-export const order = (cents: number, id = "ord-1"): Order => ({
-  id,
-  orderNonce: "00000000-0000-4000-8000-000000000001",
-  orderType: "TAKE_OUT",
-  status: "AWAITING_PAYMENT",
-  posCheckNumber: null,
-  businessDate: "2026-10-30",
-  language: "pt-BR",
+export const totals = (total: number, extra: Partial<TotalsResponse> = {}): TotalsResponse => ({
+  basketId: "B-1",
+  subTotal: total,
+  discount: 0,
+  tax: 0,
+  total,
   orderItems: [],
-  orderTotal: total(cents),
-  cpfCnpj: null,
-  journeyStartedTimestamp: "2026-10-30T09:00:00Z",
-  createdAt: "2026-10-30T09:05:00Z",
-  placedAt: null,
-  readyAt: null,
+  taxes: [],
+  discounts: [],
+  ...extra,
 });
 
-export const payment = (
-  paymentStatus: Payment["paymentStatus"],
-  id = "pay-1",
-  method: Payment["method"] = "CREDIT",
-): Payment => ({
-  id,
-  orderId: "ord-1",
-  method,
-  amount: 1400,
-  paymentStatus,
-  gatewayType: "SIMULATED",
-  providerRef: null,
-  failureReason: null,
-  pix: null,
-  createdAt: "2026-10-30T09:05:00Z",
-  updatedAt: "2026-10-30T09:05:00Z",
+/** Go's totals for the journey's basket as it is now. */
+export const pricedAt = (journey: Journey, total: number, extra: Partial<TotalsResponse> = {}): JourneyAction => ({
+  type: "priced",
+  key: totalsKey(journey),
+  result: { ok: true, data: totals(total, extra) },
 });
+
+export const session = (
+  status: PaymentSession["status"],
+  method: PaymentSession["method"] = "PIX",
+  id = "pay-1",
+): PaymentSession => ({
+  id,
+  basketId: "B-1",
+  method,
+  amount: 5.2,
+  status,
+  tenderId: method === "PIX" ? "MP_PIX" : "MP_POINT",
+  tenderRef: "1319876543",
+  qrCode: method === "PIX" ? "data:image/png;base64,iVBORw0KGgo=" : null,
+  copyPaste: method === "PIX" ? "00020126580014br.gov.bcb.pix-mock" : null,
+  expiresAt: method === "PIX" ? new Date(Date.now() + 5 * 60_000).toISOString() : null,
+  terminalId: method === "CARD" ? "PAX_A910__SMARTPOS1" : null,
+  createdAt: new Date().toISOString(),
+});
+
+export const placed: SubmitOrderResponse = {
+  ...totals(5.2),
+  number: "20261110-0042",
+  customerCheckNumber: "42",
+  displayText: "Pedido 42",
+  orderType: "DINEIN",
+  status: "PAID",
+  version: 1,
+  placedAt: "2026-11-10T12:04:10Z",
+  history: [{ status: "PAID", at: "2026-11-10T12:04:10Z", by: "KIOSK" }],
+};

@@ -1,248 +1,268 @@
-import Image from "next/image";
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { refreshAdmin } from "@/app/admin/(panel)/catalogue-actions";
+import {
+  AllergenFields,
+  CheckList,
+  type Choice,
+  DeleteButton,
+  ImageField,
+  LinkRows,
+  OptionRows,
+  TextsFields,
+} from "@/components/admin/catalogue-fields";
 import { ActionForm, SubmitButton } from "@/components/admin/form";
 import { Card, Checkbox, Field, inputClass } from "@/components/admin/ui";
 import {
-  attempt,
-  cents,
-  checked,
-  type FormState,
-  optionalPrice,
-  optionalText,
-  text,
-} from "@/lib/admin/form";
+  attemptCatalogue,
+  byId,
+  type Catalogue,
+  imageOf,
+  loadCatalogue,
+  nextComboId,
+  optionIds,
+  optionsPart,
+  putItem,
+} from "@/lib/admin/catalogue";
+import { type AdminItem, type Item, readItem, readOptionRows } from "@/lib/admin/catalogue-form";
+import { type FormState, saveBoth, text } from "@/lib/admin/form";
 import { uploadImage } from "@/lib/admin/media";
-import { AdminApiError, asOwner } from "@/lib/admin/session";
-import { coreApi } from "@/lib/core/client";
-import type { components } from "@/lib/core-api";
 
-type Item = components["schemas"]["AdminItem"];
-type ItemInput = components["schemas"]["ItemInput"];
-type CrossSell = components["schemas"]["AdminCrossSellGroup"];
-
-const reais = (value: number | undefined | null) =>
-  value == null ? "" : (value / 100).toFixed(2).replace(".", ",");
-
-const localized = (form: FormData, name: string) => {
-  const pt = text(form, `${name}.pt`);
-  const en = text(form, `${name}.en`);
-  return pt ? { "pt-BR": pt, ...(en ? { en } : {}) } : undefined;
-};
-
-async function readItem(form: FormData, current: Item | null): Promise<ItemInput> {
-  const price = cents(text(form, "price"));
-  if (price === null) throw new AdminApiError("VALIDATION_FAILED", "preço");
-  const dineIn = optionalPrice(form, "price.DINEIN", "preço para comer aqui");
-  const takeOut = optionalPrice(form, "price.TAKE_OUT", "preço para viagem");
-  const image =
-    (await uploadImage(form, "image")) ??
-    (checked(form, "removeImage") ? null : (current?.image ?? null));
-  return {
-    plu: optionalText(form, "plu") ?? null,
-    name: localized(form, "name") ?? { "pt-BR": "" },
-    shortName: localized(form, "shortName"),
-    description: localized(form, "description"),
-    image,
-    price,
-    servicePriceOverride: {
-      ...(dineIn !== null ? { DINEIN: dineIn } : {}),
-      ...(takeOut !== null ? { TAKE_OUT: takeOut } : {}),
-    },
-    serviceAvailability: { DINEIN: checked(form, "dineIn"), TAKE_OUT: checked(form, "takeOut") },
-    calories: optionalText(form, "calories") ?? null,
-    itemLabels: current?.itemLabels ?? [],
-    defaultEntity: current?.defaultEntity ?? null,
-    crossSellGroupId: optionalText(form, "crossSellGroupId") ?? null,
-    fiscal: current?.fiscal ?? null,
-  };
-}
+const reais = (value: number | null | undefined) => (value == null ? "" : value.toFixed(2).replace(".", ","));
 
 async function saveItem(_: FormState, form: FormData): Promise<FormState> {
   "use server";
   const itemId = text(form, "itemId");
   let createdId: string | null = null;
-  const state = await attempt(async () => {
-    if (itemId) {
-      const current = await asOwner((headers) =>
-        coreApi().GET("/v1/admin/items/{itemId}", { headers, params: { path: { itemId } } }),
-      );
-      const body = await readItem(form, current);
-      await asOwner((headers) =>
-        coreApi().PUT("/v1/admin/items/{itemId}", { headers, params: { path: { itemId } }, body }),
-      );
-      revalidatePath("/admin/itens");
-      return "Item salvo. Aparece no totem na próxima jornada.";
+  const state = await attemptCatalogue(async () => {
+    const catalogue = await loadCatalogue();
+    const items = byId(catalogue.items);
+    const current = itemId ? (items.get(itemId) ?? null) : null;
+    if (itemId && !current) return { error: "Esse item não existe mais. Recarregue a página." };
+    const uploaded = await uploadImage(form, "imageFile");
+    if (uploaded) form.set("image", uploaded);
+    const item = readItem(form, current, { nextComboId: nextComboId(catalogue.items) });
+    if (item.type === "SIZED_ITEM" && form.has("sizes")) {
+      // Sizes are items too: saved first and put back if the sized item fails (COM-129).
+      const { links: sizes, options } = readOptionRows(form, "opt", items);
+      const images = item.links.filter((l) => l.type === "IMAGE");
+      item.links = [...images, ...sizes, ...item.links.filter((l) => l.type !== "IMAGE")];
+      await saveBoth(optionsPart(options, items), { label: "o item", save: () => putItem(item) });
+    } else {
+      await putItem(item);
     }
-    const created = await asOwner(async (headers) =>
-      coreApi().POST("/v1/admin/items", { headers, body: await readItem(form, null) }),
-    );
-    createdId = created.id;
+    await refreshAdmin();
+    if (!current) createdId = item.id;
+    return "Item salvo. Aparece no totem na próxima jornada.";
   });
-  // A new item goes to its page, where it can join categories and get options.
-  if (createdId) redirect(`/admin/itens/${createdId}?novo=1`);
+  // A new item goes to its page, where it gets groups, sizes, allergens and a category.
+  if (createdId) redirect(`/admin/itens/${encodeURIComponent(createdId)}?novo=1`);
   return state;
 }
 
-async function deleteItem(_: FormState, form: FormData): Promise<FormState> {
-  "use server";
-  const itemId = text(form, "itemId");
-  const state = await attempt(() =>
-    asOwner((headers) =>
-      coreApi().DELETE("/v1/admin/items/{itemId}", { headers, params: { path: { itemId } } }),
-    ),
+/** Create: the kind of item, its name and price (and a combo's parts). The rest is on its page. */
+export function NewItemForm({ catalogue }: { catalogue: Catalogue }) {
+  const comboParts = [
+    ...catalogue.groups.filter((g) => g.type === "COMBO_MAIN"),
+    ...catalogue.groups.filter((g) => g.type === "COMBO_SIDE"),
+  ].map((g) => ({
+    value: `${g.type}:${g.id}`,
+    label: `${g.type === "COMBO_MAIN" ? "Principal" : "Acompanhamento"} · ${g.name}`,
+  }));
+  return (
+    <ActionForm action={saveItem} className="flex flex-col gap-6">
+      <input type="hidden" name="itemId" value="" />
+      <input type="hidden" name="available" value="on" />
+      <Card className="flex flex-col gap-5">
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-2 text-sm font-semibold text-muted">Tipo</legend>
+          {(
+            [
+              ["ITEM", "Item", "Um produto ou uma opção de grupo (ex.: pão de queijo, queijo extra)."],
+              ["SIZED_ITEM", "Com tamanhos", "O preço vem de cada tamanho (ex.: café P, M, G)."],
+              ["COMBO_MEAL", "Combo", "Um principal e acompanhamentos, a um preço."],
+            ] as const
+          ).map(([value, label, hint], i) => (
+            <label key={value} className="flex items-start gap-3 rounded-[10px] border border-line p-3">
+              <input type="radio" name="type" value={value} defaultChecked={i === 0} className="mt-0.5 size-5 accent-[#4e3426]" />
+              <span className="flex flex-col">
+                <span className="font-semibold">{label}</span>
+                <span className="text-xs text-muted">{hint}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+        <TextsFields entity={null} />
+        <Field label="Preço (R$)" hint="Itens com tamanhos ignoram este preço.">
+          <input name="price" inputMode="decimal" placeholder="9,50" className={inputClass} />
+        </Field>
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-2 text-sm font-semibold text-muted">Partes do combo (só para combo)</legend>
+          {comboParts.length ? (
+            <CheckList name="links.add" choices={comboParts} selected={[]} columns="sm:grid-cols-2" />
+          ) : (
+            <p className="text-sm text-muted">
+              Crie antes um grupo “Principal do combo” e um “Acompanhamento do combo” em Grupos de opções.
+            </p>
+          )}
+        </fieldset>
+      </Card>
+      <div>
+        <SubmitButton pendingLabel="Criando…">Criar item</SubmitButton>
+      </div>
+    </ActionForm>
   );
-  if (state.error) return state;
-  revalidatePath("/admin/itens");
-  redirect("/admin/itens");
 }
 
-/** Create or edit an item: texts PT/EN, photo, price, prices per order type, availability. */
-export function ItemForm({ item, crossSells }: { item: Item | null; crossSells: CrossSell[] }) {
+const sortByName = (choices: Choice[]) => choices.sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+
+/** Edit every part of a product, option, size, sized item or combo (SPEC 6). */
+export function ItemForm({ item, catalogue }: { item: AdminItem; catalogue: Catalogue }) {
+  const items = byId(catalogue.items);
+  const groups = byId(catalogue.groups);
+  const swaps = byId(catalogue.swapSells);
+  const nameOf = (type: string, id: string) =>
+    (type === "SWAP_SELL" ? swaps.get(id)?.name : type === "ITEM" || type === "SIZED_ITEM" ? items.get(id)?.name : groups.get(id)?.name) ?? id;
+  const isOption = optionIds(catalogue).has(item.id);
+  const sizes = item.type === "SIZED_ITEM" ? item.links.filter((l) => l.type === "ITEM").map((l) => items.get(l.id)).filter((i): i is Item => i?.type === "ITEM") : [];
+  const linkRows = item.links.filter((l) => l.type !== "IMAGE" && !(item.type === "SIZED_ITEM" && l.type === "ITEM"));
+  const groupChoices =
+    item.type === "COMBO_MEAL"
+      ? catalogue.groups
+          .filter((g) => g.type === "COMBO_MAIN" || g.type === "COMBO_SIDE")
+          .map((g) => ({ value: `${g.type}:${g.id}`, label: `${g.type === "COMBO_MAIN" ? "Principal" : "Acompanhamento"} · ${g.name}` }))
+      : [
+          ...sortByName(catalogue.groups.filter((g) => g.type === "MODIFIERS").map((g) => ({ value: `MODIFIERS:${g.id}`, label: g.name }))),
+          ...(item.type === "ITEM"
+            ? catalogue.swapSells.map((s) => ({ value: `SWAP_SELL:${s.id}`, label: `Oferta de troca · ${s.name}` }))
+            : []),
+        ];
+  const options = optionIds(catalogue);
+  const productChoices = sortByName(
+    catalogue.items
+      .filter((i) => i.id !== item.id && !(i.type === "ITEM" && options.has(i.id)))
+      .map((i) => ({ value: i.id, label: i.name })),
+  );
+  const optionItem = item as Item;
   return (
     <>
       <ActionForm action={saveItem} className="flex flex-col gap-6">
-        <input type="hidden" name="itemId" value={item?.id ?? ""} />
-        <Card className="grid gap-5 sm:grid-cols-2">
-          <Field label="Nome (PT)">
-            <input
-              name="name.pt"
-              defaultValue={item?.name["pt-BR"]}
-              required
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Nome (EN)">
-            <input name="name.en" defaultValue={item?.name.en} className={inputClass} />
-          </Field>
-          <Field label="Nome curto (PT)" hint="Opcional, para espaços pequenos.">
-            <input
-              name="shortName.pt"
-              defaultValue={item?.shortName?.["pt-BR"]}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Nome curto (EN)">
-            <input name="shortName.en" defaultValue={item?.shortName?.en} className={inputClass} />
-          </Field>
-          <Field label="Descrição (PT)">
-            <textarea
-              name="description.pt"
-              defaultValue={item?.description?.["pt-BR"]}
-              rows={2}
-              className={`${inputClass} h-auto py-2`}
-            />
-          </Field>
-          <Field label="Descrição (EN)">
-            <textarea
-              name="description.en"
-              defaultValue={item?.description?.en}
-              rows={2}
-              className={`${inputClass} h-auto py-2`}
-            />
-          </Field>
+        <input type="hidden" name="itemId" value={item.id} />
+        <Card className="flex flex-col gap-4">
+          <h2 className="text-lg font-bold tracking-[-0.01em]">Textos</h2>
+          <TextsFields entity={item} description />
         </Card>
 
-        <Card className="grid gap-5 sm:grid-cols-3">
-          <Field
-            label="Preço (R$)"
-            hint="Preço base. Cada cardápio pode ter o seu, nas categorias."
-          >
-            <input
-              name="price"
-              defaultValue={reais(item?.price ?? null)}
-              required
-              inputMode="decimal"
-              placeholder="28,00"
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Preço para comer aqui (R$)" hint="Vazio usa o preço base.">
-            <input
-              name="price.DINEIN"
-              defaultValue={reais(item?.servicePriceOverride?.DINEIN)}
-              inputMode="decimal"
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Preço para viagem (R$)" hint="Vazio usa o preço base.">
-            <input
-              name="price.TAKE_OUT"
-              defaultValue={reais(item?.servicePriceOverride?.TAKE_OUT)}
-              inputMode="decimal"
-              className={inputClass}
-            />
-          </Field>
-          <div className="flex flex-col gap-2">
-            <span className="text-sm font-semibold text-muted">Disponível para</span>
-            <Checkbox
-              name="dineIn"
-              label="Comer aqui"
-              defaultChecked={item?.serviceAvailability.DINEIN ?? true}
-            />
-            <Checkbox
-              name="takeOut"
-              label="Para viagem"
-              defaultChecked={item?.serviceAvailability.TAKE_OUT ?? true}
-            />
+        <Card className="flex flex-col gap-4">
+          <h2 className="text-lg font-bold tracking-[-0.01em]">Preço e venda</h2>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {item.type !== "SIZED_ITEM" && (
+              <>
+                <Field label="Preço (R$)" hint={isOption ? "Numa opção, quanto ela soma. 0 = grátis." : undefined}>
+                  <input name="price" defaultValue={reais(item.price)} required inputMode="decimal" placeholder="9,50" className={inputClass} />
+                </Field>
+                <Field label="Preço para comer aqui (R$)" hint="Vazio usa o preço.">
+                  <input name="dineInPrice" defaultValue={reais(item.dineInPriceOverride)} inputMode="decimal" className={inputClass} />
+                </Field>
+              </>
+            )}
+            <Field label="Nome na cozinha" hint="Curto, para o pedido. Vazio usa o nome.">
+              <input name="internalName" defaultValue={item.internalName ?? ""} className={inputClass} />
+            </Field>
+            <Field label="Código (PLU)">
+              <input name="plu" defaultValue={item.plu ?? ""} className={inputClass} />
+            </Field>
+            <Field label="Calorias" hint="Ex.: 320 kcal">
+              <input name="calories" defaultValue={item.calories ?? ""} className={inputClass} />
+            </Field>
+            <Field label="Idade mínima" hint="Vazio = livre.">
+              <input name="ageRestriction" defaultValue={item.ageRestriction ?? ""} inputMode="numeric" className={inputClass} />
+            </Field>
           </div>
-          <Field label="Código (PLU)">
-            <input name="plu" defaultValue={item?.plu ?? ""} className={inputClass} />
-          </Field>
-          <Field label="Calorias" hint="Ex.: 320 kcal">
-            <input name="calories" defaultValue={item?.calories ?? ""} className={inputClass} />
-          </Field>
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
+            <Checkbox name="available" label="Disponível" defaultChecked={item.available} />
+            <Checkbox name="alcoholic" label="Bebida alcoólica" defaultChecked={item.alcoholic ?? false} />
+          </div>
         </Card>
 
-        <Card className="grid gap-5 sm:grid-cols-2">
-          <Field label="Foto" hint="JPEG ou PNG até 5 MB; o totem recorta para o quadro.">
-            <div className="flex items-center gap-3">
-              {item?.image && (
-                <span className="relative size-16 shrink-0 overflow-hidden rounded-lg bg-ground">
-                  <Image src={item.image} alt="" fill sizes="64px" className="object-cover" />
-                </span>
-              )}
-              <input
-                name="image"
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                className="text-sm"
-              />
+        {item.type === "SIZED_ITEM" && (
+          <Card className="flex flex-col gap-4">
+            <input type="hidden" name="sizes" value="on" />
+            <div>
+              <h2 className="text-lg font-bold tracking-[-0.01em]">Tamanhos</h2>
+              <p className="text-sm text-muted">O totem pede o tamanho primeiro; o preço de cada um é o preço do item.</p>
             </div>
-            {item?.image && <Checkbox name="removeImage" label="Tirar a foto" />}
-          </Field>
-          <Field label="Sugestão ao adicionar" hint="Grupo de “Que tal um café?”.">
-            <select
-              name="crossSellGroupId"
-              defaultValue={item?.crossSellGroupId ?? ""}
-              className={inputClass}
-            >
-              <option value="">Nenhuma</option>
-              {crossSells.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.name["pt-BR"]}
-                </option>
-              ))}
-            </select>
-          </Field>
+            <OptionRows options={sizes} mode="sizes" />
+          </Card>
+        )}
+
+        <Card className="flex flex-col gap-4">
+          <h2 className="text-lg font-bold tracking-[-0.01em]">
+            {item.type === "COMBO_MEAL" ? "Partes do combo" : "Grupos de opções"}
+          </h2>
+          <LinkRows
+            name="links"
+            legend={
+              item.type === "COMBO_MEAL"
+                ? "Um principal e pelo menos um acompanhamento, na ordem do totem"
+                : "Na ordem do totem; uma oferta de troca aparece depois de adicionar"
+            }
+            links={linkRows}
+            nameOf={(l) => nameOf(l.type, l.id)}
+            choices={groupChoices}
+            addLabel={item.type === "COMBO_MEAL" ? "Adicionar parte…" : "Adicionar grupo ou oferta…"}
+            empty={item.type === "COMBO_MEAL" ? "Sem partes: um combo precisa delas." : "Sem opções: o item vai direto para a sacola."}
+          />
+        </Card>
+
+        {item.type === "ITEM" && (
+          <details open={isOption} className="rounded-[14px] border border-line bg-surface px-5 py-[18px]">
+            <summary className="cursor-pointer text-lg font-bold tracking-[-0.01em]">Quando é opção de um grupo</summary>
+            <div className="mt-4 grid gap-4 sm:grid-cols-3">
+              <Field label="Começa com" hint="1 = já vem marcado (ingredientes).">
+                <input name="defaultQuantity" defaultValue={optionItem.defaultQuantity ?? ""} inputMode="numeric" placeholder="0" className={inputClass} />
+              </Field>
+              <Field label="Mínimo desta opção">
+                <input name="minChoices" defaultValue={optionItem.minChoices ?? ""} inputMode="numeric" placeholder="0" className={inputClass} />
+              </Field>
+              <Field label="Máximo desta opção">
+                <input name="maxChoices" defaultValue={optionItem.maxChoices ?? ""} inputMode="numeric" placeholder="1" className={inputClass} />
+              </Field>
+            </div>
+          </details>
+        )}
+
+        <Card className="flex flex-col gap-4">
+          <h2 className="text-lg font-bold tracking-[-0.01em]">Alergênicos</h2>
+          <AllergenFields allergens={item.allergens} traces={item.allergenTraces} declared={item.allergensDeclared} />
+        </Card>
+
+        <Card className="flex flex-col gap-5">
+          <h2 className="text-lg font-bold tracking-[-0.01em]">Selos e sugestões</h2>
+          <fieldset className="flex flex-col gap-2">
+            <legend className="mb-2 text-sm font-semibold text-muted">Selos</legend>
+            {catalogue.badges.length ? (
+              <CheckList name="badgeIds" choices={catalogue.badges.map((b) => ({ value: b.id, label: b.name }))} selected={item.badgeIds ?? []} />
+            ) : (
+              <p className="text-sm text-muted">Nenhum selo criado.</p>
+            )}
+          </fieldset>
+          <fieldset className="flex flex-col gap-2">
+            <legend className="mb-2 text-sm font-semibold text-muted">Sugerir depois de adicionar (“Que tal…?”)</legend>
+            <CheckList name="crossSellIds" choices={productChoices} selected={item.crossSellIds ?? []} />
+          </fieldset>
+        </Card>
+
+        <Card>
+          <ImageField current={imageOf(item.links)} images={catalogue.images} />
         </Card>
 
         <div>
-          <SubmitButton>{item ? "Salvar item" : "Criar item"}</SubmitButton>
+          <SubmitButton>Salvar item</SubmitButton>
         </div>
       </ActionForm>
 
-      {item && (
-        <ActionForm action={deleteItem} className="flex flex-col gap-2">
-          <input type="hidden" name="itemId" value={item.id} />
-          <div>
-            <SubmitButton variant="danger" pendingLabel="Apagando…">
-              Apagar item
-            </SubmitButton>
-          </div>
-        </ActionForm>
-      )}
+      <DeleteButton kind="item" id={item.id} label="Apagar item" then="/admin/itens" />
     </>
   );
 }

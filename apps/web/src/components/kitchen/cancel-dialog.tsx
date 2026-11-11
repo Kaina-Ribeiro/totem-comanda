@@ -81,8 +81,8 @@ export function CancelDialog({
             Cancelar o pedido {number}?
           </h2>
           <p className="text-[15px] leading-[1.4] font-semibold text-muted">
-            O pedido sai do quadro e não conta no faturamento. Com o pagamento simulado, não há
-            estorno. A dona confirma com o e-mail e a senha do painel.
+            O pedido sai do quadro e não conta no faturamento. O estorno é feito no painel do
+            Mercado Pago. A dona confirma com o e-mail e a senha do painel.
           </p>
         </div>
 

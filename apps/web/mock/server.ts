@@ -1,7 +1,8 @@
 // Stateful mock of the Comanda Core API for front-end work before the Go API
-// exists. Runs on MOCK_PORT (4020); Prism runs in front on 4010 in proxy mode
-// and checks every request and response against contract/openapi.yaml, so the
-// BFF keeps CORE_API_URL=http://localhost:4010. Run with `npm run mock`.
+// exists. Runs on MOCK_PORT (4020); Prism runs in front on PRISM_PORT (4010) in
+// proxy mode and checks every request and response against contract/openapi.yaml,
+// so the BFF keeps CORE_API_URL=http://localhost:4010. Run with `npm run mock`.
+// Routes live in ./v2 (the contract's /v2 paths).
 //
 // Mock-only control endpoints (not in the contract, called on 4020 directly):
 //   GET  /__mock            current scenario, scenarios, device health, reports
@@ -11,157 +12,47 @@
 //                           (timeouts, 4xx, 5xx, a lost answer); DELETE clears them.
 //                           A 4xx answers a contract Problem: `code` defaults for 401,
 //                           404 and 422 and is required for other 4xx (faults.ts)
-//   POST /__mock/kitchen/backdate {"posCheckNumber": "42", "minutes": 12}
-//                           moves an order's placedAt, readyAt and status history back, to see waiting colours
+//   POST /__mock/kitchen/backdate {"number": "20261110-0001", "minutes": 12}
+//                           moves an order's placedAt and status history back, to see waiting colours
 //   POST /__mock/clock     {"minutes": 16} moves the mock's clock forward (a pause's automatic resume)
 //   GET  /__mock/device-credentials?kind=KITCHEN  id and secret of a seeded device, for the
 //                           dev index to pair a browser as the kiosk or the kitchen (COM-139)
+//   POST /__mock/payments/{id} {"outcome": "APPROVED" | "DECLINED" | "EXPIRED"}  decides a
+//                           Mercado Pago session; a late approval is listed under v2.refunds
+//
+// MOCK_PAYMENT_OUTCOME, MOCK_PAYMENT_DELAY_MS and MOCK_WEBHOOK_PLACE_MS: see v2/payments.ts.
 
 import { spawn } from "node:child_process";
-import { createHash, randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { fileURLToPath } from "node:url";
 
-import { SEED_MEDIA } from "./catalogue.ts";
 import { faultCode, faultReply } from "./faults.ts";
-import { authDevice, problem, type Reply, type Request, type Route, type Schemas } from "./http.ts";
-import { adminRoutes } from "./routes-admin.ts";
-import { catalogueRoutes } from "./routes-catalogue.ts";
-import { currentPace, paceRoutes } from "./pace.ts";
-import { historyOf, serveKitchenStream, kitchenRoutes } from "./routes-kitchen.ts";
-import { optionRoutes } from "./routes-options.ts";
-import { kioskRoutes } from "./routes-kiosk.ts";
-import { orderRoutes } from "./routes-orders.ts";
-import { activeMenu, nextOpening } from "./schedule.ts";
+import { problem, type Reply, type Request, type Route, type Schemas } from "./http.ts";
+import { SEED_MEDIA } from "./media.ts";
+import { currentPace } from "./pace.ts";
+import { forceOutcome, publicSession, sweep } from "./v2/payments.ts";
+import { adminRoutes } from "./v2/routes-admin.ts";
+import { guestRoutes } from "./v2/routes-guest.ts";
+import { kitchenRoutes, serveKitchenStream } from "./v2/routes-kitchen.ts";
+import { v2 } from "./v2/state.ts";
 import {
   applyScenario,
   isScenario,
   now,
   SCENARIOS,
   seededCredentials,
-  signInDevice,
   state,
 } from "./state.ts";
 
 const MOCK_PORT = Number(process.env.MOCK_PORT ?? 4020);
 const PRISM_PORT = Number(process.env.PRISM_PORT ?? 4010);
-const TOKEN_TTL_S = Number(process.env.MOCK_TOKEN_TTL ?? 900);
 const ASSETS = new URL("../../../docs/prototype/assets/", import.meta.url);
 
-function deviceConfig(device: (typeof state.devices)[number]): Schemas["DeviceConfig"] {
-  const r = state.restaurant;
-  const at = now();
-  const active = activeMenu(state.menus, at, r.timezone);
-  const storePace = currentPace();
-  return {
-    kioskID: device.id,
-    kind: device.kind,
-    idleTimerIntervalMilliseconds: device.idleTimerIntervalMilliseconds,
-    printerEnabled: device.printerEnabled,
-    maintenanceMode: device.maintenanceMode,
-    // At capacity in Aparelhos, or the whole store paused (contract 0.2.0).
-    atCapacityMode: device.atCapacityMode || storePace.pace === "PAUSED",
-    pace: { pace: storePace.pace, pausedUntil: storePace.pausedUntil },
-    isOpen: active !== null && (r.isDineInAvailable || r.isTakeOutAvailable),
-    restaurant: {
-      locationId: r.id,
-      name: r.name,
-      logo: r.logo ?? null,
-      currency: "BRL",
-      timezone: r.timezone,
-      defaultLanguage: r.defaultLanguage,
-      supportedLanguages: r.supportedLanguages.map((code) => ({
-        code,
-        name: code === "pt-BR" ? "Português" : "English",
-      })),
-      isDineInAvailable: r.isDineInAvailable,
-      isTakeOutAvailable: r.isTakeOutAvailable,
-      closedMessage: r.closedMessage,
-      posCheckNumberDisplayLength: r.posCheckNumberDisplayLength,
-    },
-    activeMenu: active
-      ? {
-          id: active.menu.id,
-          name: (active.menu as (typeof state.menus)[number]).name["pt-BR"],
-          until: active.until.toISOString(),
-        }
-      : null,
-    nextOpeningAt: active
-      ? null
-      : (nextOpening(state.menus, at, r.timezone)?.toISOString() ?? null),
-    serverTime: at.toISOString(),
-  };
-}
-
 const routes: Route[] = [
-  ...kioskRoutes,
-  ...orderRoutes,
-  ...adminRoutes,
-  ...catalogueRoutes,
-  ...optionRoutes,
+  ...guestRoutes,
   ...kitchenRoutes,
-  ...paceRoutes,
-  [
-    "POST",
-    /^\/v1\/devices\/auth$/,
-    (req) => {
-      const { deviceId, deviceSecret } = (req.body ?? {}) as Partial<Schemas["DeviceAuthRequest"]>;
-      const device = signInDevice(deviceId, deviceSecret);
-      if (!device) {
-        return problem(401, "INVALID_CREDENTIALS", "Invalid credentials");
-      }
-      if (device.status === "DISABLED") return problem(403, "DEVICE_DISABLED", "Device disabled");
-      const accessToken = randomBytes(24).toString("base64url");
-      state.tokens.set(accessToken, {
-        deviceId: device.id,
-        expiresAt: Date.now() + TOKEN_TTL_S * 1000,
-      });
-      return { status: 200, body: { accessToken, tokenType: "Bearer", expiresIn: TOKEN_TTL_S } };
-    },
-  ],
-  [
-    "GET",
-    /^\/v1\/devices\/me\/config$/,
-    (req) => {
-      const { device, error } = authDevice(req);
-      if (error) return error;
-      const config = deviceConfig(device);
-      const { serverTime: _, ...versioned } = config;
-      const etag = `"cfg-${createHash("sha1").update(JSON.stringify(versioned)).digest("hex").slice(0, 16)}"`;
-      if (req.headers["if-none-match"] === etag) return { status: 304, headers: { ETag: etag } };
-      return { status: 200, body: config, headers: { ETag: etag } };
-    },
-  ],
-  [
-    "POST",
-    /^\/v1\/devices\/heartbeat$/,
-    (req) => {
-      const { device, error } = authDevice(req);
-      if (error) return error;
-      const beat = req.body as Schemas["Heartbeat"];
-      device.appVersion = beat.appVersion;
-      device.screenResolution = beat.screenResolution;
-      device.ip = beat.ip ?? req.ip;
-      device.lastSeenAt = new Date().toISOString();
-      return { status: 204 };
-    },
-  ],
-  [
-    "POST",
-    /^\/v1\/devices\/status$/,
-    (req) => {
-      const { device, error } = authDevice(req);
-      if (error) return error;
-      state.statusReports.push({
-        deviceId: device.id,
-        at: new Date().toISOString(),
-        report: req.body as Schemas["DeviceReport"],
-      });
-      state.statusReports.splice(0, state.statusReports.length - 50);
-      return { status: 204 };
-    },
-  ],
+  ...adminRoutes,
   [
     "GET",
     /^\/__mock$/,
@@ -173,8 +64,21 @@ const routes: Route[] = [
         mockTime: now().toISOString(),
         devices: state.devices.map(({ secret: _, ...d }) => d),
         statusReports: state.statusReports.slice(-10),
+        v2: {
+          refunds: v2().refunds,
+          payments: [...v2().payments.values()].slice(-10).map(publicSession),
+        },
       },
     }),
+  ],
+  [
+    "POST",
+    /^\/__mock\/payments\/([^/]+)$/,
+    (req, [paymentId]) => {
+      const session = v2().payments.get(paymentId);
+      if (!session) return { status: 404, body: { error: "payment" } };
+      return forceOutcome(session, (req.body as { outcome?: unknown } | null)?.outcome);
+    },
   ],
   [
     "POST",
@@ -202,19 +106,15 @@ const routes: Route[] = [
     "POST",
     /^\/__mock\/kitchen\/backdate$/,
     (req) => {
-      const body = (req.body ?? {}) as { posCheckNumber?: unknown; minutes?: unknown };
-      const order = [...state.orders.values()].find(
-        (o) => o.posCheckNumber === String(body.posCheckNumber),
-      );
+      const body = (req.body ?? {}) as { number?: unknown; minutes?: unknown };
+      const order = v2().orders.get(String(body.number));
       if (!order || typeof body.minutes !== "number") {
-        return { status: 400, body: { error: "posCheckNumber of a placed order and minutes" } };
+        return { status: 400, body: { error: "number of a placed order and minutes" } };
       }
-      const back = (at: string | null | undefined) =>
-        at ? new Date(Date.parse(at) - (body.minutes as number) * 60_000).toISOString() : at;
-      order.placedAt = back(order.placedAt) ?? order.placedAt;
-      order.readyAt = back(order.readyAt) ?? null;
-      for (const change of historyOf(order)) change.at = back(change.at) ?? change.at;
-      return { status: 200, body: { id: order.id, placedAt: order.placedAt } };
+      const back = (at: string) => new Date(Date.parse(at) - (body.minutes as number) * 60_000).toISOString();
+      order.placedAt = back(order.placedAt);
+      for (const change of order.history) change.at = back(change.at);
+      return { status: 200, body: { number: order.number, placedAt: order.placedAt } };
     },
   ],
   [
@@ -350,6 +250,7 @@ const server = createServer({ insecureHTTPParser: true }, async (incoming, res) 
   };
   if (await applyFault(req, res)) return;
   if (serveKitchenStream(req, res)) return;
+  if (req.path.startsWith("/v2/")) sweep();
   for (const [method, pattern, handler] of routes) {
     const match = pattern.exec(req.path);
     if (match && method === req.method) return send(res, handler(req, match.slice(1)));
@@ -370,18 +271,19 @@ server.listen(MOCK_PORT, () => {
   console.log(
     `[mock] Core API mock on http://localhost:${MOCK_PORT} (scenario: ${state.scenario})`,
   );
+  // v2 Mercado Pago sessions move on with the clock (expiry, outcome, webhook placement).
+  setInterval(() => sweep(), 1000).unref();
   if (process.env.MOCK_NO_PRISM) return;
   // Prism validates every request and response against the contract.
   const prismCli = fileURLToPath(
     new URL("../node_modules/@stoplight/prism-cli/dist/index.js", import.meta.url),
   );
-  const contract = fileURLToPath(new URL("../../../contract/openapi.yaml", import.meta.url));
   const prism = spawn(
     process.execPath,
     [
       prismCli,
       "proxy",
-      contract,
+      fileURLToPath(new URL("../../../contract/openapi.yaml", import.meta.url)),
       `http://localhost:${MOCK_PORT}`,
       "-p",
       String(PRISM_PORT),

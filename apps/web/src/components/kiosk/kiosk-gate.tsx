@@ -1,25 +1,70 @@
+import { redirect } from "next/navigation";
+
 import { AutoRefresh } from "@/components/auto-refresh";
-import type { DeviceConfig } from "@/lib/device/config";
+import { PreparingScreen } from "@/components/device-gate";
+import { DeviceReporter } from "@/components/device-reporter";
 import { gateState } from "@/lib/device/gate";
+import { DeviceAuthError } from "@/lib/device/session";
 import { formatNextOpening } from "@/lib/format/next-opening";
+import { getKioskConfig, type KioskConfig } from "@/lib/kiosk/core";
 
 import { AttractScreen } from "./attract-screen";
-import { availableOrderTypes } from "./journey/journey-state";
-import { KioskJourney } from "./journey/kiosk-journey";
+import { KioskJourney, type KioskSettings } from "./journey/kiosk-journey";
 import { PausedScreen } from "./paused-screen";
 import { UnavailableScreen } from "./unavailable-screen";
 
-/** FR-137: gate screens re-read the config every 45 s, so the kiosk opens and closes by itself. */
+/** Gate screens re-read the config every 45 s, so the kiosk opens and closes by itself. */
 const GATE_RECHECK_MS = 45_000;
 
+/** The v2 config in the shape the shared gate rules read (pace sits under `store` on v2). */
+const gateOf = (config: KioskConfig) => gateState({ ...config, pace: config.store.pace });
+
 /**
- * The kiosk's gate (decision 14): maintenance, then closed, then paused or at
- * capacity, else the guest journey. All of these come from the Core API's config. Gate
- * screens re-check the config; the journey re-checks only while on attract,
- * so a guest mid-order is never cut off.
+ * `/kiosk` (pilot, COM-146): signs this browser in as its device (shared
+ * device session) and reads `GET /v2/devices/me/config`. Same rules as the
+ * shared DeviceGate the kitchen uses:
+ * unprovisioned or rejected credentials go to /setup, a kitchen device goes to
+ * /kitchen, a disabled kiosk gets its own screen, an unreachable Core shows the
+ * preparing screen and retries. Reads cookies, so render it inside <Suspense>.
  */
-export function KioskGate({ config }: { config: DeviceConfig }) {
-  const state = gateState(config);
+export async function KioskDeviceGate() {
+  let config: KioskConfig;
+  try {
+    config = await getKioskConfig();
+  } catch (error) {
+    if (!(error instanceof DeviceAuthError)) throw error;
+    switch (error.code) {
+      case "NOT_PROVISIONED":
+      case "INVALID_CREDENTIALS":
+      case "WRONG_DEVICE":
+        redirect("/setup");
+      case "DEVICE_DISABLED":
+        return (
+          <UnavailableScreen
+            title="Totem desativado"
+            body="Este totem foi desativado no back office. Peça ajuda a um atendente."
+          />
+        );
+      case "CORE_UNAVAILABLE":
+        return <PreparingScreen />;
+    }
+  }
+  if (config.kind !== "KIOSK") redirect("/kitchen");
+  return (
+    <>
+      <KioskGate config={config} />
+      <DeviceReporter state={gateOf(config)} />
+    </>
+  );
+}
+
+/**
+ * The kiosk's screens by precedence (Offline > Maintenance > Closed > Paused >
+ * Live), all from the v2 config. Gate screens re-check the config; the journey
+ * re-checks only while on attract, so a guest mid-order is never cut off.
+ */
+export function KioskGate({ config }: { config: KioskConfig }) {
+  const state = gateOf(config);
   return (
     <>
       <GateScreen config={config} />
@@ -28,27 +73,39 @@ export function KioskGate({ config }: { config: DeviceConfig }) {
   );
 }
 
-function GateScreen({ config }: { config: DeviceConfig }) {
-  const { restaurant } = config;
-  const brand = restaurant.name;
+/** What the journey needs from the v2 config. */
+export function kioskSettings(config: KioskConfig): KioskSettings {
+  const { store } = config;
+  const pace = store.pace?.pace;
+  const notice = store.invoiceNotice;
+  return {
+    brand: store.locationName,
+    defaultLanguage: store.defaultLanguage,
+    languages: store.languages,
+    idleMs: config.idleTimerIntervalMilliseconds,
+    cardAvailable: !!config.paymentTerminalId,
+    waitMinutes: pace === "NORMAL" || pace === "BUSY" ? (store.waitMinutes?.[pace] ?? null) : null,
+    invoiceNotice: { "pt-BR": notice["pt-BR"], en: notice.en || notice["pt-BR"] },
+  };
+}
 
-  switch (gateState(config)) {
+function GateScreen({ config }: { config: KioskConfig }) {
+  const { store } = config;
+  const brand = store.locationName;
+
+  switch (gateOf(config)) {
     case "maintenance":
       return (
-        <UnavailableScreen
-          brand={brand}
-          title="Totem em manutenção"
-          body="Faça seu pedido no balcão. Já já voltamos."
-        />
+        <UnavailableScreen brand={brand} title="Totem em manutenção" body="Faça seu pedido no balcão. Já já voltamos." />
       );
     case "paused":
       return (
         <PausedScreen
           brand={brand}
-          pausedUntil={config.pace.pausedUntil}
-          timeZone={restaurant.timezone}
-          languages={restaurant.supportedLanguages.map((l) => l.code)}
-          defaultLanguage={restaurant.defaultLanguage}
+          pausedUntil={store.pace?.pausedUntil ?? null}
+          timeZone={store.timezone}
+          languages={store.languages}
+          defaultLanguage={store.defaultLanguage}
         />
       );
     case "at-capacity":
@@ -60,38 +117,25 @@ function GateScreen({ config }: { config: DeviceConfig }) {
         />
       );
     case "closed": {
-      const { title, description } = restaurant.closedMessage;
+      const { title, description } = store.closedMessage;
       return (
         <UnavailableScreen
           brand={brand}
           title={title["pt-BR"]}
           body={description["pt-BR"]}
-          note={
-            config.nextOpeningAt
-              ? formatNextOpening(config.nextOpeningAt, restaurant.timezone)
-              : undefined
-          }
+          note={config.nextOpeningAt ? formatNextOpening(config.nextOpeningAt, store.timezone) : undefined}
         />
       );
     }
-    case "open": {
-      const languages = restaurant.supportedLanguages.map((l) => l.code);
+    case "open":
       return (
         <KioskJourney
-          settings={{
-            brand,
-            defaultLanguage: restaurant.defaultLanguage,
-            languages,
-            orderTypes: availableOrderTypes(restaurant),
-            checkNumberDigits: restaurant.posCheckNumberDisplayLength,
-            idleMs: config.idleTimerIntervalMilliseconds,
-          }}
+          settings={kioskSettings(config)}
           attract={{
-            "pt-BR": <AttractScreen brand={brand} logo={restaurant.logo} language="pt-BR" />,
-            en: <AttractScreen brand={brand} logo={restaurant.logo} language="en" />,
+            "pt-BR": <AttractScreen brand={brand} logo={store.logo ?? null} language="pt-BR" />,
+            en: <AttractScreen brand={brand} logo={store.logo ?? null} language="en" />,
           }}
         />
       );
-    }
   }
 }

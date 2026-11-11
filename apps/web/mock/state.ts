@@ -1,90 +1,35 @@
-// In-memory state of the mock Core API, seeded with the prototype's bakery.
+// In-memory state shared by the mock's routes: devices and their tokens, the
+// owner, the clock, uploads and idempotency. The catalogue, menus, baskets,
+// payments and orders are in ./v2/state.ts, which reseeds with this one.
 // Shapes follow contract/openapi.yaml; anything extra is mock-only.
 
-import { seedCatalogue } from "./catalogue.ts";
 import type { Reply, Schemas } from "./http.ts";
-import { todayAt, type ScheduledMenu, type Weekday } from "./schedule.ts";
+import { todayAt } from "./schedule.ts";
 
-export type MockDevice = Omit<Schemas["AdminDevice"], "online"> & { secret: string };
-export type MockMenu = ScheduledMenu & {
-  name: Schemas["LocalizedText"];
-  showCategoriesPrice: boolean;
-};
-export type MockJourney = {
-  orderNonce: string;
-  deviceId: string;
-  language: Schemas["LanguageCode"];
-  startedAt: string;
-  events: Array<Schemas["JourneyEvent"] & { at: string }>;
-};
+export type MockDevice = Omit<Schemas["AdminDevice"], "online" | "paymentTerminalId"> & { secret: string };
 
-const WEEK: Weekday[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
-const daily = (timeStart: string, timeEnd: string) =>
-  WEEK.map((weekday) => ({ weekday, timeStart, timeEnd }));
+/** The store's timezone in the seed (v2/seed.ts), for the scenarios' clock shifts. */
+const TIME_ZONE = "America/Sao_Paulo";
 
 function seed() {
   return {
-    restaurant: {
-      id: "rst-padaria-01",
-      name: "Padaria do Pai do Brunera",
-      logo: null,
-      cnpj: "12345678000190",
-      timezone: "America/Sao_Paulo",
-      defaultLanguage: "pt-BR",
-      supportedLanguages: ["pt-BR", "en"],
-      isDineInAvailable: true,
-      isTakeOutAvailable: true,
-      closedMessage: {
-        title: { "pt-BR": "Fechado agora", en: "Closed now" },
-        description: { "pt-BR": "Volte no nosso horário.", en: "Come back during our hours." },
-      },
-      posCheckNumberDisplayLength: 2,
-      receiptFooter: { "pt-BR": "Obrigado e volte sempre!", en: "Thank you!" },
-    } as Schemas["Restaurant"],
     devices: [
       device("KIOSK-TBT-001", "KIOSK", "Totem da entrada", "s3cr3t-from-provisioning"),
       device("KITCHEN-TBT-001", "KITCHEN", "Tela da cozinha", "kitchen-s3cr3t"),
     ],
-    menus: [
-      {
-        id: "mnu-manha",
-        name: { "pt-BR": "Manhã", en: "Morning" },
-        showCategoriesPrice: false,
-        schedules: daily("06:00", "11:00"),
-        forcedUntil: null,
-      },
-      {
-        id: "mnu-tarde",
-        name: { "pt-BR": "Tarde", en: "Afternoon" },
-        showCategoriesPrice: false,
-        schedules: daily("11:00", "20:00"),
-        forcedUntil: null,
-      },
-    ] as MockMenu[],
     /** The one owner account (test credentials, mock only). */
     owner: { email: "dono@padaria.test", password: "padaria-teste" },
     /** Opaque owner tokens: token → expiry (ms). */
     ownerTokens: new Map<string, number>(),
-    catalogue: seedCatalogue(),
     /** Owner-edited UI strings per language (OP-START-02), merged over the kiosk's bundle. */
     languagePacks: { "pt-BR": {}, en: {} } as Record<
       Schemas["LanguageCode"],
       Record<string, string>
     >,
-    /**
-     * Menu each device last loaded. QuoteRequest carries no journey or menu id,
-     * so the mock prices a device's quotes on the menu its journey started with.
-     */
-    deviceMenus: new Map<string, string>(),
-    journeys: new Map<string, MockJourney>(),
-    orders: new Map<string, Schemas["Order"] & { deviceId: string; menuId: string }>(),
-    payments: new Map<string, Schemas["Payment"]>(),
-    /** Uploaded media by file name (POST /v1/admin/media); seed photos are in catalogue.ts. */
+    /** Uploaded media by file name (POST /v2/admin/media); seed photos are in media.ts. */
     media: new Map<string, { bytes: Buffer; type: string }>(),
     /** Idempotency-Key → first body and reply. */
     idempotency: new Map<string, { body: string; reply: Reply }>(),
-    /** posCheckNumber sequence per business day (FR-1010). */
-    checkNumbers: { date: "", last: 0 },
     /** Opaque device tokens: token → device id and expiry (ms). */
     tokens: new Map<string, { deviceId: string; expiresAt: number }>(),
     /** OP-KIOSK-04 reports, newest last. */
@@ -129,7 +74,7 @@ export function seededCredentials(
   return device ? { deviceId: device.id, deviceSecret: device.secret } : null;
 }
 
-/** Ids a self-registered device may use: they end up in /v1/admin/devices/{deviceId}. */
+/** Ids a self-registered device may use: they end up in /v2/admin/devices/{deviceId}. */
 const AUTO_DEVICE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 
 /**
@@ -184,7 +129,7 @@ export function applyScenario(name: ScenarioName): void {
   state = seed();
   state.scenario = name;
   const kiosk = state.devices[0];
-  const tz = state.restaurant.timezone;
+  const tz = TIME_ZONE;
   const shiftTo = (hhmm: string) => {
     state.clockOffsetMs = todayAt(hhmm, new Date(), tz).getTime() - Date.now();
   };

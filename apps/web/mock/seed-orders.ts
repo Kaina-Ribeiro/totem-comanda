@@ -1,5 +1,6 @@
 // Places paid kiosk orders on the running mock, as the seeded kiosk, through
-// the same calls the kiosk makes (journey → order → payment → simulate → place).
+// the same v2 calls the kiosk makes (totals → Pix payment → approved → order),
+// so they reach the kitchen, the report and Início (pilot v2, COM-148).
 // `--days-ago N` moves the mock's clock back N days for them and then forward
 // again, so the back office has a past day to compare with (Início, Relatório).
 //
@@ -33,36 +34,56 @@ async function call<T>(method: string, url: string, token?: string, body?: unkno
   return json as T;
 }
 
-type Entity = { id: string; type: string; optionGroups?: unknown[]; childEntities?: Entity[] };
+type Link = { type: string; id: string };
+type Entity = { id: string; type: string; available?: boolean; links: Link[] };
+
+/** A product the kiosk can sell with no choices: an available ITEM in a section, linking only images. */
+function plainItem(entities: Entity[]): Entity | undefined {
+  const inSection = new Set(
+    entities
+      .filter((e) => e.type === "CATEGORY" || e.type === "SECTION")
+      .flatMap((e) => e.links.filter((l) => l.type === "ITEM").map((l) => l.id)),
+  );
+  return entities.find(
+    (e) =>
+      e.type === "ITEM" &&
+      e.available !== false &&
+      inSection.has(e.id) &&
+      e.links.every((l) => l.type === "IMAGE"),
+  );
+}
 
 async function placeOne(token: string) {
-  const orderNonce = randomUUID();
-  await call("POST", `${API}/v1/journeys`, token, { orderNonce, language: "pt-BR" });
-  const menu = await call<{ entities: Entity[] }>("GET", `${API}/v1/menus/active?language=pt-BR`, token);
-  const item = menu.entities
-    .flatMap((c) => c.childEntities ?? [])
-    .find((e) => e.type === "ITEM" && (e.optionGroups ?? []).length === 0);
+  const menu = await call<{ entities: Entity[] }>("GET", `${API}/v2/menus/active?language=pt-BR`, token);
+  const item = plainItem(menu.entities);
   if (!item) throw new Error("No live menu with a plain item: is the store open?");
-  const order = await call<{ id: string }>("POST", `${API}/v1/orders`, token, {
-    orderNonce,
-    orderType: "TAKE_OUT",
-    language: "pt-BR",
-    orderItems: [{ itemId: item.id, quantity: 1, options: [] }],
+  const items = [{ id: item.id, quantity: 1, uniqueId: 1, modifiers: [] }];
+  const totals = await call<{ basketId: string; total: number }>("POST", `${API}/v2/totals?language=pt-BR`, token, {
+    orderType: "DINEIN",
+    items,
   });
-  const payment = await call<{ id: string }>("POST", `${API}/v1/orders/${order.id}/payments`, token, {
-    method: "CREDIT",
+  const payment = await call<{ id: string; tenderId: string; tenderRef: string; amount: number }>(
+    "POST",
+    `${API}/v2/payments`,
+    token,
+    { basketId: totals.basketId, method: "PIX", amount: totals.total },
+  );
+  await call("POST", `${CONTROL}/payments/${payment.id}`, undefined, { outcome: "APPROVED" });
+  return call<{ customerCheckNumber: string }>("POST", `${API}/v2/orders`, token, {
+    basketId: totals.basketId,
+    orderType: "DINEIN",
+    items,
+    payments: [{ tenderId: payment.tenderId, tenderRef: payment.tenderRef, amount: payment.amount }],
   });
-  await call("POST", `${API}/v1/payments/${payment.id}/simulate`, token, { outcome: "AUTHORISED" });
-  return call<{ posCheckNumber: string }>("POST", `${API}/v1/orders/${order.id}/place`, token);
 }
 
 const minutes = daysAgo * 24 * 60;
 if (minutes) await call("POST", `${CONTROL}/clock`, undefined, { minutes: -minutes });
 try {
-  const { accessToken } = await call<{ accessToken: string }>("POST", `${API}/v1/devices/auth`, undefined, KIOSK);
+  const { accessToken } = await call<{ accessToken: string }>("POST", `${API}/v2/devices/auth`, undefined, KIOSK);
   for (let i = 0; i < count; i++) {
     const placed = await placeOne(accessToken);
-    console.log(`#${placed.posCheckNumber}${daysAgo ? ` (${daysAgo} days ago)` : ""}`);
+    console.log(`#${placed.customerCheckNumber}${daysAgo ? ` (${daysAgo} days ago)` : ""}`);
   }
 } finally {
   if (minutes) await call("POST", `${CONTROL}/clock`, undefined, { minutes });

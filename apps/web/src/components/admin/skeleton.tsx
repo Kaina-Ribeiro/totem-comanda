@@ -57,15 +57,12 @@ export function ReportSkeleton() {
           </Card>
         ))}
       </div>
-      <Card className="flex flex-col gap-3">
-        <h2 className={H2}>Comer aqui × para viagem</h2>
-        {["Comer aqui", "Para viagem"].map((label) => (
-          <div key={label} className="flex flex-col gap-1">
-            <div className="flex justify-between text-sm">
-              <span className="font-semibold">{label}</span>
-              <Bone className="my-0.5 h-4 w-28" />
-            </div>
-            <div className="h-2.5 rounded-full bg-ground" />
+      <Card className="grid gap-x-6 gap-y-3 sm:grid-cols-3">
+        {["Descontos de cupom", "Cancelados", "Não retirados"].map((label) => (
+          <div key={label} className="flex flex-col gap-0.5">
+            <span className="text-sm font-semibold text-muted">{label}</span>
+            <Bone className="my-1 h-5 w-24" />
+            <Bone className="h-3 w-36" />
           </div>
         ))}
       </Card>

@@ -8,8 +8,8 @@ import { AdminApiError, asOwner } from "./session";
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 /**
- * Uploads an image from a form field (uploadMedia) and returns its URL, or
- * null when the field is empty. Throws AdminApiError for a bad file.
+ * Uploads an image from a form field (uploadMedia) and returns the id of
+ * the `IMAGE` entity it became, or null when the field is empty.
  */
 export async function uploadImage(form: FormData, field: string): Promise<string | null> {
   const file = form.get(field);
@@ -20,12 +20,12 @@ export async function uploadImage(form: FormData, field: string): Promise<string
   const body = new FormData();
   body.set("file", file, file.name);
   const asset = await asOwner((headers) =>
-    coreMediaApi().POST("/v1/admin/media", {
+    coreMediaApi().POST("/v2/admin/media", {
       headers,
       // The generated type says `file: string` (binary); the multipart body is built here.
       body: {} as never,
       bodySerializer: () => body,
     }),
   );
-  return asset.url;
+  return asset.id;
 }

@@ -64,10 +64,10 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
 
 /** The store's name under the wordmark, as in A1. */
 async function Store() {
-  const restaurant = await load(() =>
-    asOwner((headers) => coreApi().GET("/v1/admin/restaurant", { headers })),
+  const store = await load(() =>
+    asOwner((headers) => coreApi().GET("/v2/admin/store", { headers })),
   );
-  return <StoreName name={"data" in restaurant ? restaurant.data.name : "Back office"} />;
+  return <StoreName name={"data" in store ? store.data.locationName : "Back office"} />;
 }
 
 function StoreName({ name }: { name: string }) {

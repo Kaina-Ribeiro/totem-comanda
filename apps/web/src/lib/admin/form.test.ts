@@ -2,67 +2,97 @@ import { describe, expect, it, vi } from "vitest";
 
 import { AdminApiError } from "./session";
 import {
-  cents,
+  attempt,
   errorMessage,
-  optionalPrice,
   orderTypesError,
+  priceField,
+  readPrice,
   saveBoth,
 } from "./form";
 
-describe("cents", () => {
-  it("reads Brazilian and plain prices as integer cents", () => {
-    expect(cents("28,00")).toBe(2800);
-    expect(cents("R$ 1.234,50")).toBe(123450);
-    expect(cents("13.9")).toBe(1390);
-    expect(cents("7")).toBe(700);
-    expect(cents("")).toBeNull();
-    expect(cents("-3")).toBeNull();
+describe("readPrice (Review Focus 5)", () => {
+  it.each([
+    ["9,50", 9.5],
+    ["9.50", 9.5],
+    ["9,5", 9.5],
+    ["R$ 9,50", 9.5],
+    ["R$9,50", 9.5],
+    ["28", 28],
+    ["1.234,50", 1234.5],
+    [" 1.234 ", 1234],
+    ["0,1", 0.1],
+    ["0,30", 0.3],
+    ["0,10", 0.1],
+    ["13.9", 13.9],
+  ])("reads %j as %d", (raw, expected) => {
+    expect(readPrice(raw)).toBe(expected);
   });
 
-  it("rejects what is not a price instead of guessing (COM-128)", () => {
-    expect(cents("1e3")).toBeNull(); // was R$ 13,00
-    expect(cents("10,005")).toBeNull(); // was rounded to R$ 10,01
-    expect(cents("12,3,4")).toBeNull();
-    expect(cents("abc")).toBeNull();
-    expect(cents("1,234.50")).toBeNull();
-  });
+  it.each(["9,505", "abc", "-1", "1e3", "", "1.23.4", "12,3,4", "1,234.50", "10,005"])(
+    "refuses %j instead of guessing",
+    (raw) => {
+      expect(readPrice(raw)).toBeNull();
+    },
+  );
 
-  it("keeps the formats owners type", () => {
-    expect(cents("28,5")).toBe(2850);
-    expect(cents("R$28,00")).toBe(2800);
-    expect(cents(" 1.234 ")).toBe(123400);
-    expect(cents("0,10")).toBe(10);
+  it("never carries float noise", () => {
+    expect(readPrice("0,30")).toBe(0.3);
+    expect(String(readPrice("1.234,56"))).toBe("1234.56");
   });
 });
 
-describe("optionalPrice (COM-128)", () => {
+describe("priceField", () => {
   const form = (value: string) => {
     const data = new FormData();
-    data.set("price.TAKE_OUT", value);
+    data.set("price", value);
     return data;
   };
 
-  it("is null when the field is empty", () => {
-    expect(
-      optionalPrice(form("  "), "price.TAKE_OUT", "preço para viagem"),
-    ).toBeNull();
-  });
-
   it("reads a valid price", () => {
-    expect(
-      optionalPrice(form("9,90"), "price.TAKE_OUT", "preço para viagem"),
-    ).toBe(990);
+    expect(priceField(form("9,90"), "price", "preço")).toBe(9.9);
   });
 
-  it("fails the save naming the field, never drops it", () => {
-    expect(() =>
-      optionalPrice(form("9,9,9"), "price.TAKE_OUT", "preço para viagem"),
-    ).toThrow(
-      expect.objectContaining({
-        code: "VALIDATION_FAILED",
-        detail: "preço para viagem",
-      }),
+  it("is null when an optional field is empty", () => {
+    expect(priceField(form("  "), "price", "preço", { optional: true })).toBeNull();
+  });
+
+  it("fails the save naming the field when it is not a price, never drops it", () => {
+    expect(() => priceField(form("9,9,9"), "price", "preço para comer aqui", { optional: true })).toThrow(
+      expect.objectContaining({ code: "VALIDATION_FAILED", detail: "preço para comer aqui" }),
     );
+  });
+
+  it("fails the save when a required price is empty", () => {
+    expect(() => priceField(form(""), "price", "preço")).toThrow(
+      expect.objectContaining({ code: "VALIDATION_FAILED", detail: "preço" }),
+    );
+  });
+});
+
+describe("attempt with MENU_INVALID (Review Focus 3)", () => {
+  it("returns the general message and one line per broken rule", async () => {
+    const state = await attempt(async () => {
+      throw new AdminApiError("MENU_INVALID", undefined, [
+        {
+          field: "links",
+          message: "group has no option",
+          rule: "EMPTY_GROUP",
+          entity: { type: "MODIFIERS", id: "M-SAUCE" },
+        },
+      ]);
+    });
+    expect(state.error).toBe("O cardápio ficaria quebrado. Corrija e salve de novo.");
+    expect(state.problems).toEqual(["Grupo “M-SAUCE”: precisa de pelo menos uma opção."]);
+  });
+
+  it("uses the names it is given", async () => {
+    const names = (type: string, id: string) => (id === "M-SAUCE" ? "Escolha o molho" : undefined);
+    const state = await attempt(async () => {
+      throw new AdminApiError("MENU_INVALID", undefined, [
+        { field: "links", message: "x", rule: "EMPTY_GROUP", entity: { type: "MODIFIERS", id: "M-SAUCE" } },
+      ]);
+    }, names);
+    expect(state.problems).toEqual(["Grupo “Escolha o molho”: precisa de pelo menos uma opção."]);
   });
 });
 

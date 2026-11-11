@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { mockDeviceCredentials, needsPairing, type MockDevice } from "./mock-scenarios";
+import { mockDeviceCredentials, needsPairing, pendingPayment, type MockDevice } from "./mock-scenarios";
 
 const devices: MockDevice[] = [
   { id: "KIOSK-TBT-001", kind: "KIOSK", name: "Totem da entrada", status: "ACTIVE" },
@@ -55,5 +55,23 @@ describe("mockDeviceCredentials (COM-139)", () => {
 
     await expect(mockDeviceCredentials("KITCHEN")).resolves.toBeNull();
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("pendingPayment (/dev/mock decides a Mercado Pago session)", () => {
+  const session = (id: string, status: string, createdAt: string) => ({ id, status, method: "PIX", amount: 9.5, createdAt });
+
+  it("is the newest session still waiting for the guest", () => {
+    const payments = [
+      session("pay-1", "PENDING", "2026-11-10T10:00:00Z"),
+      session("pay-2", "PENDING", "2026-11-10T10:05:00Z"),
+      session("pay-3", "APPROVED", "2026-11-10T10:09:00Z"),
+    ];
+    expect(pendingPayment({ v2: { payments } })?.id).toBe("pay-2");
+  });
+
+  it("is null when nothing waits, or the mock says nothing about payments", () => {
+    expect(pendingPayment({ v2: { payments: [session("pay-3", "DECLINED", "2026-11-10T10:09:00Z")] } })).toBeNull();
+    expect(pendingPayment({})).toBeNull();
   });
 });

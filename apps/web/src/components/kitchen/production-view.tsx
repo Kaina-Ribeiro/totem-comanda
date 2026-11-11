@@ -2,10 +2,8 @@
 
 import { useState } from "react";
 
-import type { components } from "@/lib/core-api";
+import type { KitchenOrder } from "@/lib/kitchen/order";
 import { type ProductionScope, productionTotals } from "@/lib/kitchen/production";
-
-type KitchenOrder = components["schemas"]["KitchenOrder"];
 
 const SCOPES: { id: ProductionScope; label: string }[] = [
   { id: "open", label: "Novos + preparando" },

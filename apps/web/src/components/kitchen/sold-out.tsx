@@ -1,32 +1,30 @@
 "use client";
 
-import type { components } from "@/lib/core-api";
+import type { KitchenLine } from "@/lib/kitchen/order";
 
-type Line = components["schemas"]["KitchenOrder"]["lines"][number];
+/**
+ * What "Acabou" marks: the product (`whole`) or one option of it. Both are
+ * menu entities with their own `available`, so the id alone says which.
+ */
+export type SoldOutTarget = { id: string; name: string; whole: boolean };
 
-/** What "Acabou" marks: the whole item, or one option of it. */
-export type SoldOutTarget = { itemId: string; optionId: string | null; name: string };
+/** Key of a target in the board's "marked" set: the entity id. */
+export const soldOutKey = (t: { id: string }) => t.id;
 
-/** Key of a target in the board's "marked today" set. */
-export const soldOutKey = (t: { itemId: string; optionId: string | null }) =>
-  `${t.itemId}:${t.optionId ?? ""}`;
-
-/** The targets one order line offers: the item, then each chosen option. */
-export function lineTargets(line: Line): SoldOutTarget[] {
-  const seen = new Set<string>();
-  const options = line.choices.filter((c) => !seen.has(c.optionId) && seen.add(c.optionId));
+/** The targets one order line offers: the product, then each chosen option once. */
+export function lineTargets(line: KitchenLine): SoldOutTarget[] {
   return [
-    { itemId: line.itemId, optionId: null, name: line.name },
-    ...options.map((c) => ({ itemId: line.itemId, optionId: c.optionId, name: c.name })),
+    { id: line.id, name: line.name, whole: true },
+    ...line.choices.filter((c) => c.id !== line.id).map((c) => ({ id: c.id, name: c.name, whole: false })),
   ];
 }
 
-/** The line's "Acabou" button, or a quiet chip once the item is marked today. */
+/** The line's "Acabou" button, or a quiet chip once the item is marked unavailable. */
 export function SoldOutButton({ marked, onPress }: { marked: boolean; onPress: () => void }) {
   if (marked) {
     return (
       <span className="flex h-11 shrink-0 items-center rounded-[14px] bg-danger-bg px-4 text-[15px] font-extrabold text-danger">
-        Esgotado hoje
+        Indisponível
       </span>
     );
   }
@@ -55,7 +53,7 @@ export function SoldOutPanel({
   onCancel,
   onConfirm,
 }: {
-  line: Line;
+  line: KitchenLine;
   target: SoldOutTarget;
   marked: (t: SoldOutTarget) => boolean;
   busy: boolean;
@@ -65,7 +63,7 @@ export function SoldOutPanel({
   onConfirm: () => void;
 }) {
   const targets = lineTargets(line);
-  const whole = target.optionId === null;
+  const whole = target.whole;
   return (
     <div className="mt-1 ml-[18px] flex flex-col gap-2.5 rounded-2xl bg-butter py-3.5 pr-3.5 pl-[18px]">
       {targets.length > 1 && (
@@ -84,8 +82,8 @@ export function SoldOutPanel({
                   on ? "bg-accent text-on-accent" : "bg-surface text-ink"
                 }`}
               >
-                {t.optionId === null ? `${t.name} inteiro` : t.name}
-                {done && " · esgotado"}
+                {t.whole ? `${t.name} inteiro` : t.name}
+                {done && " · indisponível"}
               </button>
             );
           })}
@@ -95,8 +93,8 @@ export function SoldOutPanel({
         <span className="text-base font-extrabold">{target.name} acabou?</span>
         <span className="text-sm leading-[1.4] font-semibold text-muted">
           {whole
-            ? "Sai do totem até o fim do dia. Este pedido continua aberto."
-            : `Sai do totem até o fim do dia. ${line.name} continua com as outras opções.`}
+            ? "Sai do totem até alguém liberar. Este pedido continua aberto."
+            : `Sai do totem até alguém liberar. ${line.name} continua com as outras opções.`}
         </span>
         {error && (
           <span role="alert" className="text-sm font-bold text-danger">

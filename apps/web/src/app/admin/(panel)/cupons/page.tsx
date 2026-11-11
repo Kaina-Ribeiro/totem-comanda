@@ -1,244 +1,139 @@
-import { revalidatePath } from "next/cache";
-
+import { refreshAdmin } from "@/app/admin/(panel)/catalogue-actions";
+import { DeleteButton, TextsFields } from "@/components/admin/catalogue-fields";
 import { ActionForm, SubmitButton } from "@/components/admin/form";
 import { FormSkeleton, Streamed } from "@/components/admin/skeleton";
-import {
-  Badge,
-  Card,
-  Checkbox,
-  Field,
-  inputClass,
-  LoadError,
-  PageHeader,
-} from "@/components/admin/ui";
-import { attempt, cents, checked, type FormState, load, text } from "@/lib/admin/form";
-import { AdminApiError, asOwner } from "@/lib/admin/session";
+import { Badge, Card, Checkbox, Field, inputClass, LoadError, PageHeader } from "@/components/admin/ui";
+import { type DiscountRule, readDiscountRule } from "@/lib/admin/catalogue-form";
+import { attempt, type FormState, load, text } from "@/lib/admin/form";
+import { asOwner } from "@/lib/admin/session";
 import { coreApi } from "@/lib/core/client";
-import type { components } from "@/lib/core-api";
-import { formatBRL } from "@/lib/format/money";
+import { formatMoney } from "@/lib/format/money";
 
-type Discount = components["schemas"]["AdminDiscount"];
-type DiscountInput = components["schemas"]["DiscountInput"];
+const reais = (value: number | null | undefined) => (value == null ? "" : value.toFixed(2).replace(".", ","));
 
-const PATH = "/admin/cupons";
-/** Validity dates are whole days in the restaurant's timezone (São Paulo has no DST). */
-const DAY_OFFSET = "-03:00";
-
-const startOfDay = (date: string) =>
-  date ? new Date(`${date}T00:00:00${DAY_OFFSET}`).toISOString() : null;
-/** "Até 31/12" means through that day: the window closes at the next midnight. */
-const endOfDay = (date: string) =>
-  date ? new Date(Date.parse(`${date}T00:00:00${DAY_OFFSET}`) + 86_400_000).toISOString() : null;
-const dayOf = (iso: string | null | undefined, end = false) => {
-  if (!iso) return "";
-  const at = new Date(Date.parse(iso) - (end ? 86_400_000 : 0));
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(at);
-};
-
-const localized = (form: FormData, name: string) => {
-  const pt = text(form, `${name}.pt`);
-  const en = text(form, `${name}.en`);
-  return pt ? { "pt-BR": pt, ...(en ? { en } : {}) } : undefined;
-};
-
-function readDiscount(form: FormData): DiscountInput {
-  const kind = text(form, "kind") === "FIXED" ? "FIXED" : "PERCENT";
-  const value =
-    kind === "FIXED" ? cents(text(form, "value")) : Math.round(Number(text(form, "value")));
-  if (!value || value < 1) throw new AdminApiError("VALIDATION_FAILED", "valor");
-  return {
-    type: text(form, "type") === "RESTAURANT_DISCOUNT" ? "RESTAURANT_DISCOUNT" : "COMANDA_COUPON",
-    code: text(form, "code").toUpperCase().replace(/\s/g, ""),
-    title: localized(form, "title") ?? { "pt-BR": "" },
-    description: localized(form, "description"),
-    kind,
-    value,
-    validFrom: startOfDay(text(form, "validFrom")),
-    validTo: endOfDay(text(form, "validTo")),
-    active: checked(form, "active"),
-  };
-}
-
-async function saveDiscount(_: FormState, form: FormData): Promise<FormState> {
+async function saveCoupon(_: FormState, form: FormData): Promise<FormState> {
   "use server";
-  const discountId = text(form, "discountId");
+  const ruleId = text(form, "ruleId");
   return attempt(async () => {
-    const body = readDiscount(form);
-    if (discountId) {
-      await asOwner((headers) =>
-        coreApi().PUT("/v1/admin/discounts/{discountId}", {
-          headers,
-          params: { path: { discountId } },
-          body,
-        }),
-      );
-    } else {
-      await asOwner((headers) => coreApi().POST("/v1/admin/discounts", { headers, body }));
-    }
-    revalidatePath(PATH);
-    return discountId ? "Desconto salvo." : `Cupom ${body.code} criado. Já vale no totem.`;
-  });
-}
-
-async function deleteDiscount(_: FormState, form: FormData): Promise<FormState> {
-  "use server";
-  const discountId = text(form, "discountId");
-  return attempt(async () => {
+    const rules = await asOwner((headers) => coreApi().GET("/v2/admin/discount-rules", { headers }));
+    const current = ruleId ? (rules.find((r) => r.id === ruleId) ?? null) : null;
+    const body = readDiscountRule(form, current);
     await asOwner((headers) =>
-      coreApi().DELETE("/v1/admin/discounts/{discountId}", {
+      coreApi().PUT("/v2/admin/discount-rules/{discountRuleId}", {
         headers,
-        params: { path: { discountId } },
+        params: { path: { discountRuleId: body.id } },
+        body,
       }),
     );
-    revalidatePath(PATH);
-    return "Desconto apagado.";
+    await refreshAdmin();
+    return current ? "Cupom salvo." : `Cupom ${body.code} criado.`;
   });
 }
 
-export default function DiscountsPage() {
+/** "10% (até R$ 15,00)" or "R$ 5,00", for the list. */
+function describe(rule: DiscountRule): string {
+  const value = rule.type === "PERCENT" ? `${rule.value}%` : formatMoney(rule.value);
+  const parts = [
+    rule.maxDiscount != null && rule.type === "PERCENT" ? `até ${formatMoney(rule.maxDiscount)}` : null,
+    rule.minOrderTotal != null ? `pedido a partir de ${formatMoney(rule.minOrderTotal)}` : null,
+  ].filter(Boolean);
+  return parts.length ? `${value} · ${parts.join(" · ")}` : value;
+}
+
+export default function CouponsPage() {
   return (
     <>
       <PageHeader
-        title="Cupons e descontos"
-        description="Códigos que o cliente digita no totem. Vale um por pedido; o desconto é calculado pelo sistema."
+        title="Cupons"
+        description="O cliente digita o código no totem; vale um cupom por pedido. O desconto é calculado pelo servidor, item por item."
       />
-      <Streamed fallback={<FormSkeleton fields={9} />}>
-        <DiscountList />
+      <Streamed fallback={<FormSkeleton cards={2} />}>
+        <CouponList />
       </Streamed>
-    </>
-  );
-}
-
-async function DiscountList() {
-  const loaded = await load(() =>
-    asOwner((headers) => coreApi().GET("/v1/admin/discounts", { headers })),
-  );
-  if ("error" in loaded) return <LoadError message={loaded.error} />;
-  return (
-    <>
-      {loaded.data.map((discount) => (
-        <DiscountForm key={discount.id} discount={discount} />
-      ))}
-      <DiscountForm discount={null} />
-    </>
-  );
-}
-
-/** Rendered per request (the owner's data), so reading the clock here is fine. */
-function isExpired(validTo: string | null | undefined): boolean {
-  return !!validTo && Date.parse(validTo) < Date.now();
-}
-
-function summary(discount: Discount): string {
-  return discount.kind === "PERCENT"
-    ? `${discount.value}% de desconto`
-    : `${formatBRL(discount.value)} de desconto`;
-}
-
-function DiscountForm({ discount }: { discount: Discount | null }) {
-  const expired = isExpired(discount?.validTo);
-  return (
-    <Card className="flex flex-col gap-4">
-      {discount ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <code className="text-lg font-bold tracking-[-0.01em]">{discount.code}</code>
-          <span className="text-sm text-muted">{summary(discount)}</span>
-          {!discount.active && <Badge tone="danger">Inativo</Badge>}
-          {expired && <Badge tone="warn">Vencido</Badge>}
-        </div>
-      ) : (
+      <Card className="flex flex-col gap-4">
         <h2 className="text-lg font-bold tracking-[-0.01em]">Novo cupom</h2>
-      )}
-      <ActionForm action={saveDiscount} resetOnSave={!discount} className="flex flex-col gap-4">
-        <input type="hidden" name="discountId" value={discount?.id ?? ""} />
-        <div className="grid gap-4 sm:grid-cols-4">
-          <Field label="Código" hint="Letras e números, sem espaço.">
-            <input
-              name="code"
-              defaultValue={discount?.code}
-              required
-              pattern="[A-Za-z0-9]{3,20}"
-              placeholder="BEMVINDO10"
-              autoCapitalize="characters"
-              className={`${inputClass} uppercase`}
-            />
-          </Field>
-          <Field label="Tipo">
-            <select
-              name="type"
-              defaultValue={discount?.type ?? "COMANDA_COUPON"}
-              className={inputClass}
-            >
-              <option value="COMANDA_COUPON">Cupom</option>
-              <option value="RESTAURANT_DISCOUNT">Desconto da loja</option>
-            </select>
-          </Field>
-          <Field label="Desconto em">
-            <select name="kind" defaultValue={discount?.kind ?? "PERCENT"} className={inputClass}>
-              <option value="PERCENT">% do pedido</option>
-              <option value="FIXED">R$ fixo</option>
-            </select>
-          </Field>
-          <Field label="Valor" hint="% inteiro (1 a 100) ou reais.">
-            <input
-              name="value"
-              defaultValue={
-                discount
-                  ? discount.kind === "FIXED"
-                    ? (discount.value / 100).toFixed(2).replace(".", ",")
-                    : discount.value
-                  : ""
-              }
-              required
-              inputMode="decimal"
-              placeholder="10"
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Título (PT)" hint="Aparece no carrinho.">
-            <input
-              name="title.pt"
-              defaultValue={discount?.title["pt-BR"]}
-              required
-              placeholder="10% na primeira compra"
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Título (EN)">
-            <input name="title.en" defaultValue={discount?.title.en} className={inputClass} />
-          </Field>
-          <Field label="Vale de">
-            <input
-              name="validFrom"
-              type="date"
-              defaultValue={dayOf(discount?.validFrom)}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Vale até">
-            <input
-              name="validTo"
-              type="date"
-              defaultValue={dayOf(discount?.validTo, true)}
-              className={inputClass}
-            />
-          </Field>
-        </div>
-        <Checkbox name="active" label="Ativo" defaultChecked={discount?.active ?? true} />
-        <div>
-          <SubmitButton>{discount ? "Salvar desconto" : "Criar cupom"}</SubmitButton>
-        </div>
-      </ActionForm>
-      {discount && (
-        <ActionForm action={deleteDiscount} className="border-t border-line pt-3">
-          <input type="hidden" name="discountId" value={discount.id} />
-          <div>
-            <SubmitButton variant="danger" pendingLabel="Apagando…">
-              Apagar desconto
-            </SubmitButton>
-          </div>
-        </ActionForm>
-      )}
-    </Card>
+        <CouponForm rule={null} />
+      </Card>
+    </>
+  );
+}
+
+async function CouponList() {
+  const loaded = await load(() => asOwner((headers) => coreApi().GET("/v2/admin/discount-rules", { headers })));
+  if ("error" in loaded) return <LoadError message={loaded.error} />;
+  const rules = [...loaded.data].sort((a, b) => a.code.localeCompare(b.code));
+  return (
+    <div className="flex flex-col gap-3">
+      {rules.map((rule) => {
+        const usedUp = rule.maxUses != null && (rule.usesCount ?? 0) >= rule.maxUses;
+        return (
+          <details key={rule.id} className="group rounded-[14px] border border-line bg-surface">
+            <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-5 py-4 [&::-webkit-details-marker]:hidden">
+              <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 shrink-0 fill-none stroke-current stroke-2 text-muted transition-transform group-open:rotate-90"><path d="M9 6l6 6-6 6" /></svg>
+        <span className="font-mono text-lg font-bold tracking-wide">{rule.code}</span>
+              {!rule.active && <Badge tone="muted">Desligado</Badge>}
+              {usedUp && <Badge tone="danger">Esgotado</Badge>}
+              <span className="w-full text-sm font-medium text-muted sm:ml-auto sm:w-auto">
+                {describe(rule)} · {rule.usesCount ?? 0}
+                {rule.maxUses != null ? ` de ${rule.maxUses}` : ""} usos
+              </span>
+            </summary>
+            <div className="flex flex-col gap-4 border-t border-line px-5 py-5">
+              <CouponForm rule={rule} />
+              <DeleteButton kind="coupon" id={rule.id} label="Apagar cupom" />
+            </div>
+          </details>
+        );
+      })}
+    </div>
+  );
+}
+
+function CouponForm({ rule }: { rule: DiscountRule | null }) {
+  return (
+    <ActionForm action={saveCoupon} resetOnSave={!rule} className="flex flex-col gap-4">
+      <input type="hidden" name="ruleId" value={rule?.id ?? ""} />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Field label="Código" hint="3 a 20 letras ou números.">
+          <input
+            name="code"
+            defaultValue={rule?.code}
+            required
+            placeholder="BEMVINDO10"
+            autoCapitalize="characters"
+            className={`${inputClass} font-mono uppercase`}
+          />
+        </Field>
+        <Field label="Tipo">
+          <select name="type" defaultValue={rule?.type ?? "PERCENT"} className={inputClass}>
+            <option value="PERCENT">Porcentagem</option>
+            <option value="FIXED">Valor fixo (R$)</option>
+          </select>
+        </Field>
+        <Field label="Desconto" hint="10 = 10%; ou 5,00 = R$ 5,00.">
+          <input
+            name="value"
+            defaultValue={rule ? (rule.type === "PERCENT" ? String(rule.value) : reais(rule.value)) : ""}
+            required
+            inputMode="decimal"
+            className={inputClass}
+          />
+        </Field>
+        <Field label="Pedido mínimo (R$)" hint="Vazio = qualquer valor.">
+          <input name="minOrderTotal" defaultValue={reais(rule?.minOrderTotal)} inputMode="decimal" className={inputClass} />
+        </Field>
+        <Field label="Desconto máximo (R$)" hint="Vazio = sem teto.">
+          <input name="maxDiscount" defaultValue={reais(rule?.maxDiscount)} inputMode="decimal" className={inputClass} />
+        </Field>
+        <Field label="Limite de usos" hint="Vazio = sem limite.">
+          <input name="maxUses" defaultValue={rule?.maxUses ?? ""} inputMode="numeric" className={inputClass} />
+        </Field>
+      </div>
+      <TextsFields entity={rule} namePlaceholder="10% de boas-vindas" />
+      <Checkbox name="active" label="Ligado" defaultChecked={rule?.active ?? true} />
+      <div>
+        <SubmitButton>{rule ? "Salvar cupom" : "Criar cupom"}</SubmitButton>
+      </div>
+    </ActionForm>
   );
 }

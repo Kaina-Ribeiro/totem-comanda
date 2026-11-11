@@ -8,7 +8,7 @@ type StorePace = components["schemas"]["StorePace"];
 
 const actions = vi.hoisted(() => ({
   moveOrder: vi.fn(),
-  setSoldOut: vi.fn(),
+  setAvailable: vi.fn(),
   cancelOrder: vi.fn(),
   setKitchenPace: vi.fn(),
   closeKitchenDay: vi.fn(),
@@ -105,5 +105,65 @@ describe("KitchenBoard store pace (COM-121)", () => {
 
     expect(actions.readKitchenPace.mock.calls.length).toBeGreaterThan(calls);
     expect(header().textContent).toContain("Movimentado");
+  });
+});
+
+describe("KitchenBoard orders on contract v2 (COM-148)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.resetAllMocks();
+    vi.stubGlobal("EventSource", FakeEventSource);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("[]", { headers: { "Content-Type": "application/json" } })),
+    );
+    actions.readKitchenPace.mockResolvedValue({ ok: true, data: pace("NORMAL", "2026-11-05T10:00:00Z") });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  const paid = (version = 1, status = "PAID") => ({
+    number: "20261110-0042",
+    customerCheckNumber: "42",
+    orderType: "DINEIN",
+    status,
+    version,
+    placedAt: new Date().toISOString(),
+    history: [{ status: "PAID", at: new Date().toISOString(), by: "KIOSK" }],
+    basketId: "B-1",
+    subTotal: 19,
+    tax: 0,
+    total: 19,
+    orderItems: [
+      { id: "2001", name: "Cappuccino", quantity: 1, modifiers: [{ id: "2001-L", name: "Grande", quantity: 1 }] },
+      { id: "2001", name: "Cappuccino", quantity: 1, modifiers: [{ id: "2001-L", name: "Grande", quantity: 1 }] },
+      { id: "3001", name: "Croissant", quantity: 1, specialNotes: "Aquecer" },
+    ],
+  });
+
+  it("shows a paid order from the stream with its short number and merged lines", async () => {
+    render(<KitchenBoard initial={[]} initialCollected={[]} initialPace={null} />);
+    act(() => FakeEventSource.last!.onopen?.());
+    act(() => FakeEventSource.last!.emit("order.paid", paid()));
+
+    const novos = screen.getByRole("region", { name: "Novos" });
+    expect(novos.textContent).toContain("42");
+    expect(novos.textContent).toContain("2× Cappuccino");
+    expect(novos.textContent).toContain("Grande");
+    expect(novos.textContent).toContain("Obs.: Aquecer");
+    expect(novos.textContent).not.toContain("Comer aqui");
+  });
+
+  it("moves the card by its number and keeps the newest version", async () => {
+    render(<KitchenBoard initial={[]} initialCollected={[]} initialPace={null} />);
+    act(() => FakeEventSource.last!.onopen?.());
+    act(() => FakeEventSource.last!.emit("order.paid", paid()));
+    act(() => FakeEventSource.last!.emit("order.status_changed", paid(2, "PREPARING")));
+    act(() => FakeEventSource.last!.emit("order.paid", paid())); // late duplicate
+
+    expect(screen.getByRole("region", { name: "Novos" }).textContent).not.toContain("Cappuccino");
+    expect(screen.getByRole("region", { name: "Preparando" }).textContent).toContain("42");
   });
 });

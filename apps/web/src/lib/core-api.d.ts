@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/v1/devices/auth": {
+    "/v2/devices/auth": {
         parameters: {
             query?: never;
             header?: never;
@@ -15,7 +15,7 @@ export interface paths {
         put?: never;
         /**
          * Exchange device credentials for a short-lived token
-         * @description Called by the BFF with the `deviceId` and `deviceSecret` set at provisioning.
+         * @description Called by the BFF with the `deviceId` and `deviceSecret` typed at `/setup`.
          *     A device disabled in the back office gets `403 DEVICE_DISABLED`.
          */
         post: operations["authenticateDevice"];
@@ -25,7 +25,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/devices/me/config": {
+    "/v2/devices/me/config": {
         parameters: {
             query?: never;
             header?: never;
@@ -33,11 +33,11 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Configuration of the calling device and its restaurant
-         * @description OP-KIOSK-06. Evaluates the menu schedule in the restaurant's timezone and
-         *     returns `isOpen`. With no active menu, `isOpen` is false and the kiosk shows
-         *     Lane Closed with `closedMessage` (BR-KIOSK-06, FR-109). The kiosk retries
-         *     every 5 s on failure (BR-KIOSK-02).
+         * Configuration of the calling device and its store
+         * @description Evaluates the menu schedule in the store's timezone and returns `isOpen`. With no
+         *     active menu, `isOpen` is false and the kiosk shows the closed screen with
+         *     `store.closedMessage`. The kiosk retries every 5 s on failure. A change of pace, store
+         *     settings or active menu changes the ETag.
          */
         get: operations["getDeviceConfig"];
         put?: never;
@@ -48,7 +48,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/devices/heartbeat": {
+    "/v2/devices/heartbeat": {
         parameters: {
             query?: never;
             header?: never;
@@ -68,7 +68,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/devices/status": {
+    "/v2/devices/status": {
         parameters: {
             query?: never;
             header?: never;
@@ -79,7 +79,7 @@ export interface paths {
         put?: never;
         /**
          * Report a status change or a key action
-         * @description OP-KIOSK-04. Fire-and-forget; the kiosk ignores errors.
+         * @description Fire-and-forget; the kiosk ignores errors.
          */
         post: operations["reportDeviceStatus"];
         delete?: never;
@@ -88,7 +88,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/menus/active": {
+    "/v2/menus/active": {
         parameters: {
             query?: never;
             header?: never;
@@ -96,11 +96,23 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The menu active right now, in the ENT-MENU-01 shape
-         * @description OP-MENU-01 / OP-START-04. Called once per journey (at start and on a
-         *     language change); the kiosk keeps it in memory until the journey ends, so a
-         *     guest who started at 10:59 finishes on the morning menu. Sold-out items are
-         *     left out. Text is resolved to `language`.
+         * The menu active right now, as one MenuResponse
+         * @description The graph reachable from the active menu's `root`, following MODELS.md section 5:
+         *     flat `entities`, `links` between them, `root` in display order. Called once per
+         *     journey (at start and on a language change); the kiosk keeps it in memory until the
+         *     journey ends.
+         *
+         *     - Text is resolved to `language` (`name`, `description`, badge names); entities
+         *       carry no `translations` here.
+         *     - Items and options with `available: false` are sent; the kiosk shows them grey
+         *       ("Indisponível" / "Unavailable") and they cannot be added.
+         *     - A section outside its `availableHours` at request time is sent with
+         *       `available: false` (hidden); `availableHours` stays for display. A window whose
+         *       `close` is before its `open` runs past midnight; the closing minute is closed.
+         *     - `TAX` entities and `TAX` links are never sent in the pilot.
+         *     - Go ignores `included` on modifier groups in the pilot (MODELS: a venue feature, off).
+         *     - `menuId` and `validUntil` say which scheduled menu this is and when the next switch
+         *       happens.
          */
         get: operations["getActiveMenu"];
         put?: never;
@@ -111,7 +123,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/languages/{code}": {
+    "/v2/languages/{code}": {
         parameters: {
             query?: never;
             header?: never;
@@ -120,8 +132,8 @@ export interface paths {
         };
         /**
          * Language pack override for the kiosk UI
-         * @description OP-START-02. Strings the owner changed; the kiosk merges them over its
-         *     bundled pack and falls back to the bundled pack on any error.
+         * @description Strings the owner changed; the kiosk merges them over its bundled pack and falls back
+         *     to the bundled pack on any error.
          */
         get: operations["getLanguagePack"];
         put?: never;
@@ -132,7 +144,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/journeys": {
+    "/v2/journeys": {
         parameters: {
             query?: never;
             header?: never;
@@ -143,7 +155,7 @@ export interface paths {
         put?: never;
         /**
          * Record the start of a guest journey
-         * @description OP-START-01. Non-blocking for the guest; the kiosk logs failures and carries on.
+         * @description Non-blocking for the guest; the kiosk logs failures and carries on.
          */
         post: operations["startJourney"];
         delete?: never;
@@ -152,7 +164,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/journeys/{orderNonce}/events": {
+    "/v2/journeys/{orderNonce}/events": {
         parameters: {
             query?: never;
             header?: never;
@@ -163,7 +175,7 @@ export interface paths {
         put?: never;
         /**
          * Record a reset or an abandoned journey
-         * @description OP-KIOSK-01, OP-KIOSK-02, OP-START-03. Fire-and-forget.
+         * @description Fire-and-forget.
          */
         post: operations["recordJourneyEvent"];
         delete?: never;
@@ -172,7 +184,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/quotes": {
+    "/v2/totals": {
         parameters: {
             query?: never;
             header?: never;
@@ -182,18 +194,26 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Totals for the current basket
-         * @description OP-BASKET-01. Called after every basket or discount change. Nothing is
-         *     stored; `POST /v1/orders` reprices everything again.
+         * Price the basket (TotalsRequest → TotalsResponse)
+         * @description Called after every basket or coupon change. Go keeps the basket and returns its
+         *     `basketId`; send it back on later calls so the coupon and the payment stay attached
+         *     to the same basket. Without `basketId`, Go opens a new basket.
+         *
+         *     The kiosk sends ids, quantities and the line tree only (`uniqueId`, `parentId`,
+         *     `position`, one line per unit); any price or total it sends is ignored. Go prices
+         *     every line from the menu: the product's price (`dineInPriceOverride` when set), plus
+         *     each option's extra `price` × quantity; a sized item costs its chosen size. An
+         *     option's group is found among the groups its parent links (an option is linked from
+         *     at most one group of the same parent). Lines in `orderItems` are named in `language`.
          */
-        post: operations["createQuote"];
+        post: operations["createTotals"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/discounts/validate": {
+    "/v2/discounts/apply": {
         parameters: {
             query?: never;
             header?: never;
@@ -203,19 +223,22 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Check a coupon or restaurant discount code
-         * @description OP-DISC-01 / OP-DISC-04. Returns the discount as it would apply to this
-         *     basket. One discount per order: replacing the current one is the kiosk's
-         *     warning (SCR-DISC-05), then it sends the new code with `currentDiscountCode`.
+         * Apply a coupon code to the basket
+         * @description The code is sent as one `Award` with `type: CODE` and `id` = the code typed by the
+         *     guest. Go checks the `DiscountRule` (active, dates, `minOrderTotal`, `maxUses`),
+         *     attaches it to `basketId` and answers the award with its `discountAmount`. One coupon
+         *     per order: a different code replaces the current one (the kiosk warns first); the
+         *     same code again is `409 COUPON_ALREADY_APPLIED`. Call `POST /v2/totals` afterwards
+         *     for the new total; the coupon shows in `discounts` with `id` = the code.
          */
-        post: operations["validateDiscount"];
+        post: operations["applyDiscount"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/orders": {
+    "/v2/discounts/cancel": {
         parameters: {
             query?: never;
             header?: never;
@@ -225,36 +248,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Store the order as AWAITING_PAYMENT
-         * @description First half of OP-PAY-01. The Go API reprices every line from the menu and
-         *     ignores any price sent by the client. Pending open question 1: what happens
-         *     when the owner changed a price during the journey.
+         * Remove a coupon from the basket
+         * @description Codes in `codesToRemove` are taken off `basketId`. Unknown codes are ignored.
          */
-        post: operations["createOrder"];
+        post: operations["cancelDiscount"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/orders/{orderId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read an order */
-        get: operations["getOrder"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/orders/{orderId}/payments": {
+    "/v2/payments": {
         parameters: {
             query?: never;
             header?: never;
@@ -264,19 +268,31 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Start a payment for the order total
-         * @description Second half of OP-PAY-01. Until phase 4 the gateway is `SIMULATED`. A new
-         *     payment can start after a `FAILED` or `CANCELLED` one; the order stays
-         *     AWAITING_PAYMENT until a payment is AUTHORISED.
+         * Start a Mercado Pago Pix or Point payment for a basket
+         * @description Anchored on `basketId`, not on an order: the order only exists after payment.
+         *     `amount` must equal the basket's current total, else `409 BASKET_CHANGED` (price or
+         *     availability changed since totals; the kiosk re-prices and asks the guest again,
+         *     never charging the old total).
+         *
+         *     - `PIX`: Go creates a Mercado Pago Pix charge; the session carries `qrCode`,
+         *       `copyPaste` and `expiresAt` (5 minutes, Mercado Pago setting).
+         *     - `CARD`: Go sends the charge to the Point terminal in the device's
+         *       `paymentTerminalId`; the guest follows the terminal. No terminal configured, or the
+         *       terminal offline or busy, is `409 PAYMENT_TERMINAL_UNAVAILABLE`.
+         *
+         *     A new session for a basket cancels its other PENDING session ("Gerar novo", or a
+         *     change of method). A basket that already has an APPROVED session is
+         *     `409 BASKET_ALREADY_PAID`: the kiosk goes on to `POST /v2/orders`. Same
+         *     `Idempotency-Key` and body returns the first session.
          */
-        post: operations["startPayment"];
+        post: operations["createPayment"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/payments/{paymentId}": {
+    "/v2/payments/{paymentId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -284,8 +300,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Poll a payment
-         * @description OP-PAY-02. The kiosk polls at most once per second until a final status.
+         * Poll a payment session
+         * @description The kiosk polls at most once per second while `PENDING`. Go learns the outcome from
+         *     Mercado Pago (webhook or query) and moves the session to APPROVED, DECLINED, EXPIRED
+         *     or CANCELLED. A Pix still PENDING at `expiresAt` becomes EXPIRED.
          */
         get: operations["getPayment"];
         put?: never;
@@ -296,24 +314,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/payments/{paymentId}/cancel": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Cancel a payment that is still AUTHORISING */
-        post: operations["cancelPayment"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/payments/{paymentId}/simulate": {
+    "/v2/payments/{paymentId}/cancel": {
         parameters: {
             query?: never;
             header?: never;
@@ -323,10 +324,31 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Force the outcome of a simulated payment
-         * @description Only while the gateway is `SIMULATED` (phases 2 and 3, staging). Lets the
-         *     kiosk and the tests reach both the success and the error screens. Returns
-         *     `404 SIMULATION_DISABLED` once a real gateway is configured.
+         * Cancel a session that is still PENDING
+         * @description Go cancels the Pix charge or the Point order on Mercado Pago. The basket is kept.
+         */
+        post: operations["cancelPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/payments/{paymentId}/simulate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Force the outcome of a session (mock and dev only)
+         * @description Only where Mercado Pago is simulated (the mock, local dev). Returns
+         *     `404 SIMULATION_DISABLED` against a real Mercado Pago account. Approving a session that
+         *     already EXPIRED is `409 PAYMENT_EXPIRED`, and that session is flagged for refund (a
+         *     Pix paid late). Any other final session is `409 INVALID_STATUS_TRANSITION`.
          */
         post: operations["simulatePayment"];
         delete?: never;
@@ -335,7 +357,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/orders/{orderId}/place": {
+    "/v2/orders": {
         parameters: {
             query?: never;
             header?: never;
@@ -345,19 +367,53 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Place a paid order
-         * @description OP-PAY-03. Requires an AUTHORISED payment. Assigns `posCheckNumber` (a
-         *     sequence per restaurant per business day, FR-1010), moves the order to
-         *     PAID, notifies the kitchen and, from phase 4, requests the NFC-e.
+         * Place the paid basket as an order (SubmitOrderRequest → SubmitOrderResponse)
+         * @description Placed only with an approved payment (SPEC 4.6):
+         *
+         *     - `payments` holds one `Payment` copied from the APPROVED session (`tenderId`
+         *       `MP_PIX` or `MP_POINT`, `tenderRef` = the Mercado Pago payment id, `amount`, and the
+         *       card fields when the terminal returned them). Go checks it against its own session:
+         *       PENDING or CANCELLED is `409 PAYMENT_NOT_APPROVED`, DECLINED is
+         *       `409 PAYMENT_DECLINED`, EXPIRED is `409 PAYMENT_EXPIRED`.
+         *     - The approved amount must equal the basket total, else `409 BASKET_CHANGED`.
+         *     - **A paid basket always becomes exactly one order.** This call is idempotent on
+         *       `basketId` as well as on `Idempotency-Key`: a second call for the same basket (a
+         *       retry, or after the webhook placed it) returns the existing order with `200`.
+         *     - **Requirement for Go:** if the kiosk never calls this (crash, network), Go places
+         *       the order itself from the Mercado Pago webhook of the approved payment, with a
+         *       history entry `by: SYSTEM`.
+         *     - `orderType` must be `DINEIN` (`422 ORDER_TYPE_UNAVAILABLE` otherwise).
+         *     - Go assigns `number` (the order id in this API) and `customerCheckNumber` (the short
+         *       number on the success screen, a sequence per business day from
+         *       `businessDayCutoff`), sets `status: PAID`, records the lines in pt-BR (the kitchen's
+         *       language) and notifies the kitchen (`order.paid`).
+         *     - `invoiceCpfCnpj` is ignored in the pilot (no NFC-e).
          */
-        post: operations["placeOrder"];
+        post: operations["submitOrder"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/kitchen/orders": {
+    "/v2/orders/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a placed order */
+        get: operations["getOrder"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/kitchen/orders": {
         parameters: {
             query?: never;
             header?: never;
@@ -367,9 +423,9 @@ export interface paths {
         /**
          * Open orders oldest first, or today's collected orders newest first
          * @description `open` (default): PAID, PREPARING and READY orders, oldest `placedAt` first.
-         *     `collected` (plan G-K7, "Retirados hoje"): COLLECTED orders of the current
-         *     business day, newest `updatedAt` first, so the kitchen can find one and move
-         *     it back to READY.
+         *     `collected`: COLLECTED orders of the current business day, newest change first, so
+         *     the kitchen can find one and move it back to READY. Lines are `orderItems`
+         *     (`CheckItem` with nested `modifiers`), in pt-BR.
          */
         get: operations["listKitchenOrders"];
         put?: never;
@@ -380,7 +436,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/kitchen/stream": {
+    "/v2/kitchen/stream": {
         parameters: {
             query?: never;
             header?: never;
@@ -389,17 +445,14 @@ export interface paths {
         };
         /**
          * Server-Sent Events for the kitchen screen
-         * @description One event per change. `event: order.paid` and `event: order.status_changed`,
-         *     each with a `KitchenOrder` as JSON in `data`; a cancelled or not-collected
-         *     order is an `order.status_changed` with that status. `event: store.pace_changed`
-         *     carries a `StorePace` whenever the pace changes, including the automatic
-         *     resume after a pause. A `: ping` comment every 15 s keeps the connection open.
-         *     If the stream drops, the kitchen falls back to polling `GET /v1/kitchen/orders`
-         *     every 2 s.
+         * @description One event per change. `event: order.paid` and `event: order.status_changed`, each
+         *     with a `SubmitOrderResponse` as JSON in `data`; a cancelled or not-collected order is
+         *     an `order.status_changed` with that status. `event: store.pace_changed` carries a
+         *     `StorePace` whenever the pace changes, including the automatic resume after a pause.
+         *     A `: ping` comment every 15 s keeps the connection open. If the stream drops, the
+         *     kitchen polls `GET /v2/kitchen/orders` every 2 s.
          *
-         *     Events can arrive late or twice. Clients keep the `KitchenOrder` with the
-         *     highest `version` and drop older ones, so a late event for an undone move
-         *     never puts a card back.
+         *     Events can arrive late or twice. Clients keep the order with the highest `version`.
          */
         get: operations["streamKitchenEvents"];
         put?: never;
@@ -410,7 +463,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/kitchen/orders/{orderId}/status": {
+    "/v2/kitchen/orders/{number}/status": {
         parameters: {
             query?: never;
             header?: never;
@@ -422,13 +475,13 @@ export interface paths {
         /**
          * Move an order to PREPARING, READY or COLLECTED, forward or one step back
          * @description Forward: PAID → PREPARING → READY → COLLECTED (PAID → READY is allowed too).
-         *     Back one step (plan decision 2, for "Desfazer" and "Voltar uma etapa"):
-         *     READY → PREPARING and COLLECTED → READY, only while the order's business day
-         *     is the current one. Anything else is `409 INVALID_STATUS_TRANSITION`.
+         *     Back one step ("Desfazer", "Voltar uma etapa"): READY → PREPARING and
+         *     COLLECTED → READY, only while the order's business day is the current one. Anything
+         *     else is `409 INVALID_STATUS_TRANSITION`.
          *
-         *     Each change adds a `history` entry, sets `updatedAt` and increments `version`.
-         *     With `expectedVersion`, Go applies the move only if the order is still at that
-         *     version, else `409 STALE_ORDER_VERSION` (another screen moved it first).
+         *     Each change adds a `history` entry and increments `version`. With `expectedVersion`,
+         *     Go applies the move only if the order is still at that version, else
+         *     `409 STALE_ORDER_VERSION`.
          */
         post: operations["updateKitchenOrderStatus"];
         delete?: never;
@@ -437,7 +490,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/kitchen/availability": {
+    "/v2/kitchen/availability": {
         parameters: {
             query?: never;
             header?: never;
@@ -446,12 +499,12 @@ export interface paths {
         };
         get?: never;
         /**
-         * "Acabou": mark an item or one option sold out for today, or back
-         * @description Plan G-K4. The kitchen marks what ran out without leaving its screen. The
-         *     ids come from the order line (`itemId`, `choices[].optionId`). Sold out
-         *     means today's business date, like `markItemSoldOut`; `soldOut: false` clears
-         *     it (the 5 s undo). Orders already placed stay open (KDS BR-027). Go changes
-         *     the menu ETag, so the next kiosk journey loads the new menu.
+         * "Acabou": set a product, option or size unavailable, or back
+         * @description The kitchen marks what ran out without leaving its screen. `id` is a `CheckItem.id`
+         *     from an order line (any `ITEM`, `SIZED_ITEM` or `COMBO_MEAL`). Sets `available` on that
+         *     entity until changed (no "unavailable until"); `available: true` is the undo. Orders
+         *     already placed stay open. Go changes the menu ETag, so the next journey loads the new
+         *     menu. Answers the entity's current price and availability.
          */
         put: operations["setKitchenAvailability"];
         post?: never;
@@ -461,7 +514,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/kitchen/close-day": {
+    "/v2/kitchen/close-day": {
         parameters: {
             query?: never;
             header?: never;
@@ -472,10 +525,9 @@ export interface paths {
         put?: never;
         /**
          * "Encerrar o dia": every open order of today becomes NOT_COLLECTED
-         * @description Plan G-K9. Moves every PAID, PREPARING and READY order of the current business
-         *     day to NOT_COLLECTED (never COLLECTED: nobody handed them over), with a history
-         *     entry, and sends one `order.status_changed` per order. The owner still sees
-         *     them in the report. Calling it again with nothing open returns `count: 0`.
+         * @description Moves every PAID, PREPARING and READY order of the current business day to
+         *     NOT_COLLECTED, with a history entry, and sends one `order.status_changed` per order.
+         *     Calling it again with nothing open returns `count: 0`.
          */
         post: operations["closeKitchenDay"];
         delete?: never;
@@ -484,7 +536,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/kitchen/pace": {
+    "/v2/kitchen/pace": {
         parameters: {
             query?: never;
             header?: never;
@@ -495,8 +547,7 @@ export interface paths {
         get: operations["getKitchenPace"];
         /**
          * Set the store's pace from the kitchen
-         * @description Plan G-K5 and decision 3: one store-level pace, set from the kitchen or the
-         *     back office (`setStorePace`). See `StorePace` for what each level does.
+         * @description One store-level pace, set from the kitchen or the back office. Never blocks the kiosk beyond PAUSED.
          */
         put: operations["setKitchenPace"];
         post?: never;
@@ -506,7 +557,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/auth/login": {
+    "/v2/admin/auth/login": {
         parameters: {
             query?: never;
             header?: never;
@@ -526,17 +577,20 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/restaurant": {
+    "/v2/admin/store": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Restaurant settings */
-        get: operations["getRestaurant"];
-        /** Replace restaurant settings */
-        put: operations["replaceRestaurant"];
+        /** Store settings */
+        get: operations["getStore"];
+        /**
+         * Replace store settings
+         * @description `pace` and `waitMinutes` are ignored here; they change through the pace endpoints.
+         */
+        put: operations["replaceStore"];
         post?: never;
         delete?: never;
         options?: never;
@@ -544,7 +598,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/media": {
+    "/v2/admin/media": {
         parameters: {
             query?: never;
             header?: never;
@@ -554,8 +608,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Upload an image for an item, category or the logo
-         * @description The Go API stores the original; the Next.js image optimizer resizes it for the kiosk.
+         * Upload a picture; it becomes an IMAGE entity
+         * @description The Go API stores the original and creates an `IMAGE` entity with a new id; link it
+         *     from a section, item or group as `{ "type": "IMAGE", "id": <id> }`. The Next.js image
+         *     optimizer resizes it for the kiosk.
          */
         post: operations["uploadMedia"];
         delete?: never;
@@ -564,7 +620,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/devices": {
+    "/v2/admin/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every uploaded picture (IMAGE entities) */
+        get: operations["listImages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/admin/devices": {
         parameters: {
             query?: never;
             header?: never;
@@ -582,7 +655,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/devices/{deviceId}": {
+    "/v2/admin/devices/{deviceId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -590,7 +663,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Rename, enable or disable a device, change its settings */
+        /** Rename, enable or disable a device, change its settings and Point terminal */
         put: operations["replaceDevice"];
         post?: never;
         delete?: never;
@@ -599,7 +672,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/devices/{deviceId}/secret": {
+    "/v2/admin/devices/{deviceId}/secret": {
         parameters: {
             query?: never;
             header?: never;
@@ -616,44 +689,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/menus": {
+    "/v2/admin/menus": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Menus */
+        /** Menus (scheduled entry points into the shared catalogue) */
         get: operations["listMenus"];
         put?: never;
-        /** Create a menu */
-        post: operations["createMenu"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/menus/{menuId}": {
+    "/v2/admin/menus/{menuId}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Read a menu */
-        get: operations["getMenu"];
-        /** Replace a menu */
-        put: operations["replaceMenu"];
+        get?: never;
+        /**
+         * Create or replace a menu
+         * @description A menu is a name and a `root`: its top `CATEGORY` links, in display order. Sections,
+         *     items and groups are a shared catalogue, so two menus may reuse the same sections.
+         *     Saving publishes (no draft). A root link to a missing section is `422 MENU_INVALID`.
+         */
+        put: operations["putMenu"];
         post?: never;
-        /** Delete a menu */
+        /** Delete a menu and its schedules */
         delete: operations["deleteMenu"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/menus/{menuId}/schedules": {
+    "/v2/admin/menus/{menuId}/schedules": {
         parameters: {
             query?: never;
             header?: never;
@@ -664,7 +740,9 @@ export interface paths {
         get: operations["listMenuSchedules"];
         /**
          * Replace all opening windows of a menu
-         * @description Rejected with `SCHEDULE_OVERLAP` when a window overlaps another menu's, so at most one menu is active.
+         * @description Same shape as section hours, in the store's timezone; `close` before `open` runs past
+         *     midnight. Rejected with `409 SCHEDULE_OVERLAP` when a window overlaps another menu's,
+         *     so at most one menu is active.
          */
         put: operations["replaceMenuSchedules"];
         post?: never;
@@ -674,7 +752,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/menus/{menuId}/force": {
+    "/v2/admin/menus/{menuId}/force": {
         parameters: {
             query?: never;
             header?: never;
@@ -692,43 +770,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/categories": {
+    "/v2/admin/sections": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Categories of a menu */
-        get: operations["listCategories"];
+        /** Every CATEGORY section of the catalogue */
+        get: operations["listSections"];
         put?: never;
-        /** Create a category */
-        post: operations["createCategory"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/categories/{categoryId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Replace a category */
-        put: operations["replaceCategory"];
-        post?: never;
-        /** Delete a category */
-        delete: operations["deleteCategory"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/admin/categories/{categoryId}/items": {
+    "/v2/admin/sections/{sectionId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -737,55 +796,68 @@ export interface paths {
         };
         get?: never;
         /**
-         * Set which items sit in a category, their order and price override
-         * @description One item can sit in several categories and menus, at a different price in each (`priceOverride`).
+         * Create or replace a section
+         * @description `links` hold sub-sections (`CATEGORY`), products (`ITEM`, `SIZED_ITEM`, `COMBO_MEAL`)
+         *     and pictures (`IMAGE`), in display order. Go validates the whole catalogue as it
+         *     would be after the save (see `MenuInvalid`).
          */
-        put: operations["replaceCategoryItems"];
+        put: operations["putSection"];
         post?: never;
-        delete?: never;
+        /**
+         * Delete a section
+         * @description Refused with `422 MENU_INVALID` while a menu root or another section links it.
+         */
+        delete: operations["deleteSection"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/items": {
+    "/v2/admin/items": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** All items */
+        /** Products, options and sizes (ITEM, SIZED_ITEM, COMBO_MEAL) */
         get: operations["listItems"];
         put?: never;
-        /** Create an item */
-        post: operations["createItem"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/items/{itemId}": {
+    "/v2/admin/items/{itemId}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Read an item */
-        get: operations["getItem"];
-        /** Replace an item */
-        put: operations["replaceItem"];
+        get?: never;
+        /**
+         * Create or replace a product, option, size, sized item or combo meal
+         * @description Same shape as in the menu. A `SIZED_ITEM` links its sizes as `ITEM`s and its own
+         *     `price` is `0`; a `COMBO_MEAL` links one `COMBO_MAIN` and at least one `COMBO_SIDE`.
+         *     `displayPrice` is computed by Go and ignored on save. Go validates the whole catalogue
+         *     as it would be after the save (see `MenuInvalid`).
+         */
+        put: operations["putItem"];
         post?: never;
-        /** Delete an item */
+        /**
+         * Delete an item
+         * @description Refused with `422 MENU_INVALID` while anything links it. Past orders keep its id and name.
+         */
         delete: operations["deleteItem"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/items/{itemId}/sold-out": {
+    "/v2/admin/items/{itemId}/availability": {
         parameters: {
             query?: never;
             header?: never;
@@ -793,38 +865,38 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
         /**
-         * Sold out for the rest of today
-         * @description Sets `soldOutDate` to today's business date; the item reappears on the next business day.
+         * Turn a product, option or size on or off ("Disponibilidade")
+         * @description Sets `available` on the item until changed (SPEC D-12: plain on/off, no "until").
+         *     Options and sizes are `ITEM`s in v2, so this one path covers them. Go changes the menu
+         *     ETag. Answers the item's current price and availability.
          */
-        post: operations["markItemSoldOut"];
-        /** Back in stock */
-        delete: operations["clearItemSoldOut"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/admin/option-groups": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Option groups of an item */
-        get: operations["listOptionGroups"];
-        put?: never;
-        /** Create an option group with its options */
-        post: operations["createOptionGroup"];
+        put: operations["setItemAvailability"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/option-groups/{optionGroupId}": {
+    "/v2/admin/modifier-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Modifier groups (MODIFIERS, COMBO_MAIN, COMBO_SIDE) */
+        get: operations["listModifierGroups"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/admin/modifier-groups/{modifierGroupId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -832,35 +904,42 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Replace an option group and its options */
-        put: operations["replaceOptionGroup"];
+        /**
+         * Create or replace a modifier group
+         * @description `links` hold the options (`ITEM` or `SIZED_ITEM`, at least one) and pictures. An option
+         *     may link its own `MODIFIERS` (a nested group). Go validates the whole catalogue as it
+         *     would be after the save (see `MenuInvalid`).
+         */
+        put: operations["putModifierGroup"];
         post?: never;
-        /** Delete an option group */
-        delete: operations["deleteOptionGroup"];
+        /**
+         * Delete a modifier group
+         * @description Refused with `422 MENU_INVALID` while anything links it.
+         */
+        delete: operations["deleteModifierGroup"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/tags": {
+    "/v2/admin/swap-sells": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Item and category badges */
-        get: operations["listTags"];
+        /** Upgrade offers (SWAP_SELL) */
+        get: operations["listSwapSells"];
         put?: never;
-        /** Create a badge */
-        post: operations["createTag"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/tags/{tagId}": {
+    "/v2/admin/swap-sells/{swapSellId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -868,35 +947,40 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Replace a badge */
-        put: operations["replaceTag"];
+        /**
+         * Create or replace an upgrade offer
+         * @description `links` hold the products the guest can swap to (at least one). See `MenuInvalid`.
+         */
+        put: operations["putSwapSell"];
         post?: never;
-        /** Delete a badge */
-        delete: operations["deleteTag"];
+        /**
+         * Delete an upgrade offer
+         * @description Refused with `422 MENU_INVALID` while an item links it.
+         */
+        delete: operations["deleteSwapSell"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/cross-sells": {
+    "/v2/admin/badges": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Cross-sell groups */
-        get: operations["listCrossSellGroups"];
+        /** Item badges ("Selos") */
+        get: operations["listBadges"];
         put?: never;
-        /** Create a cross-sell group */
-        post: operations["createCrossSellGroup"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/cross-sells/{crossSellGroupId}": {
+    "/v2/admin/badges/{badgeId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -904,35 +988,37 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Replace a cross-sell group */
-        put: operations["replaceCrossSellGroup"];
+        /** Create or replace a badge */
+        put: operations["putBadge"];
         post?: never;
-        /** Delete a cross-sell group */
-        delete: operations["deleteCrossSellGroup"];
+        /**
+         * Delete a badge
+         * @description Refused with `422 MENU_INVALID` while an item lists it in `badgeIds`.
+         */
+        delete: operations["deleteBadge"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/discounts": {
+    "/v2/admin/discount-rules": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Coupons and restaurant discounts */
-        get: operations["listDiscounts"];
+        /** Coupons */
+        get: operations["listDiscountRules"];
         put?: never;
-        /** Create a coupon or restaurant discount */
-        post: operations["createDiscount"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/discounts/{discountId}": {
+    "/v2/admin/discount-rules/{discountRuleId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -940,17 +1026,20 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Replace a discount */
-        put: operations["replaceDiscount"];
+        /**
+         * Create or replace a coupon
+         * @description `usesCount` is kept by Go and ignored on save. A code another coupon uses is `409 DISCOUNT_CODE_TAKEN`.
+         */
+        put: operations["putDiscountRule"];
         post?: never;
-        /** Delete a discount */
-        delete: operations["deleteDiscount"];
+        /** Delete a coupon */
+        delete: operations["deleteDiscountRule"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/orders/{orderId}/cancel": {
+    "/v2/admin/orders/{number}/cancel": {
         parameters: {
             query?: never;
             header?: never;
@@ -961,14 +1050,10 @@ export interface paths {
         put?: never;
         /**
          * Cancel a paid order that cannot be made
-         * @description Plan G-K11 and decision 12. Confirmed with the owner's login, not a PIN: the
-         *     kitchen screen asks for the owner's email and password, its BFF signs in with
-         *     `POST /v1/admin/auth/login`, calls this with that token and drops the token.
-         *     Allowed from PAID, PREPARING and READY; anything else is
-         *     `409 INVALID_STATUS_TRANSITION`. Sets CANCELLED with a history entry by OWNER
-         *     and sends `order.status_changed`. While the gateway is SIMULATED there is no
-         *     refund; from phase 4 a cancel of a paid order also needs the refund flow.
-         *     Cancelled orders count on their own line in the report, never in revenue.
+         * @description Confirmed with the owner's login. Allowed from PAID, PREPARING and READY; anything else
+         *     is `409 INVALID_STATUS_TRANSITION`. Sets CANCELLED with a history entry by OWNER and
+         *     sends `order.status_changed`. The refund is done in the Mercado Pago panel, outside
+         *     Comanda. Cancelled orders count on their own line in the report, never in revenue.
          */
         post: operations["cancelOrder"];
         delete?: never;
@@ -977,7 +1062,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/pace": {
+    "/v2/admin/pace": {
         parameters: {
             query?: never;
             header?: never;
@@ -986,7 +1071,7 @@ export interface paths {
         };
         /** The store's pace, for the back office home */
         get: operations["getStorePace"];
-        /** Set the store's pace from the back office ("Pausar" on Início) */
+        /** Set the store's pace from the back office */
         put: operations["setStorePace"];
         post?: never;
         delete?: never;
@@ -995,7 +1080,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/pace/wait-minutes": {
+    "/v2/admin/pace/wait-minutes": {
         parameters: {
             query?: never;
             header?: never;
@@ -1005,8 +1090,7 @@ export interface paths {
         get?: never;
         /**
          * Minutes shown to the guest for each pace level
-         * @description Plan decision 4: `waitTime` is minutes per pace level, set by the owner.
-         *     Defaults: NORMAL 8, BUSY 15.
+         * @description Defaults NORMAL 8, BUSY 15. The success screen shows `store.waitMinutes` for the current pace.
          */
         put: operations["setPaceWaitMinutes"];
         post?: never;
@@ -1016,7 +1100,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/reports/daily": {
+    "/v2/admin/reports/daily": {
         parameters: {
             query?: never;
             header?: never;
@@ -1049,59 +1133,425 @@ export interface components {
             errors?: {
                 field: string;
                 message: string;
+                rule?: components["schemas"]["MenuRule"];
+                entity?: components["schemas"]["Link"];
             }[];
         };
-        /** @enum {string} */
-        ProblemCode: "UNAUTHORIZED" | "INVALID_CREDENTIALS" | "DEVICE_DISABLED" | "NOT_FOUND" | "VALIDATION_FAILED" | "IDEMPOTENCY_KEY_REUSED" | "NO_ACTIVE_MENU" | "ITEM_UNAVAILABLE" | "ORDER_TYPE_UNAVAILABLE" | "BASKET_ITEM_LIMIT_EXCEEDED" | "INVALID_COUPON" | "COUPON_ALREADY_APPLIED" | "ORDER_NOT_AWAITING_PAYMENT" | "PAYMENT_IN_PROGRESS" | "PAYMENT_NOT_CANCELLABLE" | "PAYMENT_NOT_AUTHORISED" | "SIMULATION_DISABLED" | "INVALID_STATUS_TRANSITION" | "SCHEDULE_OVERLAP" | "DISCOUNT_CODE_TAKEN" | "STALE_ORDER_VERSION";
         /**
-         * Format: int64
-         * @description Integer cents in BRL. 2800 = R$ 28,00.
-         * @example 2800
+         * @description v1 codes that still apply, plus the pilot's payment and menu codes (SPEC 4.7). Each
+         *     has pt-BR and en copy in the kiosk.
+         * @enum {string}
+         */
+        ProblemCode: "UNAUTHORIZED" | "INVALID_CREDENTIALS" | "DEVICE_DISABLED" | "NOT_FOUND" | "VALIDATION_FAILED" | "IDEMPOTENCY_KEY_REUSED" | "NO_ACTIVE_MENU" | "ITEM_UNAVAILABLE" | "ORDER_TYPE_UNAVAILABLE" | "BASKET_ITEM_LIMIT_EXCEEDED" | "INVALID_COUPON" | "COUPON_ALREADY_APPLIED" | "ORDER_NOT_AWAITING_PAYMENT" | "PAYMENT_IN_PROGRESS" | "PAYMENT_NOT_CANCELLABLE" | "PAYMENT_NOT_AUTHORISED" | "SIMULATION_DISABLED" | "INVALID_STATUS_TRANSITION" | "SCHEDULE_OVERLAP" | "DISCOUNT_CODE_TAKEN" | "STALE_ORDER_VERSION" | "BASKET_CHANGED" | "BASKET_ALREADY_PAID" | "DISCOUNT_INVALID" | "DISCOUNT_LIMIT_REACHED" | "PAYMENT_DECLINED" | "PAYMENT_EXPIRED" | "PAYMENT_NOT_APPROVED" | "PAYMENT_TERMINAL_UNAVAILABLE" | "MENU_INVALID";
+        /**
+         * @description Which catalogue rule an entry of `MENU_INVALID` breaks (see the `MenuInvalid` response).
+         * @enum {string}
+         */
+        MenuRule: "MISSING_LINK" | "EMPTY_GROUP" | "EMPTY_SWAP_SELL" | "LOOP" | "INVALID_ID" | "DUPLICATE_PRODUCT_ID" | "COMBO_INCOMPLETE" | "LINK_NOT_ALLOWED" | "ID_MISMATCH";
+        /**
+         * Format: double
+         * @description BRL in the main currency unit with at most 2 decimals (MODELS 2.3, SPEC D-3).
+         *     `9.50` = R$ 9,50. Never cents. Format for display with
+         *     `Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })`.
+         * @example 9.5
          */
         Money: number;
+        /**
+         * Format: double
+         * @description A rate written as a fraction. `0.10` is 10%.
+         * @example 0.1
+         */
+        Fraction: number;
+        /**
+         * @description `1` yes, `0` no (MODELS 2.3).
+         * @enum {integer}
+         */
+        Flag: 0 | 1;
+        /**
+         * @description An id the back office may write. No `:` at all, so never `::` (SPEC D-4).
+         * @example M-EXTRAS
+         */
+        EntityId: string;
         /** @enum {string} */
         LanguageCode: "pt-BR" | "en";
         /**
-         * @description ENT-START-03.
-         * @enum {string}
-         */
-        OrderType: "DINEIN" | "TAKE_OUT";
-        /**
          * @example {
-         *       "pt-BR": "Fermentação natural",
-         *       "en": "Sourdough"
+         *       "pt-BR": "Se quiser nota fiscal, dirija-se ao caixa.",
+         *       "en": "If you need an invoice, please go to the counter."
          *     }
          */
         LocalizedText: {
             "pt-BR": string;
             en?: string;
         };
-        /** @description Price per order type when it differs from `price`. */
-        ServicePriceOverride: {
-            DINEIN?: components["schemas"]["Money"];
-            TAKE_OUT?: components["schemas"]["Money"];
-        };
-        ServiceAvailability: {
-            DINEIN: boolean;
-            TAKE_OUT: boolean;
-        };
-        /** @enum {string} */
-        Weekday: "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
-        /** @example 06:00 */
+        /**
+         * @description Local time of day, `HH:mm:ss` (MODELS 2.3); `HH:mm` is accepted when reading.
+         * @example 11:00:00
+         */
         LocalTime: string;
+        /** @enum {string} */
+        DayOfWeek: "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY";
+        /**
+         * @description MODELS 5.1. `root` lists the top-level sections in display order; `entities` holds
+         *     every entity of the menu in one flat list; entities point at each other with `links`.
+         */
+        MenuResponse: {
+            root: components["schemas"]["Link"][];
+            entities: components["schemas"]["PosEntity"][];
+            /**
+             * @description Which scheduled menu (`AdminMenu.id`) this is.
+             * @example mnu-tarde
+             */
+            menuId: string;
+            /**
+             * Format: date-time
+             * @description When the active menu next switches (end of its window or of the owner's force).
+             * @example 2026-11-10T23:00:00Z
+             */
+            validUntil: string | null;
+            /** @description The badges `badgeIds` point at, names resolved to `language`. */
+            badges: components["schemas"]["Badge"][];
+        };
+        /**
+         * @description MODELS 5.6 (`PosEntityLink`). Points at the entity with this `type` and `id`.
+         * @example {
+         *       "id": "M-EXTRAS",
+         *       "type": "MODIFIERS"
+         *     }
+         */
+        Link: {
+            id: string;
+            type: components["schemas"]["PosEntityType"];
+        };
+        /**
+         * @description MODELS 5.3. `CROSS_SELLS`, `INGREDIENTS` and `COMBO_ITEM` exist in the enum but are not
+         *     used in menus; `TAX` is not used in the pilot.
+         * @enum {string}
+         */
+        PosEntityType: "CATEGORY" | "ITEM" | "SIZED_ITEM" | "MODIFIERS" | "COMBO_MEAL" | "COMBO_MAIN" | "COMBO_SIDE" | "IMAGE" | "TAX" | "SWAP_SELL" | "CROSS_SELLS" | "INGREDIENTS" | "COMBO_ITEM";
+        /** @description One entity of the menu graph; its `type` decides its shape (MODELS 5.3). */
+        PosEntity: components["schemas"]["PosEntitySection"] | components["schemas"]["PosEntityItem"] | components["schemas"]["PosEntityComboMeal"] | components["schemas"]["PosEntityModifier"] | components["schemas"]["PosEntityImage"] | components["schemas"]["PosEntitySwapSell"] | components["schemas"]["PosEntityTaxGroup"];
+        /** @description MODELS 5.5 (`IPosEntity`), the fields every entity has. */
+        PosEntityCommon: {
+            /** @description Unique within its type. Never contains `::`. Sent back in orders. */
+            id: string;
+            /** @description The name guests see. Resolved to `language` on guest endpoints; pt-BR in the back office. */
+            name: string;
+            type: components["schemas"]["PosEntityType"];
+            gfcId?: number | null;
+            /** @description Arrows to other entities (MODELS 5.4), in display order. `[]` when none. */
+            links: components["schemas"]["Link"][];
+            posMetadata?: {
+                [key: string]: string;
+            } | null;
+            translations?: components["schemas"]["Translations"];
+        };
+        /**
+         * @description Back office only: the English text of an entity whose `name`/`description` are pt-BR.
+         *     Never sent on guest endpoints, which resolve `name`/`description` to `language`.
+         * @example {
+         *       "en": {
+         *         "name": "Extra cheese"
+         *       }
+         *     }
+         */
+        Translations: {
+            en?: {
+                name?: string;
+                description?: string;
+            };
+        };
+        /** @description MODELS 5.7, `CATEGORY`. Links sub-sections, products and pictures. */
+        PosEntitySection: components["schemas"]["PosEntityCommon"] & {
+            /** @enum {string} */
+            type?: "CATEGORY";
+            description?: string | null;
+            /** @description `true` (default) shows the section, `false` hides it. */
+            available?: boolean;
+            /** @description When present and not empty, the section is shown only in these windows. */
+            availableHours?: components["schemas"]["PosEntitySectionHours"][];
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "CATEGORY";
+        };
+        /**
+         * @description MODELS 5.8. One window, local store time. `close` before `open` runs past midnight;
+         *     the closing minute is closed. Also the shape of menu schedules.
+         */
+        PosEntitySectionHours: {
+            dayOfWeek: components["schemas"]["DayOfWeek"];
+            open: components["schemas"]["LocalTime"];
+            close: components["schemas"]["LocalTime"];
+        };
+        /** @description MODELS 5.9, the item shape shared by `ITEM`, `SIZED_ITEM` and `COMBO_MEAL`. */
+        PosEntityItemFields: {
+            /** @description Base price. For an option, the extra amount (`0` when free). `0` on a `SIZED_ITEM` (its sizes carry the price). */
+            price: components["schemas"]["Money"];
+            /**
+             * Format: double
+             * @description Price for dine-in orders; `price` when absent. The only override the pilot uses.
+             */
+            dineInPriceOverride?: number | null;
+            /**
+             * Format: double
+             * @description Not used in the pilot.
+             */
+            takeOutPriceOverride?: number | null;
+            /**
+             * Format: double
+             * @description Not used in the pilot.
+             */
+            deliveryPriceOverride?: number | null;
+            description?: string | null;
+            /** @description `false` = shown grey ("Indisponível" / "Unavailable") and cannot be added. */
+            available: boolean;
+            alcoholic?: boolean | null;
+            ageRestriction?: number | null;
+            plu?: string | null;
+            /** @description Short name for kitchen tickets; `name` when empty. */
+            internalName?: string | null;
+            calories?: string | null;
+            allergens?: components["schemas"]["Allergen"][];
+            barcodes?: string[] | null;
+            factor?: number | null;
+            deliveryFlag?: components["schemas"]["Flag"];
+            pickupFlag?: components["schemas"]["Flag"];
+            seatFlag?: components["schemas"]["Flag"];
+            dineinFlag?: components["schemas"]["Flag"];
+            takeoutFlag?: components["schemas"]["Flag"];
+            /** @description Options only. How many are pre-selected (`1` for an `INGR` ingredient). Default `0`. */
+            defaultQuantity?: number | null;
+            /** @description Options only. Fewest of this option. Default `0`. */
+            minChoices?: number | null;
+            /** @description Options only. Most of this option. Default `1`. */
+            maxChoices?: number | null;
+            /**
+             * @description "A partir de R$ X" for products with sizes or required options, computed by Go
+             *     (cheapest size, or `price` plus the cheapest required choices). The front end never
+             *     computes it. Ignored on back-office saves.
+             */
+            displayPrice?: components["schemas"]["Money"];
+            /** @description "Pode conter" (may contain), same values as `allergens`. */
+            allergenTraces?: components["schemas"]["Allergen"][];
+            /** @description `false` = allergens "não informado"; an empty `allergens` list never reads as safe. */
+            allergensDeclared?: boolean;
+            /** @description Ids of `Badge`s shown on the item (`MenuResponse.badges`). */
+            badgeIds?: string[];
+            /**
+             * @description Products suggested after this one is added (`ITEM`, `SIZED_ITEM` or `COMBO_MEAL`
+             *     ids; Comanda keeps those ids unique across the three types). They must exist in
+             *     `entities`.
+             */
+            crossSellIds?: string[];
+        };
+        /**
+         * @description MODELS 5.9 and 5.10. `ITEM` is a product, an option inside a group, a size of a
+         *     `SIZED_ITEM`, or a swap-sell target. `SIZED_ITEM` links its sizes as `ITEM`s; Go
+         *     creates the size group (`min` 1, `max` 1, type `SIZE`).
+         */
+        PosEntityItem: components["schemas"]["PosEntityCommon"] & components["schemas"]["PosEntityItemFields"] & {
+            /** @enum {string} */
+            type?: "ITEM" | "SIZED_ITEM" | "CROSS_SELLS";
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "ITEM" | "SIZED_ITEM" | "CROSS_SELLS";
+        };
+        /** @description MODELS 5.14, `COMBO_MEAL`. Links one `COMBO_MAIN`, one or more `COMBO_SIDE`. */
+        PosEntityComboMeal: components["schemas"]["PosEntityCommon"] & components["schemas"]["PosEntityItemFields"] & {
+            /** @enum {string} */
+            type?: "COMBO_MEAL";
+            comboMealId: number;
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "COMBO_MEAL";
+        };
+        /**
+         * @description MODELS 5.12 and 5.14: `MODIFIERS`, `COMBO_MAIN` and `COMBO_SIDE` share this shape.
+         *     `min`/`max` count picks across the group; `minChoices`/`maxChoices` on each option limit
+         *     that option. Links options (`ITEM`/`SIZED_ITEM`, at least one) and pictures.
+         */
+        PosEntityModifier: components["schemas"]["PosEntityCommon"] & {
+            /** @enum {string} */
+            type?: "MODIFIERS" | "COMBO_MAIN" | "COMBO_SIDE";
+            min: number;
+            max: number;
+            /** @description Picks included in the price. Ignored by Go in the pilot. */
+            included?: number | null;
+            modifierType?: components["schemas"]["ModifierType"];
+            internalName?: string | null;
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "MODIFIERS" | "COMBO_MAIN" | "COMBO_SIDE";
+        };
+        /**
+         * @description MODELS 5.13. `SIZE` groups are shown first; `INGR` options start selected and can be removed.
+         * @enum {string}
+         */
+        ModifierType: "MODI" | "SIZE" | "INGR" | "SURC" | "INGM";
+        /** @description MODELS 5.15, `IMAGE`. A leaf (`links: []`). */
+        PosEntityImage: components["schemas"]["PosEntityCommon"] & {
+            /** @enum {string} */
+            type?: "IMAGE";
+            /** @description Address of the picture (absolute, or a path the BFF resolves against the Core API). */
+            url: string;
+            altText?: string | null;
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "IMAGE";
+        };
+        /** @description MODELS 5.17, `SWAP_SELL`. Only the common fields; `links` point at the products the guest can swap to. */
+        PosEntitySwapSell: components["schemas"]["PosEntityCommon"] & {
+            /** @enum {string} */
+            type?: "SWAP_SELL";
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "SWAP_SELL";
+        };
+        /** @description MODELS 5.16, `TAX`. In the schema for completeness; never sent in the pilot (SPEC D-9). */
+        PosEntityTaxGroup: components["schemas"]["PosEntityCommon"] & {
+            /** @enum {string} */
+            type?: "TAX";
+            taxRates: components["schemas"]["PosEntityTaxRate"][];
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "TAX";
+        };
+        /** @description MODELS 5.16. Not used in the pilot. */
+        PosEntityTaxRate: {
+            id: string;
+            name: string;
+            pickupTax: components["schemas"]["Fraction"];
+            deliveryTax: components["schemas"]["Fraction"];
+            seatTax: components["schemas"]["Fraction"];
+            voucherTax: components["schemas"]["Fraction"];
+            bookingTax: components["schemas"]["Fraction"];
+        };
+        /**
+         * @description MODELS 5.11, upper case. `NATURAL_LATEX` is a Comanda addition (`x-comanda`): an ANVISA
+         *     group with no v2 value.
+         * @enum {string}
+         */
+        Allergen: "CELERY" | "GLUTEN" | "GRAINS_GLUTEN" | "CRUSTACEANS" | "EGGS" | "FISH" | "LUPIN" | "MILK" | "MOLLUSCS" | "MUSTARD" | "NUTS" | "PEANUTS" | "SHELLFISH" | "SOYA" | "SULPHUR" | "SESAME" | "SULPHITES" | "CEREALS" | "DAIRY" | "ALMONDS" | "BARLEY" | "BRAZIL_NUT" | "CASHEW" | "HAZELNUTS" | "KAMUT" | "MACADAMIA" | "OATS" | "PECAN" | "PISTACHIOS" | "RYE" | "SPELT" | "WALNUTS" | "WHEAT" | "GLUTEN_FREE" | "DAIRY_FREE" | "LACTOSE_FREE" | "SUGAR_FREE" | "VEGETARIAN" | "VEGAN" | "PLANT_BASED" | "HALAL" | "KOSHER" | "ORGANIC" | "NATURAL" | "KETO" | "PALEO" | "PORK" | "MILD" | "MEDIUM" | "HOT" | "VERY_HOT" | "SOFT" | "SUGARED" | "NGCI" | "NATURAL_LATEX";
+        /** @description An item badge ("Selo"). `name` resolved to `language` on guest endpoints. */
+        Badge: {
+            id: string;
+            /** @example Novidade */
+            name: string;
+            /** @example #FAF6F0 */
+            textColour: string;
+            /** @example #4E3426 */
+            backgroundColour: string;
+            translations?: components["schemas"]["Translations"];
+        };
+        /**
+         * @description MODELS 6: current price and availability only. Comanda answers it from the
+         *     availability endpoints, with the entities they changed.
+         */
+        LightMenuResponse: {
+            posItems: components["schemas"]["LightMenuItem"][];
+        };
+        /** @description MODELS 6, the item shape with only the fields that matter there. */
+        LightMenuItem: {
+            id: string;
+            name?: string;
+            type?: components["schemas"]["PosEntityType"];
+            price: components["schemas"]["Money"];
+            /** Format: double */
+            dineInPriceOverride?: number | null;
+            available: boolean;
+        };
+        AvailabilityUpdate: {
+            available: boolean;
+        };
+        KitchenAvailabilityUpdate: {
+            /** @description A `CheckItem.id` (an `ITEM`, `SIZED_ITEM` or `COMBO_MEAL`). */
+            id: string;
+            available: boolean;
+        };
+        /**
+         * @description MODELS 9.10 plus the store settings the kiosk and kitchen need (`x-comanda`). The
+         *     dine-in / take-out toggles are gone (dine-in only). Opening is driven by menu schedules;
+         *     `hours` is optional and informative.
+         */
+        StoreConfigurationResponse: {
+            /** @example Padaria do Pai do Brunera */
+            locationName: string;
+            email?: string | null;
+            phone?: string | null;
+            liveFlag?: components["schemas"]["Flag"];
+            /**
+             * Format: double
+             * @description Not used in the pilot.
+             */
+            deliveryCharge?: number | null;
+            hours?: components["schemas"]["Hours"][];
+            /** @description Address of the store logo (an uploaded `MediaAsset.url`). */
+            logo?: string | null;
+            /** @description Languages the kiosk offers. */
+            languages: components["schemas"]["LanguageCode"][];
+            defaultLanguage: components["schemas"]["LanguageCode"];
+            closedMessage: components["schemas"]["ClosedMessage"];
+            /**
+             * @description Shown on the success screen (no NFC-e in the pilot). Default pt-BR "Se quiser nota
+             *     fiscal, dirija-se ao caixa." / en "If you need an invoice, please go to the counter."
+             */
+            invoiceNotice: components["schemas"]["LocalizedText"];
+            /** @description Current pace. Read only; ignored by `replaceStore`. */
+            pace?: components["schemas"]["StorePace"];
+            /** @description Minutes told to the guest per pace level. Read only; ignored by `replaceStore`. */
+            waitMinutes?: components["schemas"]["PaceWaitMinutes"];
+            /** @example America/Sao_Paulo */
+            timezone: string;
+            /**
+             * @description Local time a business day starts (order numbers reset, report days). `HH:mm`.
+             * @example 04:00
+             */
+            businessDayCutoff: string;
+        };
+        /** @description MODELS 9.10. Day `1` Sunday … `7` Saturday; times `HH:mm:ss.SSS`. */
+        Hours: {
+            day: number;
+            /** @example 06:00:00.000 */
+            open: string;
+            /** @example 20:00:00.000 */
+            close: string;
+            pickup?: components["schemas"]["Flag"];
+            delivery?: components["schemas"]["Flag"];
+            seat?: components["schemas"]["Flag"];
+            opening?: components["schemas"]["Flag"];
+        };
+        /** @description Both languages, so the kiosk can switch without a call. */
+        ClosedMessage: {
+            title: components["schemas"]["LocalizedText"];
+            description: components["schemas"]["LocalizedText"];
+        };
         DeviceAuthRequest: {
             /** @example KIOSK-TBT-001 */
             deviceId: string;
             /** @example s3cr3t-from-provisioning */
             deviceSecret: string;
         };
-        /**
-         * @example {
-         *       "accessToken": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJLSU9TSy1UQlQtMDAxIn0.sig",
-         *       "tokenType": "Bearer",
-         *       "expiresIn": 900
-         *     }
-         */
         DeviceToken: {
             accessToken: string;
             /** @enum {string} */
@@ -1114,155 +1564,51 @@ export interface components {
         };
         /** @enum {string} */
         DeviceKind: "KIOSK" | "KITCHEN";
-        /**
-         * @description ENT-KIOSK-01 with the restaurant's brand config.
-         * @example {
-         *       "kioskID": "KIOSK-TBT-001",
-         *       "kind": "KIOSK",
-         *       "idleTimerIntervalMilliseconds": 20000,
-         *       "printerEnabled": false,
-         *       "maintenanceMode": false,
-         *       "atCapacityMode": false,
-         *       "pace": {
-         *         "pace": "NORMAL",
-         *         "pausedUntil": null
-         *       },
-         *       "isOpen": true,
-         *       "restaurant": {
-         *         "locationId": "rst-padaria-01",
-         *         "name": "[Nome da padaria]",
-         *         "logo": "/media/logo-padaria.png",
-         *         "currency": "BRL",
-         *         "timezone": "America/Sao_Paulo",
-         *         "defaultLanguage": "pt-BR",
-         *         "supportedLanguages": [
-         *           {
-         *             "code": "pt-BR",
-         *             "name": "Português"
-         *           },
-         *           {
-         *             "code": "en",
-         *             "name": "English"
-         *           }
-         *         ],
-         *         "isDineInAvailable": true,
-         *         "isTakeOutAvailable": true,
-         *         "closedMessage": {
-         *           "title": {
-         *             "pt-BR": "Fechado agora",
-         *             "en": "Closed now"
-         *           },
-         *           "description": {
-         *             "pt-BR": "Voltamos em breve.",
-         *             "en": "We'll be back soon."
-         *           }
-         *         },
-         *         "posCheckNumberDisplayLength": 2
-         *       },
-         *       "activeMenu": {
-         *         "id": "mnu-manha",
-         *         "name": "Manhã",
-         *         "until": "2026-10-30T14:00:00Z"
-         *       },
-         *       "nextOpeningAt": null,
-         *       "serverTime": "2026-10-30T12:00:00Z"
-         *     }
-         */
+        /** @description The calling device's settings plus the store (`StoreConfigurationResponse`, with `pace` and `waitMinutes`). */
         DeviceConfig: {
             /** @example KIOSK-TBT-001 */
             kioskID: string;
             kind: components["schemas"]["DeviceKind"];
             /**
-             * @description Idle timeout; 0 disables it.
-             * @example 20000
+             * @description Idle reset; 0 disables it. Pilot default 45000.
+             * @example 45000
              */
             idleTimerIntervalMilliseconds: number;
-            /**
-             * @description False until phase 4.
-             * @example false
-             */
+            /** @description False until the hardware phase. */
             printerEnabled: boolean;
-            /** @example false */
             maintenanceMode: boolean;
-            /**
-             * @description True while this device is at capacity in Aparelhos, or while the store's
-             *     pace is PAUSED. The kiosk then shows its at-capacity screen.
-             * @example false
-             */
+            /** @description True while this device is at capacity, or while the store's pace is PAUSED. */
             atCapacityMode: boolean;
-            /**
-             * @description The store's pace, so the paused screen can say when the kiosk comes back.
-             *     A change of pace changes the config ETag.
-             */
-            pace: {
-                pace: components["schemas"]["Pace"];
-                /** Format: date-time */
-                pausedUntil: string | null;
-            };
-            /**
-             * @description True when a menu is active now.
-             * @example true
-             */
+            /** @description True when a menu is active now. */
             isOpen: boolean;
-            restaurant: components["schemas"]["RestaurantPublic"];
+            store: components["schemas"]["StoreConfigurationResponse"];
             activeMenu: components["schemas"]["ActiveMenuRef"];
             /**
              * Format: date-time
-             * @description When the next menu starts, if closed. Lets the kiosk say "back at 06:00".
+             * @description When the next menu starts, if closed.
              */
             nextOpeningAt: string | null;
-            /**
-             * Format: date-time
-             * @example 2026-10-30T12:00:00Z
-             */
+            /** Format: date-time */
             serverTime: string;
-        };
-        RestaurantPublic: {
-            /** @example rst-padaria-01 */
-            locationId: string;
-            /** @example [Nome da padaria] */
-            name: string;
-            /** @example /media/logo-padaria.png */
-            logo: string | null;
-            /** @enum {string} */
-            currency: "BRL";
-            /** @example America/Sao_Paulo */
-            timezone: string;
-            defaultLanguage: components["schemas"]["LanguageCode"];
-            supportedLanguages: components["schemas"]["SupportedLanguage"][];
-            isDineInAvailable: boolean;
-            isTakeOutAvailable: boolean;
-            closedMessage: components["schemas"]["ClosedMessage"];
             /**
-             * @description Digits shown for the order number (BR-POST-01).
-             * @example 2
+             * @description The Mercado Pago Point terminal next to this kiosk; null = card payment unavailable.
+             * @example PAX_A910__SMARTPOS1495357742
              */
-            posCheckNumberDisplayLength: number;
-        };
-        SupportedLanguage: {
-            code: components["schemas"]["LanguageCode"];
-            /** @example Português */
-            name: string;
-        };
-        /** @description ENT-KIOSK-03, both languages so the kiosk can switch without a call. */
-        ClosedMessage: {
-            title: components["schemas"]["LocalizedText"];
-            description: components["schemas"]["LocalizedText"];
+            paymentTerminalId: string | null;
         };
         ActiveMenuRef: {
-            /** @example mnu-manha */
-            id: string;
-            /** @example Manhã */
+            /** @example mnu-tarde */
+            menuId: string;
+            /** @example Tarde */
             name: string;
             /**
              * Format: date-time
              * @description When this menu stops being active.
-             * @example 2026-10-30T14:00:00Z
              */
-            until: string;
+            validUntil: string;
         } | null;
         Heartbeat: {
-            /** @example 0.1.0+3f9c2a1 */
+            /** @example 0.4.0+3f9c2a1 */
             appVersion: string;
             /** @example 1080x1920 */
             screenResolution: string;
@@ -1298,348 +1644,12 @@ export interface components {
             reason?: "FAILED_START_JOURNEY" | "FAILED_LOAD_MENU";
             message?: string;
         };
-        /**
-         * @description ENT-MENU-01. Root `entities` are categories sorted by `displayOrder`.
-         * @example {
-         *       "id": "mnu-manha",
-         *       "name": "Manhã",
-         *       "language": "pt-BR",
-         *       "currency": "BRL",
-         *       "showCategoriesPrice": false,
-         *       "entities": [
-         *         {
-         *           "id": "cat-paes",
-         *           "type": "CATEGORY",
-         *           "name": "Pães",
-         *           "image": null,
-         *           "displayOrder": 1,
-         *           "childEntities": [
-         *             {
-         *               "id": "itm-fermentacao-natural",
-         *               "type": "ITEM",
-         *               "plu": "1001",
-         *               "name": "Fermentação natural",
-         *               "shortName": "Fermentação",
-         *               "description": "Pão de fermentação natural, casca crocante.",
-         *               "image": "/media/fermentacao-natural.jpg",
-         *               "price": 2800,
-         *               "servicePriceOverride": {},
-         *               "serviceAvailability": {
-         *                 "DINEIN": true,
-         *                 "TAKE_OUT": true
-         *               },
-         *               "calories": null,
-         *               "itemLabels": [],
-         *               "displayOrder": 1,
-         *               "showFromPrice": false,
-         *               "defaultEntity": null,
-         *               "crossSellGroupId": null,
-         *               "childEntities": [],
-         *               "optionGroups": [
-         *                 {
-         *                   "id": "grp-corte",
-         *                   "name": "Como você quer?",
-         *                   "role": "REQUIRED-MODIFIER",
-         *                   "minimum": 1,
-         *                   "maximum": 1,
-         *                   "defaultOption": "opt-inteiro-fatiado",
-         *                   "displayOrder": 1,
-         *                   "compositeOptions": [],
-         *                   "options": [
-         *                     {
-         *                       "id": "opt-inteiro-fatiado",
-         *                       "plu": "9001",
-         *                       "name": "Inteiro, fatiado",
-         *                       "price": 0,
-         *                       "servicePriceOverride": {},
-         *                       "maximumQuantity": 1,
-         *                       "defaultQuantity": 1,
-         *                       "supersede": false,
-         *                       "displayOrder": 1,
-         *                       "optionGroups": []
-         *                     },
-         *                     {
-         *                       "id": "opt-inteiro",
-         *                       "plu": "9002",
-         *                       "name": "Inteiro",
-         *                       "price": 0,
-         *                       "servicePriceOverride": {},
-         *                       "maximumQuantity": 1,
-         *                       "defaultQuantity": 0,
-         *                       "supersede": false,
-         *                       "displayOrder": 2,
-         *                       "optionGroups": []
-         *                     }
-         *                   ]
-         *                 }
-         *               ]
-         *             },
-         *             {
-         *               "id": "itm-baguete",
-         *               "type": "ITEM",
-         *               "plu": "1002",
-         *               "name": "Baguete tradicional",
-         *               "shortName": "Baguete",
-         *               "description": null,
-         *               "image": "/media/baguete.jpg",
-         *               "price": 1200,
-         *               "servicePriceOverride": {},
-         *               "serviceAvailability": {
-         *                 "DINEIN": true,
-         *                 "TAKE_OUT": true
-         *               },
-         *               "calories": null,
-         *               "itemLabels": [],
-         *               "displayOrder": 2,
-         *               "showFromPrice": false,
-         *               "defaultEntity": null,
-         *               "crossSellGroupId": null,
-         *               "childEntities": [],
-         *               "optionGroups": []
-         *             }
-         *           ]
-         *         },
-         *         {
-         *           "id": "cat-sanduiches",
-         *           "type": "CATEGORY",
-         *           "name": "Sanduíches",
-         *           "image": null,
-         *           "displayOrder": 4,
-         *           "childEntities": [
-         *             {
-         *               "id": "itm-croque-monsieur",
-         *               "type": "ITEM",
-         *               "plu": "3001",
-         *               "name": "Croque monsieur",
-         *               "shortName": "Croque",
-         *               "description": "Presunto, gruyère e bechamel, gratinado.",
-         *               "image": "/media/croque-monsieur.jpg",
-         *               "price": 3490,
-         *               "servicePriceOverride": {},
-         *               "serviceAvailability": {
-         *                 "DINEIN": true,
-         *                 "TAKE_OUT": true
-         *               },
-         *               "calories": null,
-         *               "itemLabels": [],
-         *               "displayOrder": 1,
-         *               "showFromPrice": false,
-         *               "defaultEntity": null,
-         *               "crossSellGroupId": "xs-cafes",
-         *               "childEntities": [],
-         *               "optionGroups": [
-         *                 {
-         *                   "id": "grp-pao",
-         *                   "name": "Pão",
-         *                   "role": "REQUIRED-MODIFIER",
-         *                   "minimum": 1,
-         *                   "maximum": 1,
-         *                   "defaultOption": "opt-pao-brioche",
-         *                   "displayOrder": 1,
-         *                   "compositeOptions": [],
-         *                   "options": [
-         *                     {
-         *                       "id": "opt-pao-brioche",
-         *                       "plu": "9101",
-         *                       "name": "Brioche",
-         *                       "price": 0,
-         *                       "servicePriceOverride": {},
-         *                       "maximumQuantity": 1,
-         *                       "defaultQuantity": 1,
-         *                       "supersede": false,
-         *                       "displayOrder": 1,
-         *                       "optionGroups": []
-         *                     },
-         *                     {
-         *                       "id": "opt-pao-fermentacao",
-         *                       "plu": "9102",
-         *                       "name": "Fermentação",
-         *                       "price": 0,
-         *                       "servicePriceOverride": {},
-         *                       "maximumQuantity": 1,
-         *                       "defaultQuantity": 0,
-         *                       "supersede": false,
-         *                       "displayOrder": 2,
-         *                       "optionGroups": []
-         *                     }
-         *                   ]
-         *                 },
-         *                 {
-         *                   "id": "grp-adicionais",
-         *                   "name": "Adicionais",
-         *                   "role": "MODIFIERS",
-         *                   "minimum": 0,
-         *                   "maximum": 3,
-         *                   "defaultOption": null,
-         *                   "displayOrder": 2,
-         *                   "compositeOptions": [],
-         *                   "options": [
-         *                     {
-         *                       "id": "opt-ovo-poche",
-         *                       "plu": "9201",
-         *                       "name": "Ovo pochê",
-         *                       "price": 600,
-         *                       "servicePriceOverride": {},
-         *                       "maximumQuantity": 1,
-         *                       "defaultQuantity": 0,
-         *                       "supersede": false,
-         *                       "displayOrder": 1,
-         *                       "optionGroups": []
-         *                     },
-         *                     {
-         *                       "id": "opt-gruyere-extra",
-         *                       "plu": "9203",
-         *                       "name": "Gruyère extra",
-         *                       "price": 700,
-         *                       "servicePriceOverride": {},
-         *                       "maximumQuantity": 1,
-         *                       "defaultQuantity": 0,
-         *                       "supersede": false,
-         *                       "displayOrder": 2,
-         *                       "optionGroups": []
-         *                     }
-         *                   ]
-         *                 }
-         *               ]
-         *             }
-         *           ]
-         *         }
-         *       ],
-         *       "customizedItemTags": [
-         *         {
-         *           "id": "tag-mais-pedido",
-         *           "badgeName": "Mais pedido",
-         *           "textColour": "#FAF6F0",
-         *           "backgroundColour": "#4E3426",
-         *           "tagsPages": [
-         *             "ITEM_MENU",
-         *             "ITEM_PAGE"
-         *           ],
-         *           "items": [
-         *             {
-         *               "menuItemId": "itm-fermentacao-natural",
-         *               "categoryId": null,
-         *               "enabled": true
-         *             }
-         *           ]
-         *         }
-         *       ],
-         *       "crossSellGroups": [
-         *         {
-         *           "id": "xs-cafes",
-         *           "name": "Que tal um café?",
-         *           "crossSells": [
-         *             "itm-cappuccino"
-         *           ]
-         *         }
-         *       ]
-         *     }
-         */
-        Menu: {
-            id: string;
-            name: string;
-            language: components["schemas"]["LanguageCode"];
-            /** @enum {string} */
-            currency: "BRL";
-            showCategoriesPrice: boolean;
-            entities: components["schemas"]["MenuEntity"][];
-            customizedItemTags: components["schemas"]["CustomizedItemTag"][];
-            crossSellGroups: components["schemas"]["CrossSellGroup"][];
-        };
-        /** @description ENT-MENU-02. A category (`childEntities` filled) or an item. */
-        MenuEntity: {
-            id: string;
-            /** @enum {string} */
-            type: "CATEGORY" | "ITEM";
-            plu?: string | null;
-            name: string;
-            shortName?: string | null;
-            description?: string | null;
-            /** @description Path or URL of the original image; the BFF resizes it. */
-            image?: string | null;
-            displayOrder: number;
-            childEntities: components["schemas"]["MenuEntity"][];
-            /** @description Pre-selected child id (variants). */
-            defaultEntity?: string | null;
-            /** @description Unit price for this menu (items only). */
-            price?: components["schemas"]["Money"];
-            servicePriceOverride?: components["schemas"]["ServicePriceOverride"];
-            serviceAvailability?: components["schemas"]["ServiceAvailability"];
-            calories?: string | null;
-            itemLabels?: string[];
-            showFromPrice?: boolean;
-            optionGroups?: components["schemas"]["OptionGroup"][];
-            crossSellGroupId?: string | null;
-        };
-        /** @enum {string} */
-        OptionGroupRole: "MODIFIERS" | "REQUIRED-MODIFIER" | "UPSELLS" | "INGREDIENTS" | "INGREDIENT_MODIFIERS" | "SURCHARGE" | "COMBO_MAIN";
-        /** @description ENT-MENU-03. */
-        OptionGroup: {
-            id: string;
-            name: string;
-            role: components["schemas"]["OptionGroupRole"];
-            minimum: number;
-            maximum: number;
-            defaultOption?: string | null;
-            displayOrder: number;
-            options: components["schemas"]["Option"][];
-            compositeOptions: components["schemas"]["CompositeOption"][];
-        };
-        /** @description ENT-MENU-04. */
-        Option: {
-            id: string;
-            plu?: string | null;
-            name: string;
-            shortName?: string | null;
-            description?: string | null;
-            image?: string | null;
-            price: components["schemas"]["Money"];
-            servicePriceOverride?: components["schemas"]["ServicePriceOverride"];
-            calories?: string | null;
-            maximumQuantity: number;
-            defaultQuantity: number;
-            supersede: boolean;
-            displayOrder: number;
-            optionGroups: components["schemas"]["OptionGroup"][];
-        };
-        /** @description ENT-MENU-05. An ingredient the guest turns on or off. */
-        CompositeOption: {
-            /** @enum {string} */
-            type: "TOGGLE";
-            positiveOption: components["schemas"]["Option"];
-            negativeOption: components["schemas"]["Option"];
-            /** @enum {string|null} */
-            defaultChoice?: "POSITIVE" | "NEGATIVE" | null;
-        };
-        /** @enum {string} */
-        TagsPage: "ITEM_MENU" | "ITEM_PAGE" | "BASKET";
-        /** @description ENT-MENU-06, already filtered by its schedule. */
-        CustomizedItemTag: {
-            id: string;
-            badgeName: string;
-            textColour: string;
-            backgroundColour: string;
-            tagsPages: components["schemas"]["TagsPage"][];
-            items: components["schemas"]["TagLink"][];
-        };
-        TagLink: {
-            menuItemId?: string | null;
-            categoryId?: string | null;
-            enabled: boolean;
-        };
-        /** @description ENT-MENU-07. `crossSells` are item ids in this menu. */
-        CrossSellGroup: {
-            id: string;
-            name: string;
-            crossSells: string[];
-        };
         LanguagePack: {
             code: components["schemas"]["LanguageCode"];
             name: string;
             /**
              * @example {
-             *       "attract.cta": "Toque para começar",
-             *       "orderType.title": "Onde você vai comer?"
+             *       "attract.cta": "Toque para começar"
              *     }
              */
             strings: {
@@ -1649,16 +1659,11 @@ export interface components {
         StartJourneyRequest: {
             /**
              * Format: uuid
-             * @description Generated by the kiosk at journey start; identifies the order until it gets an id.
+             * @description Generated by the kiosk at journey start.
              */
             orderNonce: string;
             language: components["schemas"]["LanguageCode"];
         };
-        /**
-         * @example {
-         *       "journeyStartedTimestamp": "2026-10-30T11:58:02Z"
-         *     }
-         */
         JourneyStarted: {
             /** Format: date-time */
             journeyStartedTimestamp: string;
@@ -1666,482 +1671,23 @@ export interface components {
         JourneyEvent: {
             /** @enum {string} */
             type: "RESET" | "IDLE_TIMEOUT" | "CANCELLED_BY_GUEST";
-            /** @description Basket total at the moment of the event. */
+            /** @description Basket total at the moment of the event, as last priced by Go. */
             orderTotal?: components["schemas"]["Money"];
         };
-        /** @description ENT-BASKET-03 as the kiosk sends it. No prices; the Go API prices everything. */
-        OrderLineInput: {
-            /** Format: uuid */
-            guid: string;
-            itemId: string;
-            quantity: number;
-            options: components["schemas"]["OrderLineOptionInput"][];
-        };
-        OrderLineOptionInput: {
-            /** @description For a composite option, the id of the chosen positive or negative option. */
-            optionId: string;
-            quantity: number;
-            /** @description Choices inside this option's nested groups. */
-            options?: components["schemas"]["OrderLineOptionInput"][];
-        };
-        QuoteRequest: {
-            orderType: components["schemas"]["OrderType"];
-            orderItems: components["schemas"]["OrderLineInput"][];
-            discountCode?: string | null;
-        };
         /**
-         * @description ENT-BASKET-02. Prices are tax-inclusive; `tax` is filled from phase 4 with the NFC-e data. `discount` is absent when none applies.
-         * @example {
-         *       "subtotal": 8280,
-         *       "discountTotal": 0,
-         *       "total": 8280,
-         *       "taxInclusive": true,
-         *       "tax": null,
-         *       "currency": "BRL"
-         *     }
-         */
-        OrderTotal: {
-            subtotal: components["schemas"]["Money"];
-            discountTotal: components["schemas"]["Money"];
-            total: components["schemas"]["Money"];
-            taxInclusive: boolean;
-            /**
-             * Format: int64
-             * @description Integer cents in BRL, or null.
-             */
-            tax: number | null;
-            /** @enum {string} */
-            currency: "BRL";
-            discount?: components["schemas"]["DiscountItem"];
-        };
-        /** @enum {string} */
-        DiscountType: "COMANDA_COUPON" | "RESTAURANT_DISCOUNT";
-        DiscountValidationRequest: {
-            /** @example BEMVINDO10 */
-            code: string;
-            /** @enum {string} */
-            entryMethod: "MANUAL" | "SCAN" | "UNKNOWN";
-            orderType: components["schemas"]["OrderType"];
-            orderItems: components["schemas"]["OrderLineInput"][];
-            /** @description The code already on the order, if any. */
-            currentDiscountCode?: string | null;
-        };
-        /**
-         * @description ENT-DISC-01 (applied side), amount computed for the sent basket.
-         * @example {
-         *       "type": "COMANDA_COUPON",
-         *       "value": "BEMVINDO10",
-         *       "entryMethod": "MANUAL",
-         *       "title": "10% na primeira compra",
-         *       "description": null,
-         *       "amount": 828
-         *     }
-         */
-        DiscountItem: {
-            type: components["schemas"]["DiscountType"];
-            /**
-             * @description The code.
-             * @example BEMVINDO10
-             */
-            value: string;
-            /** @enum {string} */
-            entryMethod: "MANUAL" | "SCAN" | "UNKNOWN";
-            /** @example 10% na primeira compra */
-            title: string;
-            description?: string | null;
-            amount: components["schemas"]["Money"];
-        };
-        /**
-         * @description NOT_COLLECTED: still open when the kitchen closed the day (`closeKitchenDay`);
-         *     paid, never handed over. CANCELLED: cancelled by the owner (`cancelOrder`).
-         * @enum {string}
-         */
-        OrderStatus: "AWAITING_PAYMENT" | "PAID" | "PREPARING" | "READY" | "COLLECTED" | "CANCELLED" | "NOT_COLLECTED";
-        CreateOrderRequest: {
-            /** Format: uuid */
-            orderNonce: string;
-            orderType: components["schemas"]["OrderType"];
-            language: components["schemas"]["LanguageCode"];
-            orderItems: components["schemas"]["OrderLineInput"][];
-            discountCode?: string | null;
-            /** @description Digits only, 11 (CPF) or 14 (CNPJ). OP-BASKET-04. */
-            cpfCnpj?: string | null;
-            /** Format: date-time */
-            journeyStartedTimestamp?: string | null;
-        };
-        /**
-         * @example {
-         *       "id": "ord-7f3a",
-         *       "orderNonce": "0b6c7d8e-1f2a-4b3c-9d4e-5f6a7b8c9d0e",
-         *       "orderType": "TAKE_OUT",
-         *       "status": "AWAITING_PAYMENT",
-         *       "posCheckNumber": null,
-         *       "businessDate": "2026-10-30",
-         *       "language": "pt-BR",
-         *       "orderItems": [
-         *         {
-         *           "guid": "3f0c9a52-6f0e-4d7b-9c61-0d1f4b7f2a10",
-         *           "itemId": "itm-croque-monsieur",
-         *           "name": "Croque monsieur",
-         *           "unitPrice": 4090,
-         *           "quantity": 1,
-         *           "lineTotal": 4090,
-         *           "options": [
-         *             {
-         *               "optionId": "opt-pao-brioche",
-         *               "name": "Brioche",
-         *               "price": 0,
-         *               "quantity": 1,
-         *               "options": []
-         *             },
-         *             {
-         *               "optionId": "opt-ovo-poche",
-         *               "name": "Ovo pochê",
-         *               "price": 600,
-         *               "quantity": 1,
-         *               "options": []
-         *             }
-         *           ]
-         *         },
-         *         {
-         *           "guid": "8b2d1c47-2a6e-4f53-8d0b-5e9a7c3f1b22",
-         *           "itemId": "itm-cappuccino",
-         *           "name": "Cappuccino",
-         *           "unitPrice": 1390,
-         *           "quantity": 1,
-         *           "lineTotal": 1390,
-         *           "options": [
-         *             {
-         *               "optionId": "opt-leite-integral",
-         *               "name": "Leite integral",
-         *               "price": 0,
-         *               "quantity": 1,
-         *               "options": []
-         *             }
-         *           ]
-         *         },
-         *         {
-         *           "guid": "c51e7a90-4b3d-4c8e-a2f6-9d0b1e3c5f44",
-         *           "itemId": "itm-fermentacao-natural",
-         *           "name": "Fermentação natural",
-         *           "unitPrice": 2800,
-         *           "quantity": 1,
-         *           "lineTotal": 2800,
-         *           "options": [
-         *             {
-         *               "optionId": "opt-inteiro-fatiado",
-         *               "name": "Inteiro, fatiado",
-         *               "price": 0,
-         *               "quantity": 1,
-         *               "options": []
-         *             }
-         *           ]
-         *         }
-         *       ],
-         *       "orderTotal": {
-         *         "subtotal": 8280,
-         *         "discountTotal": 0,
-         *         "total": 8280,
-         *         "taxInclusive": true,
-         *         "tax": null,
-         *         "currency": "BRL"
-         *       },
-         *       "cpfCnpj": null,
-         *       "journeyStartedTimestamp": "2026-10-30T11:58:02Z",
-         *       "createdAt": "2026-10-30T12:03:40Z",
-         *       "placedAt": null,
-         *       "readyAt": null
-         *     }
-         */
-        Order: {
-            /** @example ord-7f3a */
-            id: string;
-            /** Format: uuid */
-            orderNonce: string;
-            orderType: components["schemas"]["OrderType"];
-            status: components["schemas"]["OrderStatus"];
-            /** @description Set when placed. */
-            posCheckNumber: string | null;
-            /** Format: date */
-            businessDate: string;
-            language: components["schemas"]["LanguageCode"];
-            orderItems: components["schemas"]["OrderLine"][];
-            orderTotal: components["schemas"]["OrderTotal"];
-            cpfCnpj: string | null;
-            /** Format: date-time */
-            journeyStartedTimestamp: string | null;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            placedAt: string | null;
-            /** Format: date-time */
-            readyAt: string | null;
-        };
-        /** @description ENT-BASKET-03 as sold. `unitPrice` includes the options. */
-        OrderLine: {
-            /** Format: uuid */
-            guid: string;
-            itemId: string;
-            name: string;
-            unitPrice: components["schemas"]["Money"];
-            quantity: number;
-            lineTotal: components["schemas"]["Money"];
-            options: components["schemas"]["OrderLineOption"][];
-        };
-        OrderLineOption: {
-            optionId: string;
-            name: string;
-            price: components["schemas"]["Money"];
-            quantity: number;
-            options: components["schemas"]["OrderLineOption"][];
-        };
-        /** @enum {string} */
-        PaymentMethod: "PIX" | "CREDIT" | "DEBIT";
-        /** @enum {string} */
-        PaymentStatus: "AUTHORISING" | "AUTHORISED" | "FAILED" | "CANCELLED";
-        StartPaymentRequest: {
-            method: components["schemas"]["PaymentMethod"];
-        };
-        /**
-         * @description ENT-PAY-01.
-         * @example {
-         *       "id": "pay-91c2",
-         *       "orderId": "ord-7f3a",
-         *       "method": "CREDIT",
-         *       "amount": 8280,
-         *       "paymentStatus": "AUTHORISING",
-         *       "gatewayType": "SIMULATED",
-         *       "providerRef": null,
-         *       "failureReason": null,
-         *       "pix": null,
-         *       "createdAt": "2026-10-30T12:03:45Z",
-         *       "updatedAt": "2026-10-30T12:03:45Z"
-         *     }
-         */
-        Payment: {
-            /** @example pay-91c2 */
-            id: string;
-            /** @example ord-7f3a */
-            orderId: string;
-            method: components["schemas"]["PaymentMethod"];
-            amount: components["schemas"]["Money"];
-            paymentStatus: components["schemas"]["PaymentStatus"];
-            /**
-             * @description `SIMULATED` until phase 4; then the chosen provider.
-             * @example SIMULATED
-             */
-            gatewayType: string;
-            providerRef: string | null;
-            /** @example null */
-            failureReason: string | null;
-            pix: components["schemas"]["PixCharge"];
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-        };
-        /** @description Only for `PIX` shown on screen. */
-        PixCharge: {
-            /** @description Pix "copia e cola" payload; the kiosk draws the QR code from it. */
-            copyPaste: string;
-            /** Format: date-time */
-            expiresAt: string;
-        } | null;
-        SimulatePaymentRequest: {
-            /** @enum {string} */
-            outcome: "AUTHORISED" | "FAILED";
-        };
-        /**
-         * @description OP-PAY-03 response (`OrderResponse`).
-         * @example {
-         *       "orderId": "ord-7f3a",
-         *       "posCheckNumber": "42",
-         *       "waitTime": 8,
-         *       "status": "PAID"
-         *     }
-         */
-        PlacedOrder: {
-            /** @example ord-7f3a */
-            orderId: string;
-            /** @example 42 */
-            posCheckNumber: string;
-            /**
-             * @description Minutes: the owner's wait minutes for the current pace (NORMAL or BUSY;
-             *     `PaceWaitMinutes`). Plan decision 4 closes open question 2. Null only if
-             *     the owner cleared them.
-             * @example 8
-             */
-            waitTime: number | null;
-            status: components["schemas"]["OrderStatus"];
-        };
-        /**
-         * @example {
-         *       "id": "ord-7f3a",
-         *       "posCheckNumber": "42",
-         *       "orderType": "TAKE_OUT",
-         *       "status": "PREPARING",
-         *       "placedAt": "2026-10-30T12:04:10Z",
-         *       "readyAt": null,
-         *       "updatedAt": "2026-10-30T12:05:02Z",
-         *       "version": 2,
-         *       "history": [
-         *         {
-         *           "status": "PAID",
-         *           "at": "2026-10-30T12:04:10Z",
-         *           "by": "KIOSK"
-         *         },
-         *         {
-         *           "status": "PREPARING",
-         *           "at": "2026-10-30T12:05:02Z",
-         *           "by": "KITCHEN"
-         *         }
-         *       ],
-         *       "lines": [
-         *         {
-         *           "itemId": "itm-croque",
-         *           "name": "Croque monsieur",
-         *           "quantity": 1,
-         *           "options": [
-         *             "Brioche",
-         *             "Ovo pochê"
-         *           ],
-         *           "choices": [
-         *             {
-         *               "optionId": "opt-brioche",
-         *               "name": "Brioche",
-         *               "quantity": 1
-         *             },
-         *             {
-         *               "optionId": "opt-ovo-poche",
-         *               "name": "Ovo pochê",
-         *               "quantity": 1
-         *             }
-         *           ]
-         *         },
-         *         {
-         *           "itemId": "itm-cappuccino",
-         *           "name": "Cappuccino",
-         *           "quantity": 1,
-         *           "options": [
-         *             "Leite integral"
-         *           ],
-         *           "choices": [
-         *             {
-         *               "optionId": "opt-leite-integral",
-         *               "name": "Leite integral",
-         *               "quantity": 1
-         *             }
-         *           ]
-         *         }
-         *       ]
-         *     }
-         */
-        KitchenOrder: {
-            id: string;
-            posCheckNumber: string;
-            orderType: components["schemas"]["OrderType"];
-            status: components["schemas"]["OrderStatus"];
-            /** Format: date-time */
-            placedAt: string;
-            /** Format: date-time */
-            readyAt: string | null;
-            /**
-             * Format: date-time
-             * @description Time of the last status change.
-             */
-            updatedAt: string;
-            /**
-             * @description 1 when paid, +1 on every status change. Clients keep the highest version
-             *     they have seen (stale-event guard, plan G-K3).
-             */
-            version: number;
-            /** @description Every status the order had, oldest first (plan G-K2). Starts with PAID. */
-            history: components["schemas"]["KitchenStatusChange"][];
-            lines: {
-                /** @description For "Acabou" (`setKitchenAvailability`). */
-                itemId: string;
-                name: string;
-                quantity: number;
-                /** @description Option names, flattened, in pt-BR. Same order as `choices`. */
-                options: string[];
-                /** @description The chosen options with their ids, flattened, in pt-BR. */
-                choices: {
-                    optionId: string;
-                    name: string;
-                    quantity: number;
-                }[];
-            }[];
-        };
-        KitchenStatusChange: {
-            status: components["schemas"]["OrderStatus"];
-            /** Format: date-time */
-            at: string;
-            /**
-             * @description KIOSK for the payment, SYSTEM for automatic changes.
-             * @enum {string}
-             */
-            by: "KIOSK" | "KITCHEN" | "OWNER" | "SYSTEM";
-        };
-        KitchenStatusUpdate: {
-            /** @enum {string} */
-            status: "PREPARING" | "READY" | "COLLECTED";
-            /** @description Optional. The `version` the client saw; a different one is `409 STALE_ORDER_VERSION`. */
-            expectedVersion?: number;
-        };
-        KitchenAvailabilityUpdate: {
-            itemId: string;
-            /** @description Null marks the whole item; an id marks only that option of the item. */
-            optionId: string | null;
-            /** @description True sold out for today; false back in stock. */
-            soldOut: boolean;
-        };
-        KitchenAvailability: {
-            itemId: string;
-            optionId: string | null;
-            /**
-             * Format: date
-             * @description Today's business date while sold out; null when back in stock.
-             */
-            soldOutDate: string | null;
-        };
-        OrderCancelRequest: {
-            /** @enum {string} */
-            reason: "ITEM_SOLD_OUT" | "CANNOT_PREPARE" | "OTHER";
-            note?: string | null;
-        };
-        /**
-         * @description NORMAL: the kiosk sells, `waitTime` is the NORMAL minutes.
-         *     BUSY ("Movimentado"): the kiosk sells, `waitTime` is the BUSY minutes.
-         *     PAUSED: every kiosk shows the at-capacity screen until `pausedUntil`, when Go
-         *     returns to NORMAL by itself (server time, restaurant timezone).
+         * @description NORMAL: the kiosk sells, wait = NORMAL minutes. BUSY ("Movimentado"): the kiosk sells,
+         *     wait = BUSY minutes. PAUSED: every kiosk shows the at-capacity screen until
+         *     `pausedUntil`, when Go returns to NORMAL by itself.
          * @enum {string}
          */
         Pace: "NORMAL" | "BUSY" | "PAUSED";
-        /**
-         * @example {
-         *       "pace": "PAUSED",
-         *       "pausedUntil": "2026-10-30T12:30:00Z",
-         *       "changedAt": "2026-10-30T12:15:00Z",
-         *       "changedBy": "KITCHEN",
-         *       "waitMinutes": {
-         *         "NORMAL": 8,
-         *         "BUSY": 15
-         *       }
-         *     }
-         */
         StorePace: {
             pace: components["schemas"]["Pace"];
-            /**
-             * Format: date-time
-             * @description Set only while PAUSED.
-             */
+            /** Format: date-time */
             pausedUntil: string | null;
             /** Format: date-time */
             changedAt: string;
-            /**
-             * @description SYSTEM for the automatic resume.
-             * @enum {string}
-             */
+            /** @enum {string} */
             changedBy: "KITCHEN" | "OWNER" | "SYSTEM";
             waitMinutes: components["schemas"]["PaceWaitMinutes"];
         };
@@ -2159,6 +1705,337 @@ export interface components {
             /** @example 15 */
             BUSY: number;
         };
+        /**
+         * @description MODELS 8.1. The pilot accepts only `DINEIN` (SPEC D-7).
+         * @enum {string}
+         */
+        OrderType: "DINEIN" | "TAKE_OUT" | "PICKUP" | "DELIVERY" | "PAY_AT_TABLE" | "DRIVE_THRU" | "DELIVEROO";
+        /**
+         * @description MODELS 8.2. One basket line; option lines go in the product line's `modifiers`
+         *     (nested options included), the tree given by `parentId` → `uniqueId`. The kiosk sends
+         *     one product line per unit (`quantity: 1`). Comanda difference: the price fields are
+         *     optional on requests (MODELS marks `itemPrice` required) because the kiosk sends ids
+         *     only; Go ignores any price or total a client sends.
+         */
+        OrderItem: {
+            /** @description The menu entity id of the product, option or size. */
+            id: string;
+            name?: string | null;
+            plu?: string | null;
+            quantity: number;
+            /** Format: double */
+            itemPrice?: number | null;
+            /** Format: double */
+            itemDiscount?: number | null;
+            /** Format: double */
+            itemTax?: number | null;
+            /** Format: double */
+            itemNet?: number | null;
+            /** Format: double */
+            itemTotal?: number | null;
+            /** Format: double */
+            discountRate?: number | null;
+            /** Format: double */
+            totalPrice?: number | null;
+            /** Format: double */
+            totalDiscount?: number | null;
+            /** Format: double */
+            totalTax?: number | null;
+            /** Format: double */
+            totalNet?: number | null;
+            /** Format: double */
+            total?: number | null;
+            factor?: number | null;
+            /** @description The guest's note for this line (the kiosk's item note). */
+            specialNotes?: string | null;
+            modifierType?: components["schemas"]["ModifierType"];
+            /** @description Identifies the line within the basket. */
+            uniqueId: number;
+            /** @description Option lines only. `uniqueId` of the line this option belongs to (the parent option for a nested one). */
+            parentId?: number | null;
+            /** @description Option lines only. The option's position inside its group (1-based, link order). */
+            position?: number | null;
+            modifiers?: components["schemas"]["OrderItem"][];
+            taxes?: components["schemas"]["Tax"][];
+            discounts?: components["schemas"]["Discount"][];
+        };
+        /** @description MODELS 8.3 (also `ITax`). Always empty lists in the pilot. */
+        Tax: {
+            id: string;
+            name?: string;
+            taxRate?: components["schemas"]["Fraction"];
+            taxTotal: components["schemas"]["Money"];
+            netTotal?: components["schemas"]["Money"];
+            quantity?: number;
+        };
+        /** @description MODELS 8.4, a discount in requests. */
+        Discount: {
+            id: string;
+            name?: string;
+            rate?: components["schemas"]["Fraction"];
+            value?: components["schemas"]["Money"];
+            providerType?: string;
+            uniqueItemId?: number;
+        };
+        /** @description MODELS 8.5. Not used in the pilot. */
+        ServiceCharge: {
+            id: string;
+            name?: string;
+            type?: string;
+            value: components["schemas"]["Money"];
+        };
+        /** @description MODELS 8.6. Personal data; never logged. Not collected by the kiosk in the pilot. */
+        Customer: {
+            firstName?: string;
+            lastName?: string;
+            email?: string;
+            phoneNumber?: string;
+        };
+        /** @description MODELS 8.7. Not used in the pilot (dine-in only). */
+        Address: {
+            line1?: string;
+            line2?: string;
+            city?: string;
+            stateOrProvince?: string;
+            postCode?: string;
+            country?: string;
+        };
+        /**
+         * @description MODELS 8.8. In the pilot, copied from the APPROVED `PaymentSession`: `tenderId`
+         *     `MP_PIX` or `MP_POINT`, `tenderRef` = the Mercado Pago payment id.
+         */
+        Payment: {
+            /** @example MP_PIX */
+            tenderId: string;
+            /** @example 1319876543 */
+            tenderRef?: string | null;
+            amount: components["schemas"]["Money"];
+            /** Format: double */
+            tipAmount?: number | null;
+            /** Format: double */
+            donationAmount?: number | null;
+            customer?: components["schemas"]["Customer"];
+            collectPaymentOnDelivery?: boolean | null;
+            authCode?: string | null;
+            /** @example VISA */
+            cardScheme?: string | null;
+            cardLast4Digits?: string | null;
+        };
+        /** @description MODELS 8.9. Not used in the pilot. */
+        ExternalUserId: {
+            externalId: string;
+            system: string;
+        };
+        /**
+         * @description MODELS 8.10. A coupon is an award with `type: CODE` and `id` = the code; Go answers
+         *     it with `description` and `discountAmount`.
+         */
+        Award: {
+            id: string;
+            posId?: string | null;
+            description?: string | null;
+            /**
+             * @description `PSEUDO_CURRENCY`, `CODE`, `PROMOTION` or `ITEM`. The pilot uses `CODE`.
+             * @example CODE
+             */
+            type?: string;
+            source?: string | null;
+            isExternal?: boolean | null;
+            sourceExternalId?: string | null;
+            /** Format: double */
+            discountAmount?: number | null;
+        };
+        /**
+         * @description MODELS 8.11 without `config` (SPEC D-5). The totals a client sends are ignored: Go
+         *     prices the basket itself.
+         */
+        OrderRequest: {
+            orderId?: number | null;
+            /** @description The basket from an earlier `POST /v2/totals`. Required by discounts, payments and orders. */
+            basketId?: string | null;
+            orderType: components["schemas"]["OrderType"];
+            items: components["schemas"]["OrderItem"][];
+            /** Format: double */
+            subTotal?: number | null;
+            /** Format: double */
+            discountTotal?: number | null;
+            /** Format: double */
+            serviceChargeTotal?: number | null;
+            /** Format: double */
+            taxTotal?: number | null;
+            /** Format: double */
+            total?: number | null;
+            discounts?: components["schemas"]["Discount"][];
+            taxes?: components["schemas"]["Tax"][];
+            serviceCharges?: components["schemas"]["ServiceCharge"][];
+        };
+        /** @description MODELS 8.11. Adds nothing to `OrderRequest`. */
+        TotalsRequest: components["schemas"]["OrderRequest"];
+        /** @description MODELS 8.12. `payments` holds the approved payment; delivery, pickup and fiscal fields are not used in the pilot. */
+        SubmitOrderRequest: components["schemas"]["OrderRequest"] & {
+            payments?: components["schemas"]["Payment"][];
+            customer?: components["schemas"]["Customer"];
+            address?: components["schemas"]["Address"];
+            externalUserIds?: components["schemas"]["ExternalUserId"][];
+            specialNotes?: string | null;
+            notes?: string | null;
+            dateToFire?: string | null;
+            pickupTime?: string | null;
+            dateCreated?: string | null;
+            openCheck?: boolean | null;
+            /** @description Ignored in the pilot (no NFC-e). */
+            invoiceCpfCnpj?: string | null;
+        };
+        /** @description MODELS 8.13. The basket the coupon is for, plus the codes to apply or remove. */
+        DiscountRequest: components["schemas"]["OrderRequest"] & {
+            awards?: components["schemas"]["Award"][];
+            codesToRemove?: string[];
+        };
+        /** @description MODELS 9.8. */
+        DiscountResponse: {
+            awards: components["schemas"]["Award"][];
+        };
+        /**
+         * @description MODELS 9.1. One priced line. A product line's `total` includes its options; option lines
+         *     in `modifiers` carry their own share for display. Lines are named in `language` on totals
+         *     and in pt-BR on orders.
+         */
+        CheckItem: {
+            id: string;
+            name?: string;
+            quantity: number;
+            price?: components["schemas"]["Money"];
+            netTotal?: components["schemas"]["Money"];
+            taxTotal?: components["schemas"]["Money"];
+            total?: components["schemas"]["Money"];
+            modifiers?: components["schemas"]["CheckItem"][];
+            taxes?: components["schemas"]["Tax"][];
+            /** @description The guest's note for this line, shown in the kitchen. */
+            specialNotes?: string | null;
+        };
+        /** @description MODELS 9.2 (`IDiscount`), a discount in responses. A coupon has `id` = its code. */
+        ResponseDiscount: {
+            id: string;
+            name?: string;
+            rate?: components["schemas"]["Fraction"];
+            value?: components["schemas"]["Money"];
+            locked?: boolean;
+        };
+        /** @description MODELS 9.4. `tax` is `0` and `taxes` is `[]` in the pilot. Comanda always returns `basketId`. */
+        TotalsResponse: {
+            basketId: string;
+            subTotal: components["schemas"]["Money"];
+            discount?: components["schemas"]["Money"];
+            serviceChargeTotal?: components["schemas"]["Money"];
+            tax: components["schemas"]["Money"];
+            total: components["schemas"]["Money"];
+            orderItems?: components["schemas"]["CheckItem"][];
+            taxes?: components["schemas"]["Tax"][];
+            discounts?: components["schemas"]["ResponseDiscount"][];
+        };
+        /**
+         * @description MODELS 9.5 plus the kitchen lifecycle (`x-comanda`). `number` is the order id in this
+         *     API; `customerCheckNumber` is the short number on the success screen. Also the kitchen's
+         *     order. Fiscal fields stay empty in the pilot.
+         */
+        SubmitOrderResponse: components["schemas"]["TotalsResponse"] & {
+            /** @example 20261110-0042 */
+            number: string;
+            /** @example 42 */
+            customerCheckNumber: string;
+            displayText?: string | null;
+            text?: string | null;
+            orderType: components["schemas"]["OrderType"];
+            externalUserIds?: components["schemas"]["ExternalUserId"][];
+            fiscalQrCodeData?: string | null;
+            fiscalAccessKey?: string | null;
+            status: components["schemas"]["OrderStatus"];
+            /** @description 1 when placed, +1 on every status change. Clients keep the highest. */
+            version: number;
+            /** Format: date-time */
+            placedAt: string;
+            /** @description Every status the order had, oldest first. Starts with PAID. */
+            history: components["schemas"]["OrderStatusChange"][];
+        };
+        /**
+         * @description An order exists only once paid. NOT_COLLECTED: still open when the kitchen closed the
+         *     day. CANCELLED: cancelled by the owner (refund in the Mercado Pago panel).
+         * @enum {string}
+         */
+        OrderStatus: "PAID" | "PREPARING" | "READY" | "COLLECTED" | "NOT_COLLECTED" | "CANCELLED";
+        OrderStatusChange: {
+            status: components["schemas"]["OrderStatus"];
+            /** Format: date-time */
+            at: string;
+            /**
+             * @description KIOSK for the payment, SYSTEM for automatic changes (webhook placement, resume).
+             * @enum {string}
+             */
+            by: "KIOSK" | "KITCHEN" | "OWNER" | "SYSTEM";
+        };
+        KitchenStatusUpdate: {
+            /** @enum {string} */
+            status: "PREPARING" | "READY" | "COLLECTED";
+            expectedVersion?: number;
+        };
+        CloseDayResult: {
+            /**
+             * @description Orders moved to NOT_COLLECTED.
+             * @example 2
+             */
+            count: number;
+        };
+        OrderCancelRequest: {
+            /** @enum {string} */
+            reason: "ITEM_SOLD_OUT" | "CANNOT_PREPARE" | "OTHER";
+            note?: string | null;
+        };
+        /** @enum {string} */
+        PaymentMethod: "PIX" | "CARD";
+        /** @enum {string} */
+        PaymentSessionStatus: "PENDING" | "APPROVED" | "DECLINED" | "EXPIRED" | "CANCELLED";
+        CreatePaymentRequest: {
+            basketId: string;
+            method: components["schemas"]["PaymentMethod"];
+            /** @description Must equal the basket's current total (`BASKET_CHANGED` otherwise). */
+            amount: components["schemas"]["Money"];
+        };
+        /** @description One Mercado Pago attempt for a basket (SPEC 4.6). */
+        PaymentSession: {
+            /** @example pay-8f2c */
+            id: string;
+            basketId: string;
+            method: components["schemas"]["PaymentMethod"];
+            amount: components["schemas"]["Money"];
+            status: components["schemas"]["PaymentSessionStatus"];
+            /**
+             * @description Copy into `Payment.tenderId`.
+             * @enum {string}
+             */
+            tenderId: "MP_PIX" | "MP_POINT";
+            /** @description The Mercado Pago payment id once known. Copy into `Payment.tenderRef`. */
+            tenderRef: string | null;
+            /** @description PIX only. The QR image as a `data:image/png;base64,…` URL. */
+            qrCode: string | null;
+            /** @description PIX only. The "copia e cola" text. */
+            copyPaste: string | null;
+            /**
+             * Format: date-time
+             * @description PIX only. 5 minutes after creation; still PENDING then = EXPIRED.
+             */
+            expiresAt: string | null;
+            /** @description CARD only. The Point terminal the charge was sent to. */
+            terminalId: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            cardScheme?: string | null;
+            cardLast4Digits?: string | null;
+            authCode?: string | null;
+        };
+        SimulatePaymentRequest: {
+            /** @enum {string} */
+            outcome: "APPROVED" | "DECLINED" | "EXPIRED";
+        };
         OwnerLoginRequest: {
             /** Format: email */
             email: string;
@@ -2172,27 +2049,8 @@ export interface components {
             /** @description Seconds. */
             expiresIn: number;
         };
-        RestaurantInput: {
-            name: string;
-            logo?: string | null;
-            cnpj: string;
-            /** @example America/Sao_Paulo */
-            timezone: string;
-            defaultLanguage: components["schemas"]["LanguageCode"];
-            supportedLanguages: components["schemas"]["LanguageCode"][];
-            isDineInAvailable: boolean;
-            isTakeOutAvailable: boolean;
-            closedMessage: components["schemas"]["ClosedMessage"];
-            posCheckNumberDisplayLength: number;
-            receiptFooter?: components["schemas"]["LocalizedText"];
-        };
-        Restaurant: {
-            id: string;
-        } & components["schemas"]["RestaurantInput"];
-        MediaAsset: {
-            id: string;
-            /** @example /media/fermentacao-natural.jpg */
-            url: string;
+        /** @description An uploaded picture, as the `IMAGE` entity it became, plus its size. */
+        MediaAsset: components["schemas"]["PosEntityImage"] & {
             width: number;
             height: number;
         };
@@ -2203,10 +2061,13 @@ export interface components {
             name: string;
             kind: components["schemas"]["DeviceKind"];
             status: components["schemas"]["DeviceStatus"];
+            /** @example 45000 */
             idleTimerIntervalMilliseconds: number;
             printerEnabled: boolean;
             maintenanceMode: boolean;
             atCapacityMode: boolean;
+            /** @description The Mercado Pago Point terminal next to this kiosk. */
+            paymentTerminalId: string | null;
         };
         AdminDevice: components["schemas"]["DeviceInput"] & {
             /** @example KIOSK-TBT-001 */
@@ -2224,177 +2085,74 @@ export interface components {
             /** @description Shown once. The Go API stores only its hash. */
             deviceSecret: string;
         };
-        MenuInput: {
-            name: components["schemas"]["LocalizedText"];
-            showCategoriesPrice: boolean;
-        };
-        AdminMenu: components["schemas"]["MenuInput"] & {
+        /** @description A scheduled menu. `isActive` and `forcedUntil` are kept by Go and ignored on save. */
+        AdminMenu: {
+            /** @example mnu-tarde */
             id: string;
-            /** @enum {string} */
-            currency: "BRL";
-            isActive: boolean;
+            /** @example Tarde */
+            name: string;
+            translations?: components["schemas"]["Translations"];
+            /** @description Top-level `CATEGORY` links, in display order. */
+            root: components["schemas"]["Link"][];
+            isActive?: boolean;
             /** Format: date-time */
-            forcedUntil: string | null;
-        };
-        /** @description Opening window in the restaurant's timezone. `timeStart` later than `timeEnd` runs past midnight. */
-        MenuSchedule: {
-            weekday: components["schemas"]["Weekday"];
-            timeStart: components["schemas"]["LocalTime"];
-            timeEnd: components["schemas"]["LocalTime"];
+            forcedUntil?: string | null;
         };
         ForceMenuRequest: {
             /** Format: date-time */
             until: string;
         };
-        CategoryInput: {
-            menuId: string;
-            parentId?: string | null;
-            name: components["schemas"]["LocalizedText"];
-            image?: string | null;
-            displayOrder: number;
-        };
-        AdminCategory: components["schemas"]["CategoryInput"] & {
+        /** @description A product, option, size, sized item or combo meal, with `translations`. */
+        AdminItem: components["schemas"]["PosEntityItem"] | components["schemas"]["PosEntityComboMeal"];
+        /**
+         * @description A coupon (SPEC 4.5), applied to a basket as an `Award` of type `CODE`. One per order.
+         *     PERCENT: `value` is whole percent 1–100, applied per line and rounded half up to the
+         *     cent. FIXED: `value` is an amount in BRL, never more than the basket. `maxDiscount` caps
+         *     the discount; `minOrderTotal` is checked against the subtotal.
+         */
+        DiscountRule: {
             id: string;
-        };
-        CategoryItemLink: {
-            itemId: string;
-            displayOrder: number;
-            /**
-             * Format: int64
-             * @description Integer cents in BRL, or null.
-             */
-            priceOverride?: number | null;
-        };
-        /** @description Phase 4. Final shape depends on the NFC-e API and the accountant (open question 5). */
-        FiscalFields: {
-            /** @example 19059090 */
-            ncm?: string;
-            /** @example 5102 */
-            cfop?: string;
-            taxes?: {
-                [key: string]: string;
-            };
-        } | null;
-        ItemInput: {
-            plu?: string | null;
-            name: components["schemas"]["LocalizedText"];
-            shortName?: components["schemas"]["LocalizedText"];
-            description?: components["schemas"]["LocalizedText"];
-            image?: string | null;
-            price: components["schemas"]["Money"];
-            servicePriceOverride?: components["schemas"]["ServicePriceOverride"];
-            serviceAvailability: components["schemas"]["ServiceAvailability"];
-            calories?: string | null;
-            itemLabels?: string[];
-            defaultEntity?: string | null;
-            crossSellGroupId?: string | null;
-            fiscal?: components["schemas"]["FiscalFields"];
-        };
-        AdminItem: components["schemas"]["ItemInput"] & {
-            id: string;
-            /** Format: date */
-            soldOutDate: string | null;
-        };
-        AdminOption: {
-            /** @description Empty on create; kept on replace so order history stays linked. */
-            id?: string;
-            plu?: string | null;
-            name: components["schemas"]["LocalizedText"];
-            price: components["schemas"]["Money"];
-            servicePriceOverride?: components["schemas"]["ServicePriceOverride"];
-            maximumQuantity: number;
-            defaultQuantity: number;
-            supersede: boolean;
-            displayOrder: number;
-        };
-        AdminCompositeOption: {
-            positiveOption: components["schemas"]["AdminOption"];
-            negativeOption: components["schemas"]["AdminOption"];
-            /** @enum {string|null} */
-            defaultChoice?: "POSITIVE" | "NEGATIVE" | null;
-        };
-        /** @description Belongs to an item, or to an option for nested groups. */
-        OptionGroupInput: {
-            itemId?: string | null;
-            parentOptionId?: string | null;
-            name: components["schemas"]["LocalizedText"];
-            role: components["schemas"]["OptionGroupRole"];
-            minimum: number;
-            maximum: number;
-            defaultOption?: string | null;
-            displayOrder: number;
-            options: components["schemas"]["AdminOption"][];
-            compositeOptions?: components["schemas"]["AdminCompositeOption"][];
-        };
-        AdminOptionGroup: components["schemas"]["OptionGroupInput"] & {
-            id: string;
-        };
-        TagInput: {
-            badgeName: components["schemas"]["LocalizedText"];
-            /** @example #FAF6F0 */
-            textColour: string;
-            /** @example #4E3426 */
-            backgroundColour: string;
-            tagsPages: components["schemas"]["TagsPage"][];
-            scheduleEnabled: boolean;
-            /** Format: date */
-            startDate?: string | null;
-            /** Format: date */
-            endDate?: string | null;
-            links: components["schemas"]["TagLink"][];
-        };
-        AdminTag: components["schemas"]["TagInput"] & {
-            id: string;
-        };
-        CrossSellGroupInput: {
-            name: components["schemas"]["LocalizedText"];
-            crossSells: string[];
-        };
-        AdminCrossSellGroup: components["schemas"]["CrossSellGroupInput"] & {
-            id: string;
-        };
-        DiscountInput: {
-            type: components["schemas"]["DiscountType"];
             /** @example BEMVINDO10 */
             code: string;
-            title: components["schemas"]["LocalizedText"];
-            description?: components["schemas"]["LocalizedText"];
-            /** @enum {string} */
-            kind: "PERCENT" | "FIXED";
             /**
-             * @description Whole percent (1 to 100) for PERCENT; cents for FIXED.
-             * @example 10
+             * @description Shown to the guest as the award `description` (pt-BR).
+             * @example 10% de boas-vindas
              */
+            name: string;
+            translations?: components["schemas"]["Translations"];
+            /** @enum {string} */
+            type: "PERCENT" | "FIXED";
+            /** @example 10 */
             value: number;
+            /** Format: double */
+            minOrderTotal?: number | null;
+            /** Format: double */
+            maxDiscount?: number | null;
+            maxUses?: number | null;
+            /** @description Orders placed with this coupon. Kept by Go; ignored on save. */
+            usesCount?: number;
             /** Format: date-time */
             validFrom?: string | null;
             /** Format: date-time */
             validTo?: string | null;
             active: boolean;
         };
-        AdminDiscount: components["schemas"]["DiscountInput"] & {
-            id: string;
-        };
+        /** @description One business day, amounts in BRL. Cancelled orders count only in `cancelledCount`. */
         DailyReport: {
             /** Format: date */
             date: string;
             ordersCount: number;
             revenue: components["schemas"]["Money"];
             averageTicket: components["schemas"]["Money"];
-            byOrderType: {
-                DINEIN: components["schemas"]["OrderTypeTotals"];
-                TAKE_OUT: components["schemas"]["OrderTypeTotals"];
-            };
+            discountTotal: components["schemas"]["Money"];
+            cancelledCount: number;
+            notCollectedCount: number;
             bestSellers: {
-                itemId: string;
+                id: string;
                 name: string;
                 quantity: number;
                 revenue: components["schemas"]["Money"];
             }[];
-        };
-        OrderTypeTotals: {
-            orders: number;
-            revenue: components["schemas"]["Money"];
         };
     };
     responses: {
@@ -2473,6 +2231,23 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
+        /** @description No basket with this `basketId` (`NOT_FOUND`); price the basket again without it. */
+        BasketNotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "type": "/problems/not-found",
+                 *       "title": "Basket not found",
+                 *       "status": 404,
+                 *       "code": "NOT_FOUND"
+                 *     }
+                 */
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
         /** @description The body breaks a field rule (`VALIDATION_FAILED`); `errors` lists each field. */
         ValidationFailed: {
             headers: {
@@ -2487,7 +2262,7 @@ export interface components {
                  *       "code": "VALIDATION_FAILED",
                  *       "errors": [
                  *         {
-                 *           "field": "orderItems[0].quantity",
+                 *           "field": "items[0].quantity",
                  *           "message": "must be at least 1"
                  *         }
                  *       ]
@@ -2496,28 +2271,12 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
-        /** @description The `Idempotency-Key` was already used with a different body (`IDEMPOTENCY_KEY_REUSED`). */
-        IdempotencyConflict: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                /**
-                 * @example {
-                 *       "type": "/problems/idempotency-key-reused",
-                 *       "title": "Idempotency key reused with a different body",
-                 *       "status": 409,
-                 *       "code": "IDEMPOTENCY_KEY_REUSED"
-                 *     }
-                 */
-                "application/problem+json": components["schemas"]["Problem"];
-            };
-        };
         /**
-         * @description The basket cannot be priced: `BASKET_ITEM_LIMIT_EXCEEDED` (FR-421),
-         *     `ITEM_UNAVAILABLE` (sold out or not on the active menu; `detail` names it),
-         *     `ORDER_TYPE_UNAVAILABLE`, `INVALID_COUPON`, `NO_ACTIVE_MENU` or
-         *     `VALIDATION_FAILED`.
+         * @description The basket cannot be priced: `ITEM_UNAVAILABLE` (unavailable, unknown or not on the
+         *     active menu; `detail` names it), `ORDER_TYPE_UNAVAILABLE` (anything but DINEIN),
+         *     `BASKET_ITEM_LIMIT_EXCEEDED`, `NO_ACTIVE_MENU` or `VALIDATION_FAILED` (an option
+         *     outside its parent's groups, or a group's `min`/`max` or an option's
+         *     `minChoices`/`maxChoices` broken).
          */
         BasketRejected: {
             headers: {
@@ -2526,10 +2285,50 @@ export interface components {
             content: {
                 /**
                  * @example {
-                 *       "type": "/problems/basket-item-limit-exceeded",
-                 *       "title": "Too many items in the basket",
+                 *       "type": "/problems/item-unavailable",
+                 *       "title": "An item is unavailable",
                  *       "status": 422,
-                 *       "code": "BASKET_ITEM_LIMIT_EXCEEDED"
+                 *       "code": "ITEM_UNAVAILABLE",
+                 *       "detail": "X-BACON"
+                 *     }
+                 */
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /**
+         * @description The catalogue would be broken after this save (`MENU_INVALID`). Comanda refuses what
+         *     v2 would drop silently. Each problem is one `errors` entry with its `rule` and the
+         *     `entity` it is about:
+         *     `MISSING_LINK` (a link to an entity that does not exist), `EMPTY_GROUP` (a
+         *     `MODIFIERS`, `COMBO_MAIN` or `COMBO_SIDE` with no option), `EMPTY_SWAP_SELL`, `LOOP`
+         *     (an entity leads back to itself), `INVALID_ID` (empty, `::`, or outside the id
+         *     pattern), `DUPLICATE_PRODUCT_ID` (the same id on two of `ITEM`, `SIZED_ITEM`,
+         *     `COMBO_MEAL`), `COMBO_INCOMPLETE` (a combo without one `COMBO_MAIN` and at least one
+         *     `COMBO_SIDE`), `LINK_NOT_ALLOWED` (a link MODELS 5.4 does not follow, or an option
+         *     linked from two groups of the same parent) and `ID_MISMATCH` (body id ≠ path id).
+         */
+        MenuInvalid: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "type": "/problems/menu-invalid",
+                 *       "title": "The menu would be broken",
+                 *       "status": 422,
+                 *       "code": "MENU_INVALID",
+                 *       "errors": [
+                 *         {
+                 *           "field": "links[3]",
+                 *           "message": "ITEM X-NOPE does not exist",
+                 *           "rule": "MISSING_LINK",
+                 *           "entity": {
+                 *             "type": "MODIFIERS",
+                 *             "id": "M-EXTRAS"
+                 *           }
+                 *         }
+                 *       ]
                  *     }
                  */
                 "application/problem+json": components["schemas"]["Problem"];
@@ -2545,22 +2344,23 @@ export interface components {
         IfNoneMatch: string;
         Language: components["schemas"]["LanguageCode"];
         OrderNonce: string;
-        OrderId: string;
+        /** @description `SubmitOrderResponse.number`. */
+        OrderNumber: string;
         PaymentId: string;
         DeviceId: string;
-        MenuId: string;
-        CategoryId: string;
-        ItemId: string;
-        OptionGroupId: string;
-        TagId: string;
-        CrossSellGroupId: string;
-        DiscountId: string;
+        MenuId: components["schemas"]["EntityId"];
+        SectionId: components["schemas"]["EntityId"];
+        ItemId: components["schemas"]["EntityId"];
+        ModifierGroupId: components["schemas"]["EntityId"];
+        SwapSellId: components["schemas"]["EntityId"];
+        BadgeId: components["schemas"]["EntityId"];
+        DiscountRuleId: components["schemas"]["EntityId"];
     };
     requestBodies: never;
     headers: {
         /**
          * @description Version of the representation. Send it back in `If-None-Match`.
-         * @example "menu-mnu-manha-v17-pt-BR"
+         * @example "menu-mnu-tarde-v17-pt-BR"
          */
         ETag: string;
     };
@@ -2686,12 +2486,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Menu"];
+                    "application/json": components["schemas"]["MenuResponse"];
                 };
             };
             304: components["responses"]["NotModified"];
             401: components["responses"]["Unauthorized"];
-            /** @description No menu is active now (`NO_ACTIVE_MENU`); the kiosk shows Lane Closed. */
+            /** @description No menu is active now (`NO_ACTIVE_MENU`); the kiosk shows the closed screen. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2786,7 +2586,267 @@ export interface operations {
             422: components["responses"]["ValidationFailed"];
         };
     };
-    createQuote: {
+    createTotals: {
+        parameters: {
+            query: {
+                language: components["parameters"]["Language"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "basketId": null,
+                 *       "orderType": "DINEIN",
+                 *       "items": [
+                 *         {
+                 *           "id": "1001",
+                 *           "quantity": 1,
+                 *           "uniqueId": 1,
+                 *           "specialNotes": "Cortar ao meio, por favor",
+                 *           "modifiers": [
+                 *             {
+                 *               "id": "X-CHEESE",
+                 *               "quantity": 2,
+                 *               "uniqueId": 2,
+                 *               "parentId": 1,
+                 *               "position": 1,
+                 *               "modifierType": "MODI"
+                 *             },
+                 *             {
+                 *               "id": "X-SAUCE",
+                 *               "quantity": 1,
+                 *               "uniqueId": 3,
+                 *               "parentId": 1,
+                 *               "position": 3,
+                 *               "modifierType": "MODI"
+                 *             },
+                 *             {
+                 *               "id": "S-BBQ",
+                 *               "quantity": 1,
+                 *               "uniqueId": 4,
+                 *               "parentId": 3,
+                 *               "position": 1,
+                 *               "modifierType": "MODI"
+                 *             }
+                 *           ]
+                 *         },
+                 *         {
+                 *           "id": "2001",
+                 *           "quantity": 1,
+                 *           "uniqueId": 5,
+                 *           "modifiers": [
+                 *             {
+                 *               "id": "2001-L",
+                 *               "quantity": 1,
+                 *               "uniqueId": 6,
+                 *               "parentId": 5,
+                 *               "position": 2,
+                 *               "modifierType": "SIZE"
+                 *             }
+                 *           ]
+                 *         }
+                 *       ]
+                 *     }
+                 */
+                "application/json": components["schemas"]["TotalsRequest"];
+            };
+        };
+        responses: {
+            /** @description The priced basket. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "basketId": "B-55501",
+                     *       "subTotal": 14.7,
+                     *       "discount": 0,
+                     *       "serviceChargeTotal": 0,
+                     *       "tax": 0,
+                     *       "total": 14.7,
+                     *       "orderItems": [
+                     *         {
+                     *           "id": "1001",
+                     *           "name": "Classic Burger",
+                     *           "quantity": 1,
+                     *           "price": 9.5,
+                     *           "netTotal": 11.5,
+                     *           "taxTotal": 0,
+                     *           "total": 11.5,
+                     *           "specialNotes": "Cortar ao meio, por favor",
+                     *           "modifiers": [
+                     *             {
+                     *               "id": "X-CHEESE",
+                     *               "name": "Queijo extra",
+                     *               "quantity": 2,
+                     *               "price": 1,
+                     *               "netTotal": 2,
+                     *               "taxTotal": 0,
+                     *               "total": 2,
+                     *               "modifiers": [],
+                     *               "taxes": []
+                     *             },
+                     *             {
+                     *               "id": "X-SAUCE",
+                     *               "name": "Adicionar molho",
+                     *               "quantity": 1,
+                     *               "price": 0,
+                     *               "netTotal": 0,
+                     *               "taxTotal": 0,
+                     *               "total": 0,
+                     *               "modifiers": [
+                     *                 {
+                     *                   "id": "S-BBQ",
+                     *                   "name": "Molho barbecue",
+                     *                   "quantity": 1,
+                     *                   "price": 0,
+                     *                   "netTotal": 0,
+                     *                   "taxTotal": 0,
+                     *                   "total": 0,
+                     *                   "modifiers": [],
+                     *                   "taxes": []
+                     *                 }
+                     *               ],
+                     *               "taxes": []
+                     *             }
+                     *           ],
+                     *           "taxes": []
+                     *         },
+                     *         {
+                     *           "id": "2001",
+                     *           "name": "Refrigerante de cola",
+                     *           "quantity": 1,
+                     *           "price": 0,
+                     *           "netTotal": 3.2,
+                     *           "taxTotal": 0,
+                     *           "total": 3.2,
+                     *           "modifiers": [
+                     *             {
+                     *               "id": "2001-L",
+                     *               "name": "Grande",
+                     *               "quantity": 1,
+                     *               "price": 3.2,
+                     *               "netTotal": 3.2,
+                     *               "taxTotal": 0,
+                     *               "total": 3.2,
+                     *               "modifiers": [],
+                     *               "taxes": []
+                     *             }
+                     *           ],
+                     *           "taxes": []
+                     *         }
+                     *       ],
+                     *       "taxes": [],
+                     *       "discounts": []
+                     *     }
+                     */
+                    "application/json": components["schemas"]["TotalsResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["BasketNotFound"];
+            422: components["responses"]["BasketRejected"];
+        };
+    };
+    applyDiscount: {
+        parameters: {
+            query: {
+                language: components["parameters"]["Language"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "basketId": "B-55501",
+                 *       "orderType": "DINEIN",
+                 *       "items": [
+                 *         {
+                 *           "id": "1001",
+                 *           "quantity": 1,
+                 *           "uniqueId": 1
+                 *         }
+                 *       ],
+                 *       "awards": [
+                 *         {
+                 *           "id": "BEMVINDO10",
+                 *           "type": "CODE"
+                 *         }
+                 *       ]
+                 *     }
+                 */
+                "application/json": components["schemas"]["DiscountRequest"];
+            };
+        };
+        responses: {
+            /** @description Applied. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "awards": [
+                     *         {
+                     *           "id": "BEMVINDO10",
+                     *           "description": "10% de boas-vindas",
+                     *           "type": "CODE",
+                     *           "source": "COMANDA",
+                     *           "isExternal": false,
+                     *           "discountAmount": 0.95
+                     *         }
+                     *       ]
+                     *     }
+                     */
+                    "application/json": components["schemas"]["DiscountResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["BasketNotFound"];
+            /** @description The same code is already on the basket (`COUPON_ALREADY_APPLIED`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /**
+             * @description Unknown, inactive, expired code or minimum order not reached (`DISCOUNT_INVALID`,
+             *     `detail` says which), the coupon's uses are used up (`DISCOUNT_LIMIT_REACHED`), or
+             *     the basket cannot be priced (see `BasketRejected`).
+             */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "/problems/discount-invalid",
+                     *       "title": "Coupon not valid",
+                     *       "status": 422,
+                     *       "code": "DISCOUNT_INVALID",
+                     *       "detail": "Pedido mínimo de R$ 20,00"
+                     *     }
+                     */
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    cancelDiscount: {
         parameters: {
             query?: never;
             header?: never;
@@ -2797,126 +2857,36 @@ export interface operations {
             content: {
                 /**
                  * @example {
-                 *       "orderType": "TAKE_OUT",
-                 *       "discountCode": null,
-                 *       "orderItems": [
+                 *       "basketId": "B-55501",
+                 *       "orderType": "DINEIN",
+                 *       "items": [
                  *         {
-                 *           "guid": "3f0c9a52-6f0e-4d7b-9c61-0d1f4b7f2a10",
-                 *           "itemId": "itm-croque-monsieur",
+                 *           "id": "1001",
                  *           "quantity": 1,
-                 *           "options": [
-                 *             {
-                 *               "optionId": "opt-pao-brioche",
-                 *               "quantity": 1
-                 *             },
-                 *             {
-                 *               "optionId": "opt-ovo-poche",
-                 *               "quantity": 1
-                 *             }
-                 *           ]
-                 *         },
-                 *         {
-                 *           "guid": "8b2d1c47-2a6e-4f53-8d0b-5e9a7c3f1b22",
-                 *           "itemId": "itm-cappuccino",
-                 *           "quantity": 1,
-                 *           "options": [
-                 *             {
-                 *               "optionId": "opt-leite-integral",
-                 *               "quantity": 1
-                 *             }
-                 *           ]
-                 *         },
-                 *         {
-                 *           "guid": "c51e7a90-4b3d-4c8e-a2f6-9d0b1e3c5f44",
-                 *           "itemId": "itm-fermentacao-natural",
-                 *           "quantity": 1,
-                 *           "options": [
-                 *             {
-                 *               "optionId": "opt-inteiro-fatiado",
-                 *               "quantity": 1
-                 *             }
-                 *           ]
+                 *           "uniqueId": 1
                  *         }
+                 *       ],
+                 *       "codesToRemove": [
+                 *         "BEMVINDO10"
                  *       ]
                  *     }
                  */
-                "application/json": components["schemas"]["QuoteRequest"];
+                "application/json": components["schemas"]["DiscountRequest"];
             };
         };
         responses: {
-            /** @description Totals. */
-            200: {
+            /** @description Removed. */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["OrderTotal"];
-                };
+                content?: never;
             };
             401: components["responses"]["Unauthorized"];
-            422: components["responses"]["BasketRejected"];
+            404: components["responses"]["BasketNotFound"];
         };
     };
-    validateDiscount: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DiscountValidationRequest"];
-            };
-        };
-        responses: {
-            /** @description Valid code. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DiscountItem"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            /** @description The same code is already on the order (`COUPON_ALREADY_APPLIED`). */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "type": "/problems/coupon-already-applied",
-                     *       "title": "This code is already applied",
-                     *       "status": 409,
-                     *       "code": "COUPON_ALREADY_APPLIED"
-                     *     }
-                     */
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Unknown, expired or inactive code (`INVALID_COUPON`). */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "type": "/problems/invalid-coupon",
-                     *       "title": "Invalid coupon",
-                     *       "status": 422,
-                     *       "code": "INVALID_COUPON"
-                     *     }
-                     */
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    createOrder: {
+    createPayment: {
         parameters: {
             query?: never;
             header: {
@@ -2931,83 +2901,30 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateOrderRequest"];
-            };
-        };
-        responses: {
-            /** @description Order created. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Order"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            409: components["responses"]["IdempotencyConflict"];
-            422: components["responses"]["BasketRejected"];
-        };
-    };
-    getOrder: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                orderId: components["parameters"]["OrderId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The order. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Order"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    startPayment: {
-        parameters: {
-            query?: never;
-            header: {
                 /**
-                 * @description A UUID per logical attempt. Retrying with the same key and body returns the first result.
-                 * @example 6d1f2c9e-3b4a-4e5f-8a7b-9c0d1e2f3a4b
+                 * @example {
+                 *       "basketId": "B-55501",
+                 *       "method": "PIX",
+                 *       "amount": 14.7
+                 *     }
                  */
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path: {
-                orderId: components["parameters"]["OrderId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["StartPaymentRequest"];
+                "application/json": components["schemas"]["CreatePaymentRequest"];
             };
         };
         responses: {
-            /** @description Payment started. */
+            /** @description Session started. */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Payment"];
+                    "application/json": components["schemas"]["PaymentSession"];
                 };
             };
             401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
+            404: components["responses"]["BasketNotFound"];
             /**
-             * @description `ORDER_NOT_AWAITING_PAYMENT` (already paid or cancelled),
-             *     `PAYMENT_IN_PROGRESS` (another payment is still AUTHORISING) or
+             * @description `BASKET_CHANGED`, `BASKET_ALREADY_PAID`, `PAYMENT_TERMINAL_UNAVAILABLE` or
              *     `IDEMPOTENCY_KEY_REUSED`.
              */
             409: {
@@ -3015,9 +2932,18 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
+                    /**
+                     * @example {
+                     *       "type": "/problems/basket-changed",
+                     *       "title": "The basket changed since totals",
+                     *       "status": 409,
+                     *       "code": "BASKET_CHANGED"
+                     *     }
+                     */
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            422: components["responses"]["ValidationFailed"];
         };
     };
     getPayment: {
@@ -3031,13 +2957,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The payment. */
+            /** @description The session. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Payment"];
+                    "application/json": components["schemas"]["PaymentSession"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -3061,7 +2987,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Payment"];
+                    "application/json": components["schemas"]["PaymentSession"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -3098,14 +3024,23 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Payment"];
+                    "application/json": components["schemas"]["PaymentSession"];
                 };
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            /** @description `PAYMENT_EXPIRED` or `INVALID_STATUS_TRANSITION`. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
-    placeOrder: {
+    submitOrder: {
         parameters: {
             query?: never;
             header: {
@@ -3115,33 +3050,101 @@ export interface operations {
                  */
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
             };
-            path: {
-                orderId: components["parameters"]["OrderId"];
-            };
+            path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "basketId": "B-55501",
+                 *       "orderType": "DINEIN",
+                 *       "items": [
+                 *         {
+                 *           "id": "1001",
+                 *           "quantity": 1,
+                 *           "uniqueId": 1
+                 *         }
+                 *       ],
+                 *       "payments": [
+                 *         {
+                 *           "tenderId": "MP_PIX",
+                 *           "tenderRef": "1319876543",
+                 *           "amount": 9.5
+                 *         }
+                 *       ]
+                 *     }
+                 */
+                "application/json": components["schemas"]["SubmitOrderRequest"];
+            };
+        };
         responses: {
-            /** @description Order placed. */
+            /** @description This basket was already placed; the existing order. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PlacedOrder"];
+                    "application/json": components["schemas"]["SubmitOrderResponse"];
+                };
+            };
+            /** @description Order placed. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmitOrderResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-            /** @description No authorised payment (`PAYMENT_NOT_AUTHORISED`) or `IDEMPOTENCY_KEY_REUSED`. */
+            404: components["responses"]["BasketNotFound"];
+            /**
+             * @description `PAYMENT_NOT_APPROVED`, `PAYMENT_DECLINED`, `PAYMENT_EXPIRED`, `BASKET_CHANGED` or
+             *     `IDEMPOTENCY_KEY_REUSED`.
+             */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
+                    /**
+                     * @example {
+                     *       "type": "/problems/payment-not-approved",
+                     *       "title": "The payment is not approved",
+                     *       "status": 409,
+                     *       "code": "PAYMENT_NOT_APPROVED"
+                     *     }
+                     */
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            422: components["responses"]["BasketRejected"];
+        };
+    };
+    getOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description `SubmitOrderResponse.number`. */
+                number: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmitOrderResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
     listKitchenOrders: {
@@ -3155,13 +3158,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Open orders. */
+            /** @description Orders. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["KitchenOrder"][];
+                    "application/json": components["schemas"]["SubmitOrderResponse"][];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -3184,7 +3187,7 @@ export interface operations {
                 content: {
                     /**
                      * @example event: order.paid
-                     *     data: {"id":"ord-7f3a","posCheckNumber":"42","orderType":"TAKE_OUT","status":"PAID","placedAt":"2026-10-30T12:04:10Z","readyAt":null,"lines":[{"name":"Croque monsieur","quantity":1,"options":["Brioche","Ovo pochê"]}]}
+                     *     data: {"number":"20261110-0042","customerCheckNumber":"42","status":"PAID","version":1}
                      */
                     "text/event-stream": string;
                 };
@@ -3197,7 +3200,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                orderId: components["parameters"]["OrderId"];
+                /** @description `SubmitOrderResponse.number`. */
+                number: components["parameters"]["OrderNumber"];
             };
             cookie?: never;
         };
@@ -3213,15 +3217,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["KitchenOrder"];
+                    "application/json": components["schemas"]["SubmitOrderResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
-            /**
-             * @description Not allowed from the current status or day (`INVALID_STATUS_TRANSITION`), or
-             *     the order is no longer at `expectedVersion` (`STALE_ORDER_VERSION`).
-             */
+            /** @description `INVALID_STATUS_TRANSITION` or `STALE_ORDER_VERSION`. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -3251,7 +3252,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["KitchenAvailability"];
+                    "application/json": components["schemas"]["LightMenuResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -3274,13 +3275,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        /**
-                         * @description Orders moved to NOT_COLLECTED.
-                         * @example 2
-                         */
-                        count: number;
-                    };
+                    "application/json": components["schemas"]["CloseDayResult"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -3358,7 +3353,7 @@ export interface operations {
             401: components["responses"]["InvalidCredentials"];
         };
     };
-    getRestaurant: {
+    getStore: {
         parameters: {
             query?: never;
             header?: never;
@@ -3373,13 +3368,13 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Restaurant"];
+                    "application/json": components["schemas"]["StoreConfigurationResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];
         };
     };
-    replaceRestaurant: {
+    replaceStore: {
         parameters: {
             query?: never;
             header?: never;
@@ -3388,7 +3383,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RestaurantInput"];
+                "application/json": components["schemas"]["StoreConfigurationResponse"];
             };
         };
         responses: {
@@ -3398,7 +3393,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Restaurant"];
+                    "application/json": components["schemas"]["StoreConfigurationResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -3417,6 +3412,8 @@ export interface operations {
                 "multipart/form-data": {
                     /** Format: binary */
                     file: string;
+                    /** @description Short description for screen readers. */
+                    altText?: string;
                 };
             };
         };
@@ -3432,6 +3429,27 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             422: components["responses"]["ValidationFailed"];
+        };
+    };
+    listImages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pictures. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaAsset"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
         };
     };
     listDevices: {
@@ -3555,57 +3573,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
-    createMenu: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MenuInput"];
-            };
-        };
-        responses: {
-            /** @description Created. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminMenu"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            422: components["responses"]["ValidationFailed"];
-        };
-    };
-    getMenu: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                menuId: components["parameters"]["MenuId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The menu. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminMenu"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    replaceMenu: {
+    putMenu: {
         parameters: {
             query?: never;
             header?: never;
@@ -3616,7 +3584,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["MenuInput"];
+                "application/json": components["schemas"]["AdminMenu"];
             };
         };
         responses: {
@@ -3630,8 +3598,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["ValidationFailed"];
+            422: components["responses"]["MenuInvalid"];
         };
     };
     deleteMenu: {
@@ -3673,7 +3640,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MenuSchedule"][];
+                    "application/json": components["schemas"]["PosEntitySectionHours"][];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -3694,18 +3661,13 @@ export interface operations {
                 /**
                  * @example [
                  *       {
-                 *         "weekday": "MON",
-                 *         "timeStart": "06:00",
-                 *         "timeEnd": "11:00"
-                 *       },
-                 *       {
-                 *         "weekday": "TUE",
-                 *         "timeStart": "06:00",
-                 *         "timeEnd": "11:00"
+                 *         "dayOfWeek": "MONDAY",
+                 *         "open": "06:00:00",
+                 *         "close": "11:00:00"
                  *       }
                  *     ]
                  */
-                "application/json": components["schemas"]["MenuSchedule"][];
+                "application/json": components["schemas"]["PosEntitySectionHours"][];
             };
         };
         responses: {
@@ -3715,7 +3677,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MenuSchedule"][];
+                    "application/json": components["schemas"]["PosEntitySectionHours"][];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -3729,6 +3691,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            422: components["responses"]["ValidationFailed"];
         };
     };
     forceMenu: {
@@ -3781,67 +3744,39 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
-    listCategories: {
+    listSections: {
         parameters: {
-            query: {
-                menuId: string;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Categories. */
+            /** @description Sections, with `translations`. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminCategory"][];
+                    "application/json": components["schemas"]["PosEntitySection"][];
                 };
             };
             401: components["responses"]["Unauthorized"];
         };
     };
-    createCategory: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CategoryInput"];
-            };
-        };
-        responses: {
-            /** @description Created. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminCategory"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            422: components["responses"]["ValidationFailed"];
-        };
-    };
-    replaceCategory: {
+    putSection: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                categoryId: components["parameters"]["CategoryId"];
+                sectionId: components["parameters"]["SectionId"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CategoryInput"];
+                "application/json": components["schemas"]["PosEntitySection"];
             };
         };
         responses: {
@@ -3851,20 +3786,19 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminCategory"];
+                    "application/json": components["schemas"]["PosEntitySection"];
                 };
             };
             401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["ValidationFailed"];
+            422: components["responses"]["MenuInvalid"];
         };
     };
-    deleteCategory: {
+    deleteSection: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                categoryId: components["parameters"]["CategoryId"];
+                sectionId: components["parameters"]["SectionId"];
             };
             cookie?: never;
         };
@@ -3879,47 +3813,22 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
-        };
-    };
-    replaceCategoryItems: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                categoryId: components["parameters"]["CategoryId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CategoryItemLink"][];
-            };
-        };
-        responses: {
-            /** @description Saved. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CategoryItemLink"][];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["ValidationFailed"];
+            422: components["responses"]["MenuInvalid"];
         };
     };
     listItems: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Only this entity type. */
+                type?: "ITEM" | "SIZED_ITEM" | "COMBO_MEAL";
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Items. */
+            /** @description Items, with `translations`. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3931,57 +3840,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
-    createItem: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ItemInput"];
-            };
-        };
-        responses: {
-            /** @description Created. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminItem"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            422: components["responses"]["ValidationFailed"];
-        };
-    };
-    getItem: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                itemId: components["parameters"]["ItemId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The item. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminItem"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    replaceItem: {
+    putItem: {
         parameters: {
             query?: never;
             header?: never;
@@ -3992,7 +3851,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ItemInput"];
+                "application/json": components["schemas"]["AdminItem"];
             };
         };
         responses: {
@@ -4006,8 +3865,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["ValidationFailed"];
+            422: components["responses"]["MenuInvalid"];
         };
     };
     deleteItem: {
@@ -4030,9 +3888,10 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["MenuInvalid"];
         };
     };
-    markItemSoldOut: {
+    setItemAvailability: {
         parameters: {
             query?: never;
             header?: never;
@@ -4041,106 +3900,9 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Marked. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminItem"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    clearItemSoldOut: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                itemId: components["parameters"]["ItemId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Cleared. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminItem"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    listOptionGroups: {
-        parameters: {
-            query: {
-                itemId: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Option groups. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminOptionGroup"][];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    createOptionGroup: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["OptionGroupInput"];
-            };
-        };
-        responses: {
-            /** @description Created. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminOptionGroup"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            422: components["responses"]["ValidationFailed"];
-        };
-    };
-    replaceOptionGroup: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                optionGroupId: components["parameters"]["OptionGroupId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["OptionGroupInput"];
+                "application/json": components["schemas"]["AvailabilityUpdate"];
             };
         };
         responses: {
@@ -4150,20 +3912,68 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminOptionGroup"];
+                    "application/json": components["schemas"]["LightMenuResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
-            422: components["responses"]["ValidationFailed"];
         };
     };
-    deleteOptionGroup: {
+    listModifierGroups: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Groups, with `translations`. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosEntityModifier"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    putModifierGroup: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                optionGroupId: components["parameters"]["OptionGroupId"];
+                modifierGroupId: components["parameters"]["ModifierGroupId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosEntityModifier"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosEntityModifier"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["MenuInvalid"];
+        };
+    };
+    deleteModifierGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                modifierGroupId: components["parameters"]["ModifierGroupId"];
             };
             cookie?: never;
         };
@@ -4178,9 +3988,10 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["MenuInvalid"];
         };
     };
-    listTags: {
+    listSwapSells: {
         parameters: {
             query?: never;
             header?: never;
@@ -4189,56 +4000,30 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Tags. */
+            /** @description Swap sells, with `translations`. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminTag"][];
+                    "application/json": components["schemas"]["PosEntitySwapSell"][];
                 };
             };
             401: components["responses"]["Unauthorized"];
         };
     };
-    createTag: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TagInput"];
-            };
-        };
-        responses: {
-            /** @description Created. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminTag"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            422: components["responses"]["ValidationFailed"];
-        };
-    };
-    replaceTag: {
+    putSwapSell: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                tagId: components["parameters"]["TagId"];
+                swapSellId: components["parameters"]["SwapSellId"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["TagInput"];
+                "application/json": components["schemas"]["PosEntitySwapSell"];
             };
         };
         responses: {
@@ -4248,20 +4033,19 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminTag"];
+                    "application/json": components["schemas"]["PosEntitySwapSell"];
                 };
             };
             401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["ValidationFailed"];
+            422: components["responses"]["MenuInvalid"];
         };
     };
-    deleteTag: {
+    deleteSwapSell: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                tagId: components["parameters"]["TagId"];
+                swapSellId: components["parameters"]["SwapSellId"];
             };
             cookie?: never;
         };
@@ -4276,9 +4060,10 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["MenuInvalid"];
         };
     };
-    listCrossSellGroups: {
+    listBadges: {
         parameters: {
             query?: never;
             header?: never;
@@ -4287,56 +4072,30 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Groups. */
+            /** @description Badges, with `translations`. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminCrossSellGroup"][];
+                    "application/json": components["schemas"]["Badge"][];
                 };
             };
             401: components["responses"]["Unauthorized"];
         };
     };
-    createCrossSellGroup: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CrossSellGroupInput"];
-            };
-        };
-        responses: {
-            /** @description Created. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminCrossSellGroup"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            422: components["responses"]["ValidationFailed"];
-        };
-    };
-    replaceCrossSellGroup: {
+    putBadge: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                crossSellGroupId: components["parameters"]["CrossSellGroupId"];
+                badgeId: components["parameters"]["BadgeId"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CrossSellGroupInput"];
+                "application/json": components["schemas"]["Badge"];
             };
         };
         responses: {
@@ -4346,20 +4105,19 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminCrossSellGroup"];
+                    "application/json": components["schemas"]["Badge"];
                 };
             };
             401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationFailed"];
         };
     };
-    deleteCrossSellGroup: {
+    deleteBadge: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                crossSellGroupId: components["parameters"]["CrossSellGroupId"];
+                badgeId: components["parameters"]["BadgeId"];
             };
             cookie?: never;
         };
@@ -4374,9 +4132,10 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["MenuInvalid"];
         };
     };
-    listDiscounts: {
+    listDiscountRules: {
         parameters: {
             query?: never;
             header?: never;
@@ -4385,42 +4144,44 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Discounts. */
+            /** @description Coupons. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminDiscount"][];
+                    "application/json": components["schemas"]["DiscountRule"][];
                 };
             };
             401: components["responses"]["Unauthorized"];
         };
     };
-    createDiscount: {
+    putDiscountRule: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                discountRuleId: components["parameters"]["DiscountRuleId"];
+            };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["DiscountInput"];
+                "application/json": components["schemas"]["DiscountRule"];
             };
         };
         responses: {
-            /** @description Created. */
-            201: {
+            /** @description Saved. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminDiscount"];
+                    "application/json": components["schemas"]["DiscountRule"];
                 };
             };
             401: components["responses"]["Unauthorized"];
-            /** @description Code already used by another discount (`DISCOUNT_CODE_TAKEN`). */
+            /** @description Code already used by another coupon (`DISCOUNT_CODE_TAKEN`). */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -4432,50 +4193,12 @@ export interface operations {
             422: components["responses"]["ValidationFailed"];
         };
     };
-    replaceDiscount: {
+    deleteDiscountRule: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                discountId: components["parameters"]["DiscountId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DiscountInput"];
-            };
-        };
-        responses: {
-            /** @description Saved. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminDiscount"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-            /** @description Code already used by another discount (`DISCOUNT_CODE_TAKEN`). */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            422: components["responses"]["ValidationFailed"];
-        };
-    };
-    deleteDiscount: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                discountId: components["parameters"]["DiscountId"];
+                discountRuleId: components["parameters"]["DiscountRuleId"];
             };
             cookie?: never;
         };
@@ -4497,7 +4220,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                orderId: components["parameters"]["OrderId"];
+                /** @description `SubmitOrderResponse.number`. */
+                number: components["parameters"]["OrderNumber"];
             };
             cookie?: never;
         };
@@ -4513,7 +4237,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["KitchenOrder"];
+                    "application/json": components["schemas"]["SubmitOrderResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -4606,8 +4330,8 @@ export interface operations {
         parameters: {
             query: {
                 /**
-                 * @description Business date in the restaurant's timezone.
-                 * @example 2026-10-30
+                 * @description Business date in the store's timezone (days start at `businessDayCutoff`).
+                 * @example 2026-11-10
                  */
                 date: string;
             };
@@ -4627,6 +4351,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            422: components["responses"]["ValidationFailed"];
         };
     };
 }

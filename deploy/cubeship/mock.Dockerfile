@@ -1,6 +1,6 @@
 # Stateful mock Core API behind Prism, standing in for the Go API until it exists.
-# Build context: repo root. Prism (validated, contract paths) on 4010, the mock's own
-# port (media, kitchen stream) on 4020.
+# Build context: repo root. Prism (validated against contract/openapi.yaml) on 4010, the
+# mock's own port (media, kitchen stream) on 4020.
 FROM node:24-slim
 WORKDIR /repo/apps/web
 COPY apps/web/package.json apps/web/package-lock.json ./
