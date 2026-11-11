@@ -1,8 +1,8 @@
 # Comanda contract
 
 `openapi.yaml` is the contract between the **Comanda BFF** (Next.js server routes, Kai) and the
-**Comanda Core API** (Go, partner), for the dine-in pilot (`docs/pilot-v2/SPEC.md`). It is the
-source of truth: the TypeScript types and the Go server interface are both generated from it, so
+**Comanda Core API** (Java, Bruno), for the dine-in pilot (`docs/pilot-v2/SPEC.md`). It is the
+source of truth: the TypeScript types and the Java server interface are both generated from it, so
 neither side can drift without the build noticing.
 
 Version `2.0.0` · 64 operations · OpenAPI 3.0.3 · every path under `/v2`. Every data model follows
@@ -16,7 +16,7 @@ pilot phase 5 (COM-149); git history has it.
 
 | Rule | Detail |
 |:--|:--|
-| Money | JSON number in BRL, main currency unit, 2 decimals: `28.00` = R$ 28,00. Never cents. Go rounds discounts per line, half up, to the cent, then sums. No tax in the pilot (`tax: 0`, `taxes: []`). |
+| Money | JSON number in BRL, main currency unit, 2 decimals: `28.00` = R$ 28,00. Never cents. The Core API rounds discounts per line, half up, to the cent, then sums. No tax in the pilot (`tax: 0`, `taxes: []`). |
 | Names | MODELS.md names and fields. `x-comanda: true` marks what Comanda adds (see "Reading the file"). |
 | Time | Timestamps in UTC ISO 8601. Business dates `YYYY-MM-DD` and opening hours `HH:MM[:SS]` in the store's timezone. |
 | IDs | Strings, never containing `::`. An entity is `type` + `id`. Back-office writes take the id in the path, pattern `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`. |
@@ -24,9 +24,9 @@ pilot phase 5 (COM-149); git history has it.
 | Retries | `POST /v2/payments` and `POST /v2/orders` require `Idempotency-Key` (UUID). Same key + same body returns the first result; same key + different body is `409 IDEMPOTENCY_KEY_REUSED`. |
 | Caching | `GET /v2/devices/me/config` and `GET /v2/menus/active` return an `ETag`; `If-None-Match` gets `304`. |
 | Language | Guest endpoints return text resolved to `language` (`pt-BR` or `en`). The back office edits `translations`; `LocalizedText` has `pt-BR` required, `en` optional. |
-| Prices | The Go API prices everything (`POST /v2/totals`). The kiosk sends entity ids, never prices. |
+| Prices | The Core API prices everything (`POST /v2/totals`). The kiosk sends entity ids, never prices. |
 | Order type | Dine-in only: every order is `DINEIN` (`ORDER_TYPE_UNAVAILABLE` otherwise). |
-| Payment | Mercado Pago Pix and Point, called only by Go, anchored on `basketId`; the order is placed after approval. |
+| Payment | Mercado Pago Pix and Point, called only by the Core API, anchored on `basketId`; the order is placed after approval. |
 | Order id | `number` (the id) + `customerCheckNumber` (the short daily number on the success screen). |
 | Availability | `available` on/off, kept until changed. No "sold out today". |
 | Fiscal | No NFC-e and no CPF step in the pilot; the success screen shows the store's `invoiceNotice`. |
@@ -61,13 +61,13 @@ pilot phase 5 (COM-149); git history has it.
    (`Problem.errors[].rule` + `.entity`).
 3. **Product ids are unique across `ITEM`, `SIZED_ITEM`, `COMBO_MEAL`**, so `crossSellIds` and
    `/v2/admin/items/{itemId}` are unambiguous. Cross-sells are edited on the item.
-4. **An option is linked from at most one group of the same parent**, so Go finds an order line's
+4. **An option is linked from at most one group of the same parent**, so the Core API finds an order line's
    group from its parent (`OrderItem` has no group id).
-5. **`OrderItem.itemPrice` is optional on requests**: the kiosk sends ids only; Go prices every line
+5. **`OrderItem.itemPrice` is optional on requests**: the kiosk sends ids only; the Core API prices every line
    and ignores client prices and totals.
-6. **Section hours are resolved by Go**: outside its `availableHours` a section is sent with
+6. **Section hours are resolved by the Core API**: outside its `availableHours` a section is sent with
    `available: false`. `included` on groups is ignored in the pilot.
-7. **Exactly one order per paid basket**: `POST /v2/orders` is idempotent on `basketId`, and Go must
+7. **Exactly one order per paid basket**: `POST /v2/orders` is idempotent on `basketId`, and the Core API must
    place the order from the Mercado Pago webhook when the kiosk never calls it.
 8. **Availability**: one path for products, options and sizes
    (`PUT /v2/admin/items/{itemId}/availability`) and the kitchen's `PUT /v2/kitchen/availability`;
@@ -87,37 +87,36 @@ The BFF reaches the Core API at `CORE_API_URL` (`http://localhost:4010` with the
 server-only client in `apps/web/src/lib/core/client.ts` (`coreApi()`). The device and owner tokens
 never reach the browser.
 
-## Back end (partner)
+## Back end (Bruno, Java)
 
-```bash
-go get -tool github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
-```
+The Core API is written in Java (it was planned in Go; nothing in the contract depends on the
+language). Generate the server interfaces and the models from `openapi.yaml` and implement them;
+do not write them by hand, so a contract change breaks the build instead of drifting. Any generator
+that reads OpenAPI 3.0.3 works. With OpenAPI Generator, for example, the `spring` generator in
+interface-only mode gives the interfaces to implement, one method per `operationId`.
 
-The generator itself needs Go 1.25+ to build; the generated `net/http` server needs Go 1.24+.
+What the BFF sends and expects, where a Java stack usually needs a setting:
 
-```yaml
-# api/internal/api/cfg.yaml
-package: api
-output: api.gen.go
-generate:
-  models: true
-  std-http-server: true
-  strict-server: true
-```
+| Topic | What the contract needs |
+|:--|:--|
+| Money | `Money` is a JSON **number** with at most 2 decimals. Use `BigDecimal` in code (the schema says `double` only for the wire), round half up, and never write it as a string or in cents. |
+| Absent values | Leave an optional field out when it has no value. `null` is valid only where the schema says `nullable: true`. A field that is both required and nullable (`DeviceConfig.nextOpeningAt`) must be there, as `null`. Lists the reader walks (`root`, `links`) are `[]`, never `null`. |
+| Timestamps | ISO 8601 in UTC with `Z` (`2026-11-10T12:00:00Z`), never an epoch number. |
+| Unknown fields | Ignore what the client sends and the schema does not need: the kiosk may send prices and totals, and they are ignored. |
+| Errors | **Every** answer that is not 2xx or 304 is `application/problem+json` with `type`, `title`, `status` and `code`, including the ones a framework writes by itself: unknown route (`404 NOT_FOUND`), missing or expired token (`401 UNAUTHORIZED`), a body that breaks a field rule (`422 VALIDATION_FAILED`; the contract has no `400`). The BFF switches on `code`. |
+| Tokens | Two bearer tokens: device (`POST /v2/devices/auth`) and owner (`POST /v2/admin/auth/login`), `expiresIn` in seconds. On a `401` the BFF signs the device in again and repeats the call once. The owner has no refresh: when the token expires the owner types the password again, so its lifetime is the length of a back-office session (the mock uses 8 h, and 15 min for devices). |
+| Time limits | The BFF gives up on any call after **5 s** (30 s for pictures) and treats a timeout or a `5xx` as "outcome unknown". `POST /v2/payments` and `POST /v2/orders` are then repeated with the same `Idempotency-Key` for up to 15 s, so both must answer fast and return the first result for a repeated key. |
+| Caching | `ETag` on `GET /v2/devices/me/config` and `GET /v2/menus/active`; a matching `If-None-Match` answers `304` with no body. |
+| Kitchen stream | `text/event-stream`, each event flushed as it happens, a `: ping` comment every 15 s, no compression or buffering in between. The BFF opens it from the server with the device token in `Authorization`. |
+| Pictures | `POST /v2/admin/media` is `multipart/form-data` (the back office sends at most 5 MB, images only). See "Open questions" for where pictures are read. |
+| CORS | Not needed: only the Next.js server calls the Core API, never a browser. |
+| First data | No operation creates the store or the owner, so the Core API starts with one store and one owner. Devices are created in the back office (`POST /v2/admin/devices`). |
+| Mercado Pago | The webhook Mercado Pago calls is the Core API's own endpoint and is not in this contract. |
 
-```go
-//go:generate go tool oapi-codegen -config cfg.yaml ../../../contract/openapi.yaml
-```
+`GET /v2/orders/{number}` is in the contract but the app does not call it today.
+`POST /v2/payments/{id}/simulate` is called only in tests, never by the app.
 
-Implement `StrictServerInterface` (one method per operation, typed request and response objects),
-then mount it:
-
-```go
-mux := http.NewServeMux()
-handler := api.HandlerFromMux(api.NewStrictHandler(impl, nil), mux)
-```
-
-Things the contract expects from the implementation:
+What the contract expects from the implementation:
 
 - **Pricing**: `POST /v2/totals` and `POST /v2/orders` price every line from the catalogue; client
   prices and totals are ignored.
@@ -136,19 +135,25 @@ Things the contract expects from the implementation:
   `409 STALE_ORDER_VERSION`. Backward moves (READY → PREPARING, COLLECTED → READY) only on the
   order's own business day.
 - **Store pace**: one per store. PAUSED sets `atCapacityMode` on every kiosk until `pausedUntil`,
-  then Go returns to NORMAL by itself and sends `store.pace_changed`. The wait time on the success
-  screen is the owner's minutes for NORMAL or BUSY.
+  then the Core API returns to NORMAL by itself and sends `store.pace_changed`. The wait time on the
+  success screen is the owner's minutes for NORMAL or BUSY.
 
-## Checking the Go API against the contract
+The mock in `apps/web/mock/v2` is a working example of every operation (TypeScript, in memory):
+when the contract's words leave a doubt, it shows the behaviour the front end was built against.
+`apps/web/mock/smoke.ts` calls all 64 operations in order.
+
+## Checking the Core API against the contract
 
 ```bash
-# Go API on :8080; Prism validates every request and response that passes through
+# Core API on :8080; Prism validates every request and response that passes through
 npx @stoplight/prism-cli proxy contract/openapi.yaml http://localhost:8080 -p 4010 --errors
-CORE_API_URL=http://localhost:4010
 ```
 
-Any field the Go API returns that the contract does not describe (or the other way round) comes back
-as an error, so drift shows up during development, not on the kiosk.
+Then run the app with `CORE_API_URL=http://localhost:4010`, and `CORE_MEDIA_URL` and
+`CORE_STREAM_URL` set to `http://localhost:8080` (Prism cannot pass pictures or a stream through).
+Any field the Core API returns that the contract does not describe (or the other way round) comes
+back as an error, so drift shows up during development, not on the kiosk. `README.md` at the root
+has the rest of the local setup.
 
 ## Changing the contract
 
@@ -160,10 +165,15 @@ as an error, so drift shows up during development, not on the kiosk.
 
 ## Open questions
 
-From `docs/data-model-and-api.md`. The pilot SPEC (section 9) settles order number reset (per
-business day, from `businessDayCutoff`), offline (a "Temporariamente offline" screen, no selling from
-a cached menu) and device pairing (id + secret typed at `/setup`). Still open:
+The pilot SPEC (section 9) settles order number reset (per business day, from
+`businessDayCutoff`), offline (a "Temporariamente offline" screen, no selling from a cached menu)
+and device pairing (id + secret typed at `/setup`). A price that changed during a journey is
+settled by the contract: `409 BASKET_CHANGED`, and the guest confirms the new total. Still open:
 
-- Price changed during a journey: Go re-prices on `POST /v2/orders`; what the guest sees when the
-  total moved is not decided.
-- Where the device secret lives on the Go side (the BFF keeps it sealed in an HttpOnly cookie).
+- **Where pictures are read.** The contract has the upload and `PosEntityImage.url` ("absolute, or
+  a path"), but no operation that serves the file. Today the app only works with a path like
+  `/media/croissant.jpg`: the BFF reads it from the Core API at `GET /media/croissant.jpg`, without
+  a token, and resizes it. An absolute address (a bucket, a CDN) needs a change in the app first.
+  To decide, then write into `openapi.yaml`.
+- Where the device secret lives on the Core API side (the BFF keeps it sealed in an HttpOnly
+  cookie).
