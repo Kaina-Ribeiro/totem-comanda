@@ -300,7 +300,11 @@ Follow these rules exactly. If a request conflicts with them, stop and say which
   Cubeship app list is the source of truth for the address). `web` is limited to 1 CPU like prod and
   keeps the image optimizer's cache in a volume at `/repo/apps/web/.next/cache/images` (12 Nov 2026,
   COM-173), so resized photos survive a deploy; an app with a volume stops before the new container
-  starts, so each deploy has a short gap. Prod has no such volume yet (needs Kai's yes).
+  starts, so each deploy has a short gap. Prod's `web` has the same volume since 13 Nov 2026
+  (COM-173), mounted from its next deploy (a `v0.6.x` tag; the `v0.5.2` image lacks the directory).
+  Prod deploys are always done outside opening hours (Kai, 13 Nov 2026), so those few seconds
+  without answers are accepted. The itodev volume is not needed and stays only until Kai removes
+  it in the Cubeship panel (no tool removes a volume).
   `DEPLOY_TEST_APPS="comanda/itodev/mock comanda/itodev/web"`, so every new rc deploys there by
   itself (mock first). `web` reaches `http://cubeship-comanda-itodev-mock:4010`/`:4020`, has its own
   `DEVICE_COOKIE_SECRET`, and `mock` runs with `MOCK_AUTO_DEVICES=1`.
