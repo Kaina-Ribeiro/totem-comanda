@@ -1,9 +1,12 @@
 // The v2 mock's starting data: the complete menu of MODELS.md 5.20 without tax,
 // named in pt-BR with the original English in `translations.en`, two scheduled
 // menus over that catalogue (06:00–11:00 and 11:00–20:00), store settings, a
-// badge and three coupons.
+// badge and three coupons. Abigail Coffee's menu (seed-abigail.ts, with photos)
+// comes first in both menus so the kiosk demo shows real food; MOCK_MENU=reference
+// leaves it out.
 
 import type { Entity, S } from "./http.ts";
+import { ABIGAIL_CATEGORY_IDS, abigailEntities } from "./seed-abigail.ts";
 
 type Hours = S["PosEntitySectionHours"];
 type Day = Hours["dayOfWeek"];
@@ -194,17 +197,25 @@ export function seedEntities(): Entity[] {
     image("1001", "Hambúrguer clássico", "croque-monsieur.jpg"),
     image("2001", "Refrigerante de cola", "cookie.jpg"),
     image("3001", "Combo hambúrguer", "misto-quente.jpg"),
+    ...(demoMenu() ? abigailEntities() : []),
   ];
 }
 
 export type MockMenuV2 = Omit<S["AdminMenu"], "isActive"> & { schedules: Hours[] };
+
+/**
+ * Abigail Coffee's menu goes in front unless MOCK_MENU=reference, which keeps
+ * only the MODELS 5.20 menu (the tests run that way: vitest.config.mts).
+ */
+export const demoMenu = () => process.env.MOCK_MENU !== "reference";
+const abigail = () => (demoMenu() ? ABIGAIL_CATEGORY_IDS.map((id) => link("CATEGORY", id)) : []);
 
 export const seedMenus = (): MockMenuV2[] => [
   {
     id: "mnu-manha",
     name: "Manhã",
     translations: en("Morning"),
-    root: [link("CATEGORY", "200"), link("CATEGORY", "100")],
+    root: [...abigail(), link("CATEGORY", "200"), link("CATEGORY", "100")],
     forcedUntil: null,
     schedules: daily("06:00:00", "11:00:00"),
   },
@@ -212,7 +223,7 @@ export const seedMenus = (): MockMenuV2[] => [
     id: "mnu-tarde",
     name: "Tarde",
     translations: en("Afternoon"),
-    root: [link("CATEGORY", "100"), link("CATEGORY", "200"), link("CATEGORY", "300")],
+    root: [...abigail(), link("CATEGORY", "100"), link("CATEGORY", "200"), link("CATEGORY", "300")],
     forcedUntil: null,
     schedules: daily("11:00:00", "20:00:00"),
   },

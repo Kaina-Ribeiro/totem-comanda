@@ -1,3 +1,5 @@
+import { ABIGAIL_MEDIA } from "./v2/seed-abigail.ts";
+
 // Multipart upload parsing and image size sniffing for POST /v2/admin/media.
 
 export type UploadedFile = { filename: string; type: string; bytes: Buffer };
@@ -47,23 +49,39 @@ export function imageSize(bytes: Buffer): { width: number; height: number } {
   return { width: 0, height: 0 };
 }
 
+const PROTOTYPE = new URL("../../../docs/prototype/assets/", import.meta.url);
+const ABIGAIL = new URL("./media/abigail/", import.meta.url);
+
 /**
- * Media files the mock serves under /media, mapped to the prototype's photos
- * (docs/prototype/assets). The Go API will serve uploads the same way.
+ * Media files the mock serves under /media: the prototype's photos
+ * (docs/prototype/assets) and Abigail Coffee's (mock/media/abigail). The Core
+ * API will serve uploads the same way.
  */
-export const SEED_MEDIA: Record<string, string> = {
-  "fermentacao-natural.jpg": "sourdough.jpg",
-  "baguete.jpg": "baguette.jpg",
-  "brioche.jpg": "brioche.jpg",
-  "centeio.jpg": "rye.jpg",
-  "pao-de-forma.jpg": "forma.jpg",
-  "croissant.jpg": "croissant.jpg",
-  "pain-au-chocolat.jpg": "choco.jpg",
-  "cookie.jpg": "cookie.jpg",
-  "cupcake.jpg": "cupcake.jpg",
-  "donut.jpg": "donut.jpg",
-  "croque-monsieur.jpg": "sandwich.jpg",
-  "misto-quente.jpg": "bread.jpg",
-  "cappuccino.jpg": "cappuccino.jpg",
-  "latte.jpg": "latte.jpg",
+export const SEED_MEDIA: Record<string, URL> = {
+  ...Object.fromEntries(
+    Object.entries({
+      "fermentacao-natural.jpg": "sourdough.jpg",
+      "baguete.jpg": "baguette.jpg",
+      "brioche.jpg": "brioche.jpg",
+      "centeio.jpg": "rye.jpg",
+      "pao-de-forma.jpg": "forma.jpg",
+      "croissant.jpg": "croissant.jpg",
+      "pain-au-chocolat.jpg": "choco.jpg",
+      "cookie.jpg": "cookie.jpg",
+      "cupcake.jpg": "cupcake.jpg",
+      "donut.jpg": "donut.jpg",
+      "croque-monsieur.jpg": "sandwich.jpg",
+      "misto-quente.jpg": "bread.jpg",
+      "cappuccino.jpg": "cappuccino.jpg",
+      "latte.jpg": "latte.jpg",
+    }).map(([name, file]) => [name, new URL(file, PROTOTYPE)]),
+  ),
+  ...Object.fromEntries(ABIGAIL_MEDIA.map((name) => [name, new URL(name, ABIGAIL)])),
 };
+
+/** Content type of a seed media file, by extension. */
+export function mediaType(name: string): string {
+  if (name.endsWith(".webp")) return "image/webp";
+  if (name.endsWith(".png")) return "image/png";
+  return "image/jpeg";
+}
