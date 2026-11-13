@@ -26,6 +26,16 @@ function renderItem(productId: string) {
 const add = () => screen.getByRole<HTMLButtonElement>("button", { name: strings["item.addToOrder"] });
 
 describe("ItemScreen (v2 groups)", () => {
+  it("puts the menu thumbnail under the item photo, so a photo is on screen at once", () => {
+    renderItem("1001");
+    const photos = [...document.querySelectorAll("img")];
+    expect(photos.map((photo) => photo.getAttribute("width") ?? photo.getAttribute("sizes"))).toEqual(["384", "1080px"]);
+    expect(photos.map((photo) => photo.getAttribute("src"))).toEqual([
+      "/media/croque-monsieur.jpg",
+      "/media/croque-monsieur.jpg",
+    ]);
+  });
+
   it("asks for a size first and sends it as a pick; the button carries no total", async () => {
     const onSave = renderItem("2001");
     expect(add().disabled).toBe(true);

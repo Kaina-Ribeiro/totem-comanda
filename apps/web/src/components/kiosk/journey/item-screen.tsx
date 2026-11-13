@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { type ReactNode, useState } from "react";
 
 import { formatMoney } from "@/lib/format/money";
@@ -22,6 +21,7 @@ import { format, type Strings } from "@/lib/kiosk/strings";
 
 import { Check, ChevronLeft, Minus, Plus } from "../icons";
 import { Badges, productPrice } from "./menu-screen";
+import { Photo } from "./photo";
 
 /**
  * Prototype 04-Item at 1080x1920 on the v2 groups (SPEC 5.3): sizes first,
@@ -54,7 +54,11 @@ export function ItemScreen({
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="relative h-[570px] bg-wheat">
           {product.picture && (
-            <Image src={product.picture.url} alt={product.picture.alt ?? ""} fill sizes="1080px" priority className="object-cover" />
+            <>
+              {/* The grid thumbnail, already in the browser, holds the place until the full photo fades in over it. */}
+              <Photo picture={product.picture} variant="thumb" decorative />
+              <Photo picture={product.picture} variant="hero" preload />
+            </>
           )}
           <button
             onClick={onBack}

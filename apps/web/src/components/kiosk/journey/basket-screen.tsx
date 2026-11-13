@@ -1,4 +1,3 @@
-import Image from "next/image";
 import type { ReactNode } from "react";
 
 import { formatMoney } from "@/lib/format/money";
@@ -8,6 +7,7 @@ import { format, type Strings } from "@/lib/kiosk/strings";
 
 import { ChevronLeft, Minus, Plus } from "../icons";
 import { currentTotals, currentTotalsFailure, type Journey, lastTotal } from "./journey-state";
+import { Photo } from "./photo";
 
 export { CancelDialog } from "./cancel-dialog";
 
@@ -184,7 +184,7 @@ function LineRow({
     <li className="flex gap-[30px] border-b border-line py-[42px] last:border-0">
       <div className="relative size-[132px] shrink-0 overflow-hidden rounded-[24px] bg-wheat">
         {product.picture ? (
-          <Image src={product.picture.url} alt="" fill sizes="132px" className="object-cover" />
+          <Photo picture={product.picture} variant="thumb" decorative />
         ) : (
           <span className="flex size-full items-center justify-center font-display text-[60px] font-semibold text-ink/25">
             {product.name.charAt(0)}

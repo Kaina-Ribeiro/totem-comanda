@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { useState } from "react";
 
 import type { BasketLine } from "@/lib/kiosk/basket";
@@ -8,6 +7,7 @@ import type { Strings } from "@/lib/kiosk/strings";
 
 import { Check } from "../icons";
 import { productPrice } from "./menu-screen";
+import { Photo } from "./photo";
 
 /**
  * "Que tal acompanhar?" after a product is added (`crossSellIds`). Not drawn
@@ -66,7 +66,7 @@ export function CrossSellSheet({
               >
                 <div className="relative h-[240px] overflow-hidden rounded-[27px] bg-oat">
                   {p.picture ? (
-                    <Image src={p.picture.url} alt="" fill sizes="440px" className="object-cover" />
+                    <Photo picture={p.picture} variant="thumb" decorative />
                   ) : (
                     <span className="flex size-full items-center justify-center font-display text-[96px] font-semibold text-ink/25">
                       {p.name.charAt(0)}

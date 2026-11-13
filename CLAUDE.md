@@ -132,7 +132,16 @@ editor, 4 kitchen, store, devices, orders, report). The Core API needs all 64.
 - The attract, closed and unavailable screens are Server Components. Client code only for the
   journey (menu, item builder, basket, checkout and the success screen with its countdown), the
   paused screen and the idle timer.
-- Images through `next/image`, sized for 1080x1920; cached by the service worker.
+- Menu photos (COM-173) go through `<Photo>` (`components/kiosk/journey/photo.tsx`), in two variants
+  only (`PHOTO_PROPS`, `src/lib/kiosk/photos.ts`): `thumb` (one fixed 384 px width, used by the grid,
+  the basket and the swap and cross-sell sheets) and `hero` (the item screen, over the thumbnail).
+  Never give the thumbnail `fill sizes`: Chromium then draws the 1080 px variant it already holds
+  and decodes it for every cell. Right after the menu loads, the journey preloads every photo in
+  the background (`photo-preload.ts`), so a category or an item opens with no image request.
+- The service worker keeps photos for 30 days (`photos` cache in `src/app/sw.ts`, up to 600) and
+  the optimizer for a day (`images.minimumCacheTTL`; not longer while COM-45 is open). On the first
+  kiosk render after a start, then every 10 minutes, the server resizes the active menu's photos
+  in the background (`warmMenuPhotos`, production only), in the widths of `KIOSK_PHOTO_WIDTHS`.
 - CSS transitions only. No blur or heavy shadows in animation.
 - Keep the bundle in check with `npm run analyze` (baseline: ~181 KB gzip of JS on `/kiosk`); the
   real board is tested in phase 4, so do not let client code grow without a reason.
@@ -166,6 +175,9 @@ npm run mock:orders -- 3 --days-ago 7   # ...on the same weekday last week (Iní
 # /kiosk). In dev with the mock, "Totem" and "Cozinha" on / pair this browser as the mock's
 # device of that kind first.
 # Extend apps/web/mock with the operations each story needs; Prism flags any drift from the contract.
+# The mock's menu is Abigail Coffee's (mock/v2/seed-abigail.ts, photos in mock/media/abigail, invented
+# prices) in front of the MODELS 5.20 reference menu; MOCK_MENU=reference keeps only the reference menu,
+# which is how vitest runs (vitest.config.mts), so tests assert on MODELS 5.20 alone.
 # Mercado Pago is simulated: MOCK_PAYMENT_OUTCOME=APPROVED|DECLINED|EXPIRED|NONE (default APPROVED)
 # after MOCK_PAYMENT_DELAY_MS (3000); POST /__mock/payments/{id} {"outcome": …} decides one session.
 # To see a Pix or card outcome, run the mock with MOCK_PAYMENT_OUTCOME=NONE and decide the waiting
@@ -177,6 +189,10 @@ npm run mock:smoke                      # with the mock running: every operation
 # ("sem Tomate", always pt-BR, built in toOrderItems), so every call that sends the basket carries it.
 # Ports taken by another worktree? MOCK_PORT and PRISM_PORT move the mock (then set CORE_API_URL
 # and MOCK_CONTROL_URL to match).
+
+# The service worker's caches and the photo warm-up run only in a production build. To see them
+# locally, with the mock running (`web-prod` in .claude/launch.json):
+npm run build && npm run start
 
 # Regenerate API types after any contract change (in apps/web)
 npm run gen:api        # contract/openapi.yaml → src/lib/core-api.d.ts
@@ -279,7 +295,16 @@ Follow these rules exactly. If a request conflicts with them, stop and say which
   `CUBESHIP_URL` and the `CUBESHIP_TOKEN` secret); then the merge into master tags it final.
   Without those variables, deploy by hand after `node .git/release.mjs deploy-check <rc> --prod` passes.
 - Test stage is the Cubeship environment `itodev` (5 Nov 2026, COM-70): apps `comanda/itodev/mock`
-  and `comanda/itodev/web`, same Dockerfiles as prod, at https://comanda-itodev.5-189-167-204.sslip.io.
+  and `comanda/itodev/web`, same Dockerfiles as prod, at https://comanda-itodev.13-140-33-41.sslip.io
+  (prod: https://comanda.13-140-33-41.sslip.io; the instance moved from `5.189.167.204`, and the
+  Cubeship app list is the source of truth for the address). `web` is limited to 1 CPU like prod and
+  keeps the image optimizer's cache in a volume at `/repo/apps/web/.next/cache/images` (12 Nov 2026,
+  COM-173), so resized photos survive a deploy; an app with a volume stops before the new container
+  starts, so each deploy has a short gap. Prod's `web` has the same volume since 13 Nov 2026
+  (COM-173), mounted from its next deploy (a `v0.6.x` tag; the `v0.5.2` image lacks the directory).
+  Prod deploys are always done outside opening hours (Kai, 13 Nov 2026), so those few seconds
+  without answers are accepted. The itodev volume is not needed and stays only until Kai removes
+  it in the Cubeship panel (no tool removes a volume).
   `DEPLOY_TEST_APPS="comanda/itodev/mock comanda/itodev/web"`, so every new rc deploys there by
   itself (mock first). `web` reaches `http://cubeship-comanda-itodev-mock:4010`/`:4020`, has its own
   `DEVICE_COOKIE_SECRET`, and `mock` runs with `MOCK_AUTO_DEVICES=1`.
