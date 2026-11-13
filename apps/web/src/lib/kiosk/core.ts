@@ -8,7 +8,10 @@ import type { components } from "@/lib/core-api";
 import { getDeviceConfig } from "@/lib/device/config";
 import { asDevice, DeviceAuthError, type DeviceAuthHeaders } from "@/lib/device/session";
 
+import { readMenu } from "./menu-graph";
+import { menuPhotos } from "./photos";
 import type { Language } from "./strings";
+import { photoWarmer } from "./warm-photos";
 
 // The kiosk's way to the Core API (pilot, COM-146). The device token comes
 // from the shared device session (lib/device/session.ts).
@@ -102,6 +105,28 @@ export async function loadLanguagePack(language: Language): Promise<Record<strin
     coreApi().GET("/v2/languages/{code}", { headers, params: { path: { code: language } } }),
   );
   return result.ok ? result.data.strings : {};
+}
+
+/**
+ * Resizes the active menu's photos in the background when it is time: on the
+ * first kiosk render after the server starts, then every ten minutes. The
+ * optimizer's work is then done before a guest opens the menu (COM-173).
+ * Production only. The menu is read here, during the render, because that
+ * needs the device cookie; only the resizing runs after the response.
+ */
+export async function warmMenuPhotos(language: Language): Promise<void> {
+  if (process.env.NODE_ENV !== "production" || !photoWarmer.due(Date.now())) return;
+  const menu = await loadActiveMenu(language);
+  if (!menu.ok) {
+    photoWarmer.retry();
+    return;
+  }
+  const urls = menuPhotos(readMenu(menu.data));
+  after(async () => {
+    const started = Date.now();
+    const count = await photoWarmer.warm(urls);
+    if (count > 0) console.info(`Photo warm-up: ${count} variants in ${Date.now() - started} ms`);
+  });
 }
 
 /** Fire-and-forget device report after the response is sent. */

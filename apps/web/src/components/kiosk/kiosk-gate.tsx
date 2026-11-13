@@ -6,7 +6,7 @@ import { DeviceReporter } from "@/components/device-reporter";
 import { gateState } from "@/lib/device/gate";
 import { DeviceAuthError } from "@/lib/device/session";
 import { formatNextOpening } from "@/lib/format/next-opening";
-import { getKioskConfig, type KioskConfig } from "@/lib/kiosk/core";
+import { getKioskConfig, type KioskConfig, warmMenuPhotos } from "@/lib/kiosk/core";
 
 import { AttractScreen } from "./attract-screen";
 import { KioskJourney, type KioskSettings } from "./journey/kiosk-journey";
@@ -50,6 +50,7 @@ export async function KioskDeviceGate() {
     }
   }
   if (config.kind !== "KIOSK") redirect("/kitchen");
+  if (gateOf(config) === "open") await warmMenuPhotos(config.store.defaultLanguage);
   return (
     <>
       <KioskGate config={config} />
