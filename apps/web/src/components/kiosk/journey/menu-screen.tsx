@@ -1,5 +1,3 @@
-import Image from "next/image";
-
 import { formatMoney } from "@/lib/format/money";
 import { basketUnits } from "@/lib/kiosk/basket";
 import type { Badge, Product, Section } from "@/lib/kiosk/menu-graph";
@@ -7,6 +5,7 @@ import { format, type Strings } from "@/lib/kiosk/strings";
 
 import { Close, Plus } from "../icons";
 import { currentTotals, type Journey, lastTotal } from "./journey-state";
+import { Photo } from "./photo";
 
 /** Pastel tints the prototype rotates through the categories (03-Menu). */
 const TINTS = ["bg-butter", "bg-wheat", "bg-sage", "bg-oat"];
@@ -210,14 +209,10 @@ function ProductCell({
     >
       <div className={`relative flex h-[240px] items-center justify-center overflow-hidden rounded-[30px] ${off ? "bg-ground" : tint}`}>
         {product.picture ? (
-          <Image
-            src={product.picture.url}
-            alt={product.picture.alt ?? ""}
-            fill
-            sizes="324px"
-            priority={priority}
-            className={`object-cover ${off ? "opacity-45 grayscale" : ""}`}
-          />
+          // The wrapper dims a sold-out photo: Photo's own opacity is its fade-in.
+          <div className={`absolute inset-0 ${off ? "opacity-45 grayscale" : ""}`}>
+            <Photo picture={product.picture} variant="thumb" preload={priority} />
+          </div>
         ) : (
           <span className="font-display text-[96px] font-semibold text-ink/25">{product.name.charAt(0)}</span>
         )}

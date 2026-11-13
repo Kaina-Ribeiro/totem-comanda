@@ -19,6 +19,7 @@ import { IdleGuard } from "./idle-guard";
 import { ItemScreen } from "./item-screen";
 import { currentTotals, initialJourney, journeyReducer, lastTotal, totalsKey } from "./journey-state";
 import { MenuScreen } from "./menu-screen";
+import { preloadMenuPhotos } from "./photo-preload";
 import { SuccessScreen } from "./success-screen";
 import { SwapSellSheet } from "./swap-sell-sheet";
 
@@ -97,6 +98,14 @@ export function KioskJourney({ settings, attract }: { settings: KioskSettings; a
     // `key` covers lines, coupon and language; `totalsAttempt` is the retry button.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [needsTotals, key, totalsAttempt]);
+
+  // Once the menu is here, all its photos go to the browser in the background,
+  // so a category or an item opens with its photo already loaded (COM-173).
+  const { menu } = journey;
+  useEffect(() => {
+    if (!menu) return;
+    return preloadMenuPhotos(menu).cancel;
+  }, [menu]);
 
   useEffect(() => {
     if (phase !== "attract" || language === settings.defaultLanguage) return;

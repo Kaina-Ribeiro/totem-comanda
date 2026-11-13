@@ -1,9 +1,9 @@
-import Image from "next/image";
 
 import { findProduct, type KioskMenu, type Product } from "@/lib/kiosk/menu-graph";
 import { format, type Strings } from "@/lib/kiosk/strings";
 
 import { productPrice } from "./menu-screen";
+import { Photo } from "./photo";
 
 /**
  * The swap-sell offer right after a product is added (SPEC 5.4, MODELS 5.17):
@@ -43,7 +43,7 @@ export function SwapSellSheet({
             >
               <span className="relative size-[210px] shrink-0 overflow-hidden rounded-[27px] bg-oat">
                 {target.picture ? (
-                  <Image src={target.picture.url} alt="" fill sizes="210px" className="object-cover" />
+                  <Photo picture={target.picture} variant="thumb" decorative />
                 ) : (
                   <span className="flex size-full items-center justify-center font-display text-[90px] font-semibold text-ink/25">
                     {target.name.charAt(0)}

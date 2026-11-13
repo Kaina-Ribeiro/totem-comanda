@@ -11,6 +11,9 @@ COPY apps/web ./
 ARG GIT_SHA=""
 ENV GIT_SHA=$GIT_SHA
 RUN npm run build
+# The image optimizer's cache: a Cubeship volume is mounted here so resized photos
+# survive a deploy (COM-173). Created in the image so the volume starts owned by `node`.
+RUN mkdir -p .next/cache/images
 
 FROM node:24-slim
 ARG GIT_SHA=""

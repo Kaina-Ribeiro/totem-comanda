@@ -3,8 +3,19 @@ import { afterEach, vi } from "vitest";
 // next/image needs the Next.js image config; a plain <img> is enough to test screens.
 vi.mock("next/image", async () => {
   const { createElement } = await import("react");
+  type Props = {
+    src: string;
+    alt: string;
+    sizes?: string;
+    width?: number;
+    className?: string;
+    onLoad?: () => void;
+    ref?: (node: HTMLImageElement | null) => void;
+  };
   return {
-    default: ({ src, alt }: { src: string; alt: string }) => createElement("img", { src, alt }),
+    default: ({ src, alt, sizes, width, className, onLoad, ref }: Props) =>
+      createElement("img", { src, alt, sizes, width, className, onLoad, ref }),
+    getImageProps: ({ src, sizes }: Props) => ({ props: { src, sizes, srcSet: undefined } }),
   };
 });
 
