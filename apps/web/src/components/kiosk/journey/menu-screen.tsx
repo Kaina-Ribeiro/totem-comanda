@@ -28,7 +28,8 @@ export function MenuScreen({
   journey,
   strings,
   onPickSection,
-  onPickProduct,
+  onOpenProduct,
+  onAddProduct,
   onOpenBasket,
   onCancel,
 }: {
@@ -36,7 +37,10 @@ export function MenuScreen({
   journey: Journey;
   strings: Strings;
   onPickSection: (sectionId: string) => void;
-  onPickProduct: (product: Product) => void;
+  /** The card: opens the product's screen. */
+  onOpenProduct: (product: Product) => void;
+  /** The +: adds the product, or opens it when it has choices to make. */
+  onAddProduct: (product: Product) => void;
   onOpenBasket: () => void;
   onCancel: () => void;
 }) {
@@ -105,7 +109,8 @@ export function MenuScreen({
               section={section}
               tint={tint}
               strings={strings}
-              onPickProduct={onPickProduct}
+              onOpenProduct={onOpenProduct}
+              onAddProduct={onAddProduct}
               first
             />
           )}
@@ -151,13 +156,15 @@ function SectionGrid({
   section,
   tint,
   strings,
-  onPickProduct,
+  onOpenProduct,
+  onAddProduct,
   first,
 }: {
   section: Section;
   tint: string;
   strings: Strings;
-  onPickProduct: (product: Product) => void;
+  onOpenProduct: (product: Product) => void;
+  onAddProduct: (product: Product) => void;
   first?: boolean;
 }) {
   return (
@@ -174,13 +181,21 @@ function SectionGrid({
               tint={tint}
               priority={first && index < 4}
               strings={strings}
-              onPress={() => onPickProduct(product)}
+              onOpen={() => onOpenProduct(product)}
+              onAdd={() => onAddProduct(product)}
             />
           ))}
         </div>
       )}
       {section.sections.map((sub) => (
-        <SectionGrid key={sub.id} section={sub} tint={tint} strings={strings} onPickProduct={onPickProduct} />
+        <SectionGrid
+          key={sub.id}
+          section={sub}
+          tint={tint}
+          strings={strings}
+          onOpenProduct={onOpenProduct}
+          onAddProduct={onAddProduct}
+        />
       ))}
     </>
   );
@@ -191,53 +206,61 @@ function ProductCell({
   tint,
   priority,
   strings,
-  onPress,
+  onOpen,
+  onAdd,
 }: {
   product: Product;
   tint: string;
   priority?: boolean;
   strings: Strings;
-  onPress: () => void;
+  onOpen: () => void;
+  onAdd: () => void;
 }) {
   const off = !product.available;
+  // The card opens the product; only the + adds it. Two sibling buttons (a
+  // button cannot hold another), the + laid over the card's name row.
   return (
-    <button
-      onClick={onPress}
-      disabled={off}
-      aria-label={off ? `${product.name}, ${strings["menu.unavailable"]}` : format(strings["menu.add"], { name: product.name })}
-      className="flex flex-col gap-[18px] text-left"
-    >
-      <div className={`relative flex h-[240px] items-center justify-center overflow-hidden rounded-[30px] ${off ? "bg-ground" : tint}`}>
-        {product.picture ? (
-          // The wrapper dims a sold-out photo: Photo's own opacity is its fade-in.
-          <div className={`absolute inset-0 ${off ? "opacity-45 grayscale" : ""}`}>
-            <Photo picture={product.picture} variant="thumb" preload={priority} />
-          </div>
-        ) : (
-          <span className="font-display text-[96px] font-semibold text-ink/25">{product.name.charAt(0)}</span>
-        )}
-        {off ? (
-          <span className="absolute top-[18px] left-[18px] rounded-[18px] bg-surface px-[18px] py-[9px] text-[21px] font-bold text-muted">
-            {strings["menu.unavailable"]}
-          </span>
-        ) : (
-          product.badges.length > 0 && <Badges badges={product.badges} />
-        )}
-      </div>
-      <div className="flex items-start justify-between gap-[15px]">
-        <div className="flex flex-col gap-[6px]">
+    <div className="relative">
+      <button
+        onClick={onOpen}
+        disabled={off}
+        aria-label={off ? `${product.name}, ${strings["menu.unavailable"]}` : product.name}
+        className="flex w-full flex-col gap-[18px] text-left"
+      >
+        <div className={`relative flex h-[240px] items-center justify-center overflow-hidden rounded-[30px] ${off ? "bg-ground" : tint}`}>
+          {product.picture ? (
+            // The wrapper dims a sold-out photo: Photo's own opacity is its fade-in.
+            <div className={`absolute inset-0 ${off ? "opacity-45 grayscale" : ""}`}>
+              <Photo picture={product.picture} variant="thumb" preload={priority} />
+            </div>
+          ) : (
+            <span className="font-display text-[96px] font-semibold text-ink/25">{product.name.charAt(0)}</span>
+          )}
+          {off ? (
+            <span className="absolute top-[18px] left-[18px] rounded-[18px] bg-surface px-[18px] py-[9px] text-[21px] font-bold text-muted">
+              {strings["menu.unavailable"]}
+            </span>
+          ) : (
+            product.badges.length > 0 && <Badges badges={product.badges} />
+          )}
+        </div>
+        <div className={`flex flex-col gap-[6px] ${off ? "" : "pr-[81px]"}`}>
           <div className={`text-[30px] leading-[1.2] font-bold ${off ? "text-muted" : ""}`}>{product.name}</div>
           <div className={`text-[28.5px] font-semibold ${off ? "text-muted" : "text-price"}`}>
             {off ? strings["menu.unavailable"] : productPrice(product, strings)}
           </div>
         </div>
-        {!off && (
-          <span className="flex size-[66px] shrink-0 items-center justify-center rounded-full border-[3px] border-ink">
-            <Plus size={30} strokeWidth={2.6} />
-          </span>
-        )}
-      </div>
-    </button>
+      </button>
+      {!off && (
+        <button
+          onClick={onAdd}
+          aria-label={format(strings["menu.add"], { name: product.name })}
+          className="absolute top-[258px] right-0 flex size-[66px] items-center justify-center rounded-full border-[3px] border-ink bg-surface"
+        >
+          <Plus size={30} strokeWidth={2.6} />
+        </button>
+      )}
+    </div>
   );
 }
 

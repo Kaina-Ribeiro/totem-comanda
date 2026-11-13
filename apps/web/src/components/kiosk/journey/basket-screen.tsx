@@ -6,7 +6,7 @@ import { findProduct, type KioskMenu, nameOf } from "@/lib/kiosk/menu-graph";
 import { format, type Strings } from "@/lib/kiosk/strings";
 
 import { ChevronLeft, Minus, Plus } from "../icons";
-import { currentTotals, currentTotalsFailure, type Journey, lastTotal } from "./journey-state";
+import { currentTotals, currentTotalsFailure, type Journey, lastLineUnits, lastTotal } from "./journey-state";
 import { Photo } from "./photo";
 
 export { CancelDialog } from "./cancel-dialog";
@@ -45,7 +45,12 @@ export function BasketScreen({
   const failed = currentTotalsFailure(journey);
   const stale = !totals && !failed;
   const empty = journey.basket.length === 0;
-  const units = totals ? lineUnits(journey.basket, totals) : null;
+  // While re-pricing, each line keeps the last price Go gave it (no flash); the total says it is updating.
+  const units = totals
+    ? lineUnits(journey.basket, totals)
+    : stale
+      ? lastLineUnits(journey)
+      : new Map<string, CheckItem | null>();
   const shown = totals?.total ?? lastTotal(journey);
 
   return (
@@ -78,7 +83,7 @@ export function BasketScreen({
                 key={line.guid}
                 line={line}
                 menu={menu}
-                unit={units?.get(line.guid) ?? null}
+                unit={units.get(line.guid) ?? null}
                 strings={strings}
                 onEdit={() => onEdit(line)}
                 onQuantity={(quantity) => onQuantity(line, quantity)}

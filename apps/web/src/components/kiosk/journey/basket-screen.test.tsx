@@ -46,6 +46,25 @@ describe("BasketScreen (v2)", () => {
     expect(screen.getByText("10% de boas-vindas")).toBeTruthy();
   });
 
+  it("keeps the other lines' last prices while a removal is re-priced", () => {
+    const journey = journeyAt(
+      { type: "addLine", line: burger },
+      { type: "swapDone" },
+      { type: "crossSellDismissed" },
+      { type: "addLine", line: line("2010") },
+      { type: "openBasket" },
+    );
+    const priced = journeyReducer(
+      journey,
+      pricedAt(journey, 31, { orderItems: [unit("1001", 11.5), unit("1001", 11.5), unit("2010", 8)] }),
+    );
+    renderBasket(journeyReducer(priced, { type: "removeLine", guid: burger.guid }));
+    const price = screen.getByText(/^R\$\s8,00$/);
+    expect(price.className).not.toContain("opacity-0");
+    expect(screen.getByText(strings["basket.updating"])).toBeTruthy();
+    expect(screen.queryByText(/11,50/)).toBeNull();
+  });
+
   it("pays only once Go priced this basket", () => {
     const journey = journeyAt({ type: "addLine", line: line("2010") }, { type: "crossSellDismissed" }, { type: "openBasket" });
     renderBasket(journey);

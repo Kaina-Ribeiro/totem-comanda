@@ -243,28 +243,20 @@ npm run typecheck && npm run lint && npm test
 
 ## Task tracking
 
-Work is tracked in Linear, Jira-style (Team → Squad → Epic → Story). Use the `linear-backlog`
-skill (`.claude/skills/linear-backlog`) for any backlog change: types, squads, points, splitting.
+**No tracker** (Kai, 13 Nov 2026): Linear is abandoned (the free plan ran out of issues) and is not
+read or updated any more. Do not use the `linear-backlog` skill.
 
-| Item | Value |
-|:--|:--|
-| Team | Comanda (`COM`); the workspace also holds another product's team (`BOOK`) |
-| Squads | Free plan, so labels in the `Squad` group: `Web` = `apps/web` (Kai), `Core` = the Core API (Bruno) |
-| Epics | Linear projects `E0 · Fundação` … `E5 · Piloto`, one per phase; pass ids (`P-COM-12` = E0) |
-| Types | `Type` group: `Story`, `Bug`, `Tech Debt`, `Spike`; Fibonacci points, split over 8 |
-| Issue language | pt-BR |
-
-Phase 0 stories are COM-5 to COM-13 (former GAB-n, same numbers). Name branches and commits per the
-release flow below (`feat/COM-9-short-name`, `feat(COM-9): summary`), not Linear's suggested branch
-name, and move the issue as work progresses. Issues with the `Core` label are Bruno's back-end work (e.g. COM-12): do not implement them.
-
-Batch Linear updates to save tokens:
-- At the start of a plan, move its story to In Progress (one call). Nothing else in Linear mid-work.
-- While working, append each bug, tech debt or follow-up found to `docs/backlog-pending.md`: type,
-  pt-BR title, 1–2 lines of context, related story id, and whether it was fixed in this plan.
-- At the end of the plan, hand that file to one Haiku subagent (fresh, short brief, `effort: low`;
-  Sonnet only if descriptions need real writing). It creates, closes and moves the issues per the
-  `linear-backlog` skill and reports the ids in ≤5 lines. Check the result, then clear the file.
+- Ticket ids keep the `COM-n` shape, because the release kit's `conventions` check needs one in
+  the branch and the PR title. A new piece of work takes the next number after the highest `COM-n`
+  in git: `git log --all --format=%s | grep -oE "COM-[0-9]+" | sort -t- -k2 -n | tail -1`, plus one
+  (COM-175 was the first after Linear).
+- Name branches and commits per the release flow below (`fix/COM-175-short-name`,
+  `fix(COM-175): summary`). The PR description says what the work is; it is the only record.
+- Bugs, tech debt and follow-ups found while working go in `docs/backlog-pending.md` (type, pt-BR
+  title, 1–2 lines of context, related id, fixed or not). It is the backlog now: remove an entry
+  when its fix merges.
+- Issues numbered before COM-175 with Bruno's back-end work (e.g. COM-12) stay his: do not
+  implement the Core API.
 
 ## Release flow — always follow this
 
@@ -288,6 +280,9 @@ Follow these rules exactly. If a request conflicts with them, stop and say which
   The version-lines ruleset also has the admin role as bypass (`always`, 4 Nov 2026), so the
   workflow can delete a shipped `release/*` or `hotfix/*` branch. Never reapply `.github/rulesets/*.json` here as they are. Kai manages tokens himself: never ask
   for, read or handle a token value.
+- GitHub auto-merge is allowed on the repo (Kai, 13 Nov 2026): a work PR into `release/*` or
+  `hotfix/*` gets squash auto-merge when it opens, so it lands on green CI. Merged branches are not
+  deleted by GitHub (`delete_branch_on_merge` is off): delete them after the merge.
 - Deploy is Cubeship (`deploy/cubeship`), not Jenkins. The apps `comanda/production/web` and
   `comanda/production/mock` build from a tag (`ref: v0.1.0` since 31 Oct 2026), never a branch.
   On release day prod takes the open line's last rc, with Kai's confirmation: Actions → Release →
@@ -323,7 +318,7 @@ Follow these rules exactly. If a request conflicts with them, stop and say which
 ### Naming
 - Branch: `<type>/<TICKET>-short-name`. Types: feat, fix, chore, refactor, perf, docs, test, ci, build, revert.
 - PR title / commit: Conventional Commits → `type(TICKET): summary`, imperative, lowercase.
-  Here the ticket is the Linear id: `feat/COM-9-heartbeat`, `feat(COM-9): send device heartbeat`.
+  Here the ticket is a `COM-n` id (see Task tracking): `feat/COM-9-heartbeat`, `feat(COM-9): send device heartbeat`.
 
 ### Procedures
 1. **Feature/fix:** find the open release it ships in (`release/vX.Y` not merged into master;
