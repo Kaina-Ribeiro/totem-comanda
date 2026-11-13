@@ -10,6 +10,6 @@ Pointers it relies on:
 - The API contract: `contract/openapi.yaml` and `contract/README.md`.
 - The pilot: `docs/pilot-v2/SPEC.md`.
 - Running the project locally: `README.md`. The release flow in full: `RELEASING.md`.
-- The backlog skill (Linear): `.claude/skills/linear-backlog/SKILL.md`.
+- The backlog: `docs/backlog-pending.md` (no tracker since 13 Nov 2026; see CLAUDE.md).
 
 Do not copy rules into this file: change `CLAUDE.md` instead, so the two can never disagree.
