@@ -15,5 +15,7 @@ export default defineConfig({
     // everything else runs in Node.
     include: ["src/**/*.test.ts", "src/**/*.test.tsx", "mock/**/*.test.ts"],
     setupFiles: ["./test/setup.ts"],
+    // The mock seeds only the MODELS 5.20 reference menu, which the tests assert on.
+    env: { MOCK_MENU: "reference" },
   },
 });

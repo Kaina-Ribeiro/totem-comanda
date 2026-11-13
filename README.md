@@ -145,6 +145,8 @@ through. With the mock they point past Prism, at the mock's own port.
 
 The mock reads its own variables when it starts: `MOCK_PORT` (4020), `PRISM_PORT` (4010),
 `MOCK_PAYMENT_OUTCOME` (`APPROVED`), `MOCK_PAYMENT_DELAY_MS` (3000).
+Its menu starts with Abigail Coffee's (52 items with photos, invented prices) in front of the
+MODELS 5.20 reference menu; `MOCK_MENU=reference` leaves only the reference menu (the tests run so).
 
 ## Run against the real Core API
 

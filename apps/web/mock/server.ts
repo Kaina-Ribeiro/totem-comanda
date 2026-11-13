@@ -29,7 +29,7 @@ import { fileURLToPath } from "node:url";
 
 import { faultCode, faultReply } from "./faults.ts";
 import { problem, type Reply, type Request, type Route, type Schemas } from "./http.ts";
-import { SEED_MEDIA } from "./media.ts";
+import { mediaType, SEED_MEDIA } from "./media.ts";
 import { currentPace } from "./pace.ts";
 import { forceOutcome, publicSession, sweep } from "./v2/payments.ts";
 import { adminRoutes } from "./v2/routes-admin.ts";
@@ -47,7 +47,6 @@ import {
 
 const MOCK_PORT = Number(process.env.MOCK_PORT ?? 4020);
 const PRISM_PORT = Number(process.env.PRISM_PORT ?? 4010);
-const ASSETS = new URL("../../../docs/prototype/assets/", import.meta.url);
 
 const routes: Route[] = [
   ...guestRoutes,
@@ -222,8 +221,9 @@ async function serveMedia(path: string, res: ServerResponse): Promise<boolean> {
   const file = name && (state.media.get(name) ?? SEED_MEDIA[name]);
   if (!file) return false;
   try {
-    const bytes = typeof file === "string" ? await readFile(new URL(file, ASSETS)) : file.bytes;
-    const type = typeof file === "string" ? "image/jpeg" : file.type;
+    const seed = file instanceof URL;
+    const bytes = seed ? await readFile(file) : file.bytes;
+    const type = seed ? mediaType(name) : file.type;
     res.writeHead(200, { "Content-Type": type, "Cache-Control": "public, max-age=3600" });
     res.end(bytes);
     return true;

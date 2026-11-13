@@ -175,6 +175,9 @@ npm run mock:orders -- 3 --days-ago 7   # ...on the same weekday last week (Iní
 # /kiosk). In dev with the mock, "Totem" and "Cozinha" on / pair this browser as the mock's
 # device of that kind first.
 # Extend apps/web/mock with the operations each story needs; Prism flags any drift from the contract.
+# The mock's menu is Abigail Coffee's (mock/v2/seed-abigail.ts, photos in mock/media/abigail, invented
+# prices) in front of the MODELS 5.20 reference menu; MOCK_MENU=reference keeps only the reference menu,
+# which is how vitest runs (vitest.config.mts), so tests assert on MODELS 5.20 alone.
 # Mercado Pago is simulated: MOCK_PAYMENT_OUTCOME=APPROVED|DECLINED|EXPIRED|NONE (default APPROVED)
 # after MOCK_PAYMENT_DELAY_MS (3000); POST /__mock/payments/{id} {"outcome": …} decides one session.
 # To see a Pix or card outcome, run the mock with MOCK_PAYMENT_OUTCOME=NONE and decide the waiting
