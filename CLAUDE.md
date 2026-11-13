@@ -280,6 +280,9 @@ Follow these rules exactly. If a request conflicts with them, stop and say which
   The version-lines ruleset also has the admin role as bypass (`always`, 4 Nov 2026), so the
   workflow can delete a shipped `release/*` or `hotfix/*` branch. Never reapply `.github/rulesets/*.json` here as they are. Kai manages tokens himself: never ask
   for, read or handle a token value.
+- GitHub auto-merge is allowed on the repo (Kai, 13 Nov 2026): a work PR into `release/*` or
+  `hotfix/*` gets squash auto-merge when it opens, so it lands on green CI. Merged branches are not
+  deleted by GitHub (`delete_branch_on_merge` is off): delete them after the merge.
 - Deploy is Cubeship (`deploy/cubeship`), not Jenkins. The apps `comanda/production/web` and
   `comanda/production/mock` build from a tag (`ref: v0.1.0` since 31 Oct 2026), never a branch.
   On release day prod takes the open line's last rc, with Kai's confirmation: Actions → Release →
