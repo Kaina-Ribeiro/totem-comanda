@@ -1,5 +1,5 @@
 import type { SubmitOrderResponse, TotalsResponse } from "@/app/kiosk/actions";
-import type { BasketLine } from "@/lib/kiosk/basket";
+import { type BasketLine, type CheckItem, lineUnits } from "@/lib/kiosk/basket";
 import type { Result } from "@/lib/kiosk/core";
 import { findProduct, type KioskMenu } from "@/lib/kiosk/menu-graph";
 import type { Language, Strings } from "@/lib/kiosk/strings";
@@ -23,8 +23,8 @@ export type Journey = {
   coupon: string | null;
   /** Go's basket for this journey, from the first `POST /v2/totals`. */
   basketId: string | null;
-  /** Go's latest totals, for the basket they were asked for (`key`). */
-  totals: { key: string; result: Result<TotalsResponse> } | null;
+  /** Go's latest totals, for the basket they were asked for (`key`, and its lines in `basket`). */
+  totals: { key: string; basket: BasketLine[]; result: Result<TotalsResponse> } | null;
   /** The `Idempotency-Key` that places this basket; kept while the basket stays the same. */
   checkout: { key: string; orderKey: string } | null;
   /** What to offer after an add: the product's swap sell, then its cross-sells. */
@@ -169,7 +169,7 @@ export function journeyReducer(state: Journey, action: JourneyAction): Journey {
       // A late answer for an older basket is dropped; Go's basket id is kept either way.
       const basketId = action.result.ok ? action.result.data.basketId : state.basketId;
       if (action.key !== totalsKey(state)) return { ...state, basketId };
-      return { ...state, basketId, totals: { key: action.key, result: action.result } };
+      return { ...state, basketId, totals: { key: action.key, basket: state.basket, result: action.result } };
     }
     case "basketLost":
       return { ...state, basketId: null, coupon: null, totals: null, checkout: null };
@@ -208,6 +208,15 @@ export function currentTotalsFailure(state: Journey): Extract<Result<TotalsRespo
 /** The last total Go priced for this journey (for the basket bar while re-pricing, and journey events). */
 export function lastTotal(state: Journey): number | null {
   return state.totals?.result.ok ? state.totals.result.data.total : null;
+}
+
+/**
+ * Each line's unit as Go last priced it, by line guid: the basket screen keeps
+ * showing them while a changed basket is re-priced, instead of blanking every
+ * line. A line Go has not priced yet has no entry.
+ */
+export function lastLineUnits(state: Journey): Map<string, CheckItem | null> {
+  return state.totals?.result.ok ? lineUnits(state.totals.basket, state.totals.result.data) : new Map();
 }
 
 /** After a product is added: its swap sell first, else its cross-sells. */

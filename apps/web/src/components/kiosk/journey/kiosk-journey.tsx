@@ -310,8 +310,9 @@ export function KioskJourney({ settings, attract }: { settings: KioskSettings; a
             journey={journey}
             strings={strings}
             onPickSection={(sectionId) => dispatch({ type: "pickSection", sectionId })}
-            onPickProduct={(product) => {
-              // Products with nothing to choose go straight in.
+            onOpenProduct={(product) => dispatch({ type: "openItem", productId: product.id })}
+            onAddProduct={(product) => {
+              // The + puts a product with nothing to choose straight in.
               if (product.groups.length === 0) {
                 dispatch({
                   type: "addLine",
